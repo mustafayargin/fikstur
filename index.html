@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fikstür Tahmin Paneli Pro</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div>
+          <div class="brand-card">
+            <div class="brand-icon">⚽</div>
+            <div>
+              <h1>Fikstür</h1>
+              <p>Süper Lig Tahmin Paneli</p>
+            </div>
+          </div>
+
+          <nav class="nav-tabs" id="navTabs">
+            <button class="nav-tab active" data-tab="dashboard">
+              Genel Bakış
+            </button>
+            <button class="nav-tab" data-tab="seasons">
+              Sezonlar & Takımlar
+            </button>
+            <button class="nav-tab admin-only" data-tab="players">
+              Kişiler
+            </button>
+            <button class="nav-tab" data-tab="weeks">Haftalar</button>
+            <button class="nav-tab" data-tab="matches">Maçlar</button>
+            <button class="nav-tab" data-tab="predictions">Tahminler</button>
+            <button class="nav-tab" data-tab="standings">Puan Durumu</button>
+            <button class="nav-tab" data-tab="stats">İstatistikler</button>
+            <button class="nav-tab admin-only" data-tab="backup">
+              Yedekleme
+            </button>
+          </nav>
+          <div class="role-switch-card session-card" id="sessionCard">
+            <div>
+              <div class="role-switch-title">Oturum</div>
+              <div class="small-meta" id="sessionSummaryText">
+                Giriş yapılmadı.
+              </div>
+            </div>
+            <div class="session-actions">
+              <button class="secondary full" type="button" id="logoutBtn">
+                Çıkış Yap
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="sidebar-footer">
+          <div class="mini-note">
+            Veriler tarayıcıda saklanır. İstersen ayrıca bilgisayarındaki bir
+            JSON dosyasına otomatik kaydedebilirsin.
+          </div>
+        </div>
+      </aside>
+
+      <main class="content">
+        <section class="tab-panel active" id="tab-dashboard">
+          <div class="page-header">
+            <div>
+              <h2>Genel Bakış</h2>
+              <p>
+                Aktif sezon, haftalık durum, eksik tahminler ve liderlik tablosu
+                burada.
+              </p>
+            </div>
+
+            <div class="header-actions double-selects">
+              <select id="dashboardSeasonSelect"></select>
+              <select id="dashboardWeekSelect"></select>
+            </div>
+          </div>
+
+          <div class="stats-grid" id="statsGrid"></div>
+
+          <section class="card dashboard-sync-card">
+            <div class="card-header">
+              <h3>Akıllı Güncelleme</h3>
+            </div>
+            <div class="dashboard-sync-grid">
+              <div>
+                <div class="small-meta">
+                  Sistem sadece aktif sezon ve aktif hafta üzerinden çalışır.
+                  Yanlış hafta ya da yanlış sezon seçme riski olmaz.
+                </div>
+                <div class="dashboard-sync-meta">
+                  <span class="badge gray" id="dashboardActiveSeasonBadge"
+                    >Aktif sezon: -</span
+                  >
+                  <span class="badge gray" id="dashboardActiveWeekBadge"
+                    >Aktif hafta: -</span
+                  >
+                </div>
+              </div>
+              <div class="inline-actions">
+                <button class="secondary" id="dashboardSyncWeekBtn">
+                  Aktif Haftayı Güncelle
+                </button>
+                <button class="secondary" id="dashboardSyncSeasonBtn">
+                  Tüm Sezonu Güncelle
+                </button>
+              </div>
+            </div>
+            <div class="status-note" id="dashboardSyncStatus">Hazır.</div>
+          </section>
+
+          <section class="card admin-sync-overview-card admin-only is-open" id="adminSyncOverviewCard">
+            <div class="card-header admin-sync-header-row">
+              <div>
+                <h3>Senkron Durumu</h3>
+                <span class="small-meta">Admin tarafında son durum özeti</span>
+              </div>
+              <button
+                type="button"
+                class="secondary admin-sync-toggle-btn"
+                id="adminSyncToggleBtn"
+                aria-expanded="true"
+                aria-controls="adminSyncOverviewBody"
+              >
+                Gizle
+              </button>
+            </div>
+            <div class="admin-sync-overview-body" id="adminSyncOverviewBody">
+              <div class="admin-sync-overview-grid">
+                <div class="admin-sync-stat">
+                  <span class="admin-sync-label">Son işlem</span>
+                  <strong id="adminSyncLastAction">Hazır.</strong>
+                </div>
+                <div class="admin-sync-stat">
+                  <span class="admin-sync-label">Başarılı son senkron</span>
+                  <strong id="adminSyncLastSuccess">Henüz yok</strong>
+                </div>
+                <div class="admin-sync-stat">
+                  <span class="admin-sync-label">Bekleyen tahmin</span>
+                  <strong id="adminSyncQueueCount">0</strong>
+                </div>
+                <div class="admin-sync-stat">
+                  <span class="admin-sync-label">Son işlemde etkilenen maç</span>
+                  <strong id="adminSyncUpdatedMatches">0</strong>
+                </div>
+              </div>
+              <div class="status-note admin-sync-last-error">
+                <strong>Son hata:</strong> <span id="adminSyncLastError">Yok</span>
+              </div>
+              <div class="status-note" id="adminSyncFooter">Henüz senkron yapılmadı.</div>
+            </div>
+          </section>
+
+          <div class="dashboard-grid">
+            <section class="card">
+              <div class="card-header">
+                <h3>Seçili Haftadaki Maçlar</h3>
+              </div>
+              <div id="dashboardMatches"></div>
+            </section>
+
+            <section class="card missing-predictions">
+              <div class="card-header">
+                <h3>Eksik Tahminler</h3>
+              </div>
+              <div id="missingPredictions"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="tab-seasons">
+          <div class="page-header">
+            <div>
+              <h2>Sezonlar & Takımlar</h2>
+              <p>
+                Sezon oluştur, takım listesini yönet ve istersen API ile fikstür
+                çek.
+              </p>
+            </div>
+            <div class="header-actions">
+              <select id="seasonManagerSelect"></select>
+            </div>
+          </div>
+
+          <div class="dashboard-grid standings-layout">
+            <section class="card form-card">
+              <div class="card-header"><h3>Yeni Sezon</h3></div>
+              <div class="form-grid three">
+                <div class="field">
+                  <label for="seasonName">Sezon adı</label>
+                  <input
+                    type="text"
+                    id="seasonName"
+                    placeholder="Örn: 2025-2026"
+                  />
+                </div>
+                <div class="field">
+                  <label for="seasonLeague">Lig adı</label>
+                  <input type="text" id="seasonLeague" value="Süper Lig" />
+                </div>
+                <div class="field button-field">
+                  <button id="addSeasonBtn">Sezon Ekle</button>
+                </div>
+              </div>
+            </section>
+
+            <section class="card form-card">
+              <div class="card-header"><h3>Takım Ekle</h3></div>
+              <div class="form-grid three">
+                <div class="field">
+                  <label for="seasonTeamName">Takım adı</label>
+                  <input
+                    type="text"
+                    id="seasonTeamName"
+                    placeholder="Örn: Kocaelispor"
+                  />
+                </div>
+                <div class="field">
+                  <label for="seasonTeamSlug">Logo dosya adı</label>
+                  <input
+                    type="text"
+                    id="seasonTeamSlug"
+                    placeholder="Örn: kocaelispor"
+                  />
+                </div>
+                <div class="field button-field">
+                  <button id="addSeasonTeamBtn">Takım Ekle</button>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="dashboard-grid standings-layout">
+            <section class="card">
+              <div class="card-header"><h3>Sezon Takımları</h3></div>
+              <div id="seasonTeamsList"></div>
+            </section>
+            <section class="card">
+              <div class="card-header"><h3>API ile İçeri Aktar</h3></div>
+              <div class="stack-actions">
+                <div class="field">
+                  <label for="apiSeasonText">API sezon etiketi</label>
+                  <input
+                    type="text"
+                    id="apiSeasonText"
+                    placeholder="Örn: 2025-2026"
+                  />
+                </div>
+                <div class="small-meta">
+                  TheSportsDB free API ile sezon fikstürü çekilir. İstersen aynı
+                  sezon için sonuç güncellemesi de yapılır.
+                </div>
+                <div class="inline-actions compact">
+                  <button class="secondary" id="apiImportFixturesBtn">
+                    Fikstürü Çek
+                  </button>
+                  <button class="secondary" id="apiUpdateResultsBtn">
+                    Sonuçları Güncelle
+                  </button>
+                </div>
+                <div class="status-note" id="apiStatus">Hazır.</div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="tab-players">
+          <div class="page-header">
+            <div>
+              <h2>Kişiler</h2>
+              <p>Tahmin yapacak kişileri buradan ekleyip düzenleyebilirsin.</p>
+            </div>
+          </div>
+
+          <div class="card form-card">
+            <div class="form-grid three">
+              <div class="field">
+                <label for="playerName">Kişi adı</label>
+                <input type="text" id="playerName" placeholder="Örn: Veli" />
+              </div>
+              <div class="field">
+                <label for="playerPassword">Şifre</label>
+                <input
+                  type="text"
+                  id="playerPassword"
+                  placeholder="Örn: 1234"
+                />
+              </div>
+              <div class="field button-field">
+                <button id="addPlayerBtn">Kişi Ekle</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3>Kayıtlı Kişiler</h3>
+            </div>
+            <div id="playersList"></div>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="tab-weeks">
+          <div class="page-header">
+            <div>
+              <h2>Haftalar</h2>
+              <p>
+                Aktif sezona hafta oluşturabilir, aktif haftayı seçebilir ve
+                durum takibi yapabilirsin.
+              </p>
+            </div>
+            <div class="header-actions double-selects">
+              <select id="weekSeasonSelect"></select>
+              <select id="weekActiveSelect"></select>
+            </div>
+          </div>
+
+          <div class="card form-card">
+            <div class="form-grid three">
+              <div class="field">
+                <label for="weekNumber">Hafta no</label>
+                <input
+                  type="number"
+                  id="weekNumber"
+                  min="1"
+                  placeholder="Örn: 1"
+                />
+              </div>
+              <div class="field">
+                <label for="weekStatus">Durum</label>
+                <select id="weekStatus">
+                  <option value="aktif">Aktif</option>
+                  <option value="hazirlaniyor">Hazırlanıyor</option>
+                  <option value="tamamlandi">Tamamlandı</option>
+                </select>
+              </div>
+              <div class="field button-field">
+                <button id="addWeekBtn">Hafta Ekle</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="dashboard-grid standings-layout">
+            <section class="card stack-actions">
+              <div class="card-header">
+                <h3>Seçili Haftayı API ile Güncelle</h3>
+              </div>
+              <div class="field">
+                <label for="weekApiSeasonText">API sezon etiketi</label>
+                <input
+                  type="text"
+                  id="weekApiSeasonText"
+                  placeholder="Boşsa seçili sezon adı kullanılır"
+                />
+              </div>
+              <div class="small-meta">
+                Seçili hafta API'den tekrar okunur. Gelecek maçlarda tarih-saat
+                güncellenir, oynanmış maçlarda skorlar işlenir.
+              </div>
+              <div class="inline-actions compact">
+                <button class="secondary" id="apiSyncWeekBtn">
+                  Seçili Haftayı Güncelle
+                </button>
+              </div>
+              <div class="status-note" id="weekApiStatus">Hazır.</div>
+            </section>
+
+            <section class="card">
+              <div class="card-header">
+                <h3>Hafta Listesi</h3>
+              </div>
+              <div id="weeksList"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="tab-matches">
+          <div class="page-header">
+            <div>
+              <h2>Maçlar</h2>
+              <p>Seçilen sezonda haftaya maç ekle, sonuçları işle.</p>
+            </div>
+            <div class="header-actions double-selects">
+              <select id="matchSeasonSelect"></select>
+              <select id="matchesFilterWeek"></select>
+            </div>
+          </div>
+
+          <div class="card form-card">
+            <div class="form-grid four">
+              <div class="field">
+                <label for="matchWeekSelect">Hafta</label>
+                <select id="matchWeekSelect"></select>
+              </div>
+              <div class="field">
+                <label for="homeTeam">Ev sahibi</label>
+                <select id="homeTeam"></select>
+              </div>
+              <div class="field">
+                <label for="awayTeam">Deplasman</label>
+                <select id="awayTeam"></select>
+              </div>
+              <div class="field">
+                <label for="matchDate">Maç tarihi</label>
+                <input type="datetime-local" id="matchDate" />
+              </div>
+            </div>
+            <div class="form-actions">
+              <button id="addMatchBtn">Maç Ekle</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3>Haftanın Maçları</h3>
+            </div>
+            <div id="matchesList"></div>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="tab-predictions">
+          <div class="page-header">
+            <div>
+              <h2>Tahminler</h2>
+              <p>
+                Seçili hafta için tüm kullanıcı tahminlerini tek ekrandan gir.
+              </p>
+            </div>
+            <div class="header-actions prediction-header-actions">
+              <div class="double-selects">
+                <select id="predictionSeasonSelect"></select>
+                <select id="predictionWeekSelect"></select>
+              </div>
+              <button id="toggleShareModeBtn" type="button" class="secondary share-mode-btn">Paylaşım Modu: Kapalı</button>
+            </div>
+          </div>
+
+          <div id="predictionShareToolbar" class="share-toolbar hidden" aria-hidden="true">
+            <div class="share-toolbar-group">
+              <span class="share-toolbar-label">Görünüm</span>
+              <div class="share-segmented" role="group" aria-label="Paylaşım görünümü">
+                <button id="shareViewPreBtn" type="button" class="share-segment-btn is-active">Maç Öncesi</button>
+                <button id="shareViewPostBtn" type="button" class="share-segment-btn">Maç Sonrası</button>
+              </div>
+            </div>
+            <label class="share-toggle-inline" for="shareCompactToggle">
+              <input id="shareCompactToggle" type="checkbox" checked />
+              <span>Sıkı görünüm</span>
+            </label>
+            <label class="share-toggle-inline" for="shareHideEmptyToggle">
+              <input id="shareHideEmptyToggle" type="checkbox" />
+              <span>Boşları soluk göster</span>
+            </label>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3>Tahmin Tablosu</h3>
+              <span class="small-meta"
+                >Değişiklikler otomatik kaydedilir. Haftanın ilk maçına 10 dk kala tüm tahminler kilitlenir.</span
+              >
+            </div>
+            <div id="predictionLockBanner" class="prediction-lock-banner is-hidden"></div>
+            <div id="predictionsTable"></div>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="tab-standings">
+          <div class="page-header">
+            <div>
+              <h2>Puan Durumu</h2>
+              <p>Genel toplam, haftalık puanlar ve başarı istatistikleri.</p>
+            </div>
+            <div class="header-actions double-selects">
+              <select id="standingsSeasonSelect"></select>
+              <select id="standingsWeekSelect"></select>
+            </div>
+          </div>
+
+          <div class="dashboard-grid standings-layout">
+            <section class="card">
+              <div class="card-header">
+                <h3>Genel Sıralama</h3>
+              </div>
+              <div id="standingsTable"></div>
+            </section>
+            <section class="card">
+              <div class="card-header">
+                <h3>Seçili Hafta Puanları</h3>
+              </div>
+              <div id="weeklyStandings"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="tab-stats">
+          <div class="page-header">
+            <div>
+              <h2>İstatistikler</h2>
+              <p>Detaylı başarı verileri ve sezon şampiyonluğu.</p>
+            </div>
+            <div class="header-actions">
+              <select id="statsSeasonSelect"></select>
+            </div>
+          </div>
+
+          <div class="stats-grid" id="advancedStatsGrid"></div>
+          <div class="dashboard-grid standings-layout">
+            <section class="card">
+              <div class="card-header"><h3>Başarı Özeti</h3></div>
+              <div id="insightsList"></div>
+            </section>
+            <section class="card champion-card" id="championCard"></section>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="tab-backup">
+          <div class="page-header">
+            <div>
+              <h2>Yedekleme</h2>
+              <p>
+                JSON dışa aktar, içe aktar ve yerel dosya bağlantısını yönet.
+              </p>
+            </div>
+          </div>
+
+          <div class="dashboard-grid backup-layout">
+            <section class="card stack-actions">
+              <div class="card-header"><h3>JSON Yedeği</h3></div>
+              <button id="exportBtn">Yedeği İndir</button>
+              <label class="file-label" for="importFile">Yedek Yükle</label>
+              <input
+                type="file"
+                id="importFile"
+                accept="application/json"
+                hidden
+              />
+            </section>
+
+            <section class="card stack-actions">
+              <div class="card-header"><h3>Yerel Dosya Kaydı</h3></div>
+              <button class="secondary" id="connectLocalFileBtn">
+                Yerel Dosya Bağla
+              </button>
+              <button class="secondary" id="saveLocalFileBtn">
+                Şimdi Dosyaya Yaz
+              </button>
+              <div class="status-note" id="localSaveStatus">Hazır.</div>
+            </section>
+
+            <section class="card stack-actions">
+              <div class="card-header"><h3>Temizlik</h3></div>
+              <button class="danger" id="resetBtn">Tüm Verileri Sıfırla</button>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <nav class="mobile-bottom-nav" id="mobileBottomNav">
+      <button class="mobile-nav-btn active" type="button" data-tab="dashboard">
+        Genel
+      </button>
+      <button class="mobile-nav-btn" type="button" data-tab="predictions">
+        Tahminler
+      </button>
+      <button class="mobile-nav-btn" type="button" data-tab="standings">
+        Puan
+      </button>
+      <button
+        class="mobile-nav-btn more-trigger"
+        type="button"
+        id="mobileMoreBtn"
+      >
+        Daha
+      </button>
+    </nav>
+
+    <div class="mobile-more-sheet" id="mobileMoreSheet">
+      <div class="mobile-more-backdrop" id="mobileMoreBackdrop"></div>
+      <div class="mobile-more-panel">
+        <div class="mobile-more-header">
+          <h3>Daha Fazla Sayfa</h3>
+          <button class="secondary small" type="button" id="mobileMoreCloseBtn">
+            Kapat
+          </button>
+        </div>
+        <div class="mobile-more-grid" id="mobileMoreGrid">
+          <button class="mobile-more-item" type="button" data-tab="seasons">
+            Sezonlar & Takımlar
+          </button>
+          <button class="mobile-more-item" type="button" data-tab="weeks">
+            Haftalar
+          </button>
+          <button class="mobile-more-item" type="button" data-tab="matches">
+            Maçlar
+          </button>
+          <button class="mobile-more-item" type="button" data-tab="stats">
+            İstatistikler
+          </button>
+          <button
+            class="mobile-more-item admin-only"
+            type="button"
+            data-tab="players"
+          >
+            Kişiler
+          </button>
+          <button
+            class="mobile-more-item admin-only"
+            type="button"
+            data-tab="backup"
+          >
+            Yedekleme
+          </button>
+          <button
+            class="mobile-more-item mobile-logout-item"
+            type="button"
+            id="mobileLogoutBtn"
+          >
+            Çıkış Yap
+          </button>
+        </div>
+        <div class="mobile-more-session" id="mobileMoreSessionText">
+          Giriş yapılmadı.
+        </div>
+      </div>
+    </div>
+
+    <div class="login-overlay hidden" id="loginOverlay">
+      <div class="login-card">
+        <div class="brand-icon login-brand">⚽</div>
+        <h2>Panele Giriş Yap</h2>
+        <p class="small-meta login-note">
+          Rolünüz sistem tarafından otomatik belirlenir. Admin tüm alanları
+          yönetir, kullanıcı sadece kendi tahminini düzenler.
+        </p>
+        <div class="form-grid login-grid">
+          <div>
+            <label for="loginUsername">Kullanıcı adı</label>
+            <input
+              type="text"
+              id="loginUsername"
+              placeholder="Kullanıcı adınızı girin"
+            />
+          </div>
+          <div>
+            <label for="loginPassword">Şifre</label>
+            <input
+              type="password"
+              id="loginPassword"
+              placeholder="Şifrenizi girin"
+            />
+          </div>
+        </div>
+        <button class="full" id="loginBtn">Giriş Yap</button>
+
+        <div class="status-note" id="loginStatus">Hazır.</div>
+      </div>
+    </div>
+
+    <div class="leader-toast" id="leaderToast"></div>
+
+    <div class="app-modal hidden" id="appModal">
+      <div class="app-modal-card">
+        <div class="app-modal-icon" id="appModalIcon">ℹ️</div>
+        <h3 id="appModalTitle">Bilgi</h3>
+        <p id="appModalText"></p>
+        <div
+          class="field"
+          id="appModalInputWrap"
+          style="display: none; text-align: left"
+        >
+          <label for="appModalInput">Değer</label>
+          <input type="text" id="appModalInput" />
+        </div>
+        <div class="app-modal-actions">
+          <button class="secondary" id="appModalCancelBtn">Vazgeç</button>
+          <button id="appModalConfirmBtn">Tamam</button>
+        </div>
+      </div>
+    </div>
+    <div class="champion-modal hidden" id="championModal">
+      <div class="champion-modal-card">
+        <div class="champion-trophy">🏆</div>
+        <h3 id="championModalTitle">Şampiyon</h3>
+        <p id="championModalText"></p>
+        <button id="closeChampionModalBtn">Harika</button>
+      </div>
+    </div>
+    <div id="confettiLayer"></div>
+    <div class="app-loading-overlay" id="appLoadingOverlay">
+      <div class="app-loading-card">
+        <div class="app-loading-hero">
+          <div class="app-loading-spinner" id="appLoadingSpinner"></div>
+          <div class="app-loading-success hidden" id="appLoadingSuccess">✓</div>
+        </div>
+        <h3 id="appLoadingTitle">Veriler yükleniyor</h3>
+        <p id="appLoadingMessage">Lütfen bekleyin, maçlar ve tahminler Google Sheets üzerinden getiriliyor...</p>
+        <div class="app-loading-progress-wrap">
+          <div class="app-loading-progress-top">
+            <span id="appLoadingStepLabel">Bağlantı hazırlanıyor...</span>
+            <strong id="appLoadingPercent">0%</strong>
+          </div>
+          <div class="app-loading-progress-track">
+            <div class="app-loading-progress-bar" id="appLoadingProgressBar"></div>
+          </div>
+        </div>
+        <div class="app-loading-checklist" id="appLoadingChecklist">
+          <div class="app-loading-checkitem pending" id="loadingCheckLogin">Giriş bekleniyor</div>
+          <div class="app-loading-checkitem pending" id="loadingCheckUsers">Kullanıcılar hazırlanıyor</div>
+          <div class="app-loading-checkitem pending" id="loadingCheckMatches">Maç verileri yükleniyor</div>
+          <div class="app-loading-checkitem pending" id="loadingCheckPredictions">Tahminler yükleniyor</div>
+        </div>
+      </div>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>
