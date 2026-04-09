@@ -4,7 +4,7 @@ const DB_STORE = "handles";
 const HANDLE_KEY = "backupHandle";
 const LEAGUE_ID = 4339; // Turkish Super Lig on TheSportsDB
 const GOOGLE_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbzcyAI06Rou8EZNr-_5FV21Km53d6BEizVsrd_auXHTRus4gxQe25QT-9CJyOgH7iU-/exec";
+  "https://script.google.com/macros/s/AKfycbwIcUAropb7sIXmvT3uKn6Ly6JAZ6kMQ-t3Y9vaURG_kR0-8szafkIZ9fpRR8ZzPA/exec";
 
 let currentSessionUser = null;
 let useOnlineMode = true;
@@ -5613,4 +5613,10 @@ if (isAuthenticated()) {
   );
 } else {
   renderAll();
+}
+try {
+  // fetch işlemi
+} catch (err) {
+  console.error(err);
+  alert("Veri alınamadı!");
 }
