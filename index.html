@@ -7,8 +7,10 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="app-shell zoom-90">
-      <aside class="sidebar">
+    <button type="button" class="landscape-sidebar-toggle" id="landscapeSidebarToggle" aria-label="Menüyü aç">☰</button>
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+    <div class="app-shell">
+      <aside class="sidebar" id="sidebar">
         <div>
           <div class="brand-card">
             <div class="brand-icon">⚽</div>
@@ -455,7 +457,12 @@
           </div>
 
           <div class="card">
-
+            <div class="card-header">
+              <h3>Tahmin Tablosu</h3>
+              <span class="small-meta"
+                >Değişiklikler otomatik kaydedilir. Haftanın ilk maçına 10 dk kala tüm tahminler kilitlenir.</span
+              >
+            </div>
             <div id="predictionLockBanner" class="prediction-lock-banner is-hidden"></div>
             <div id="predictionsTable"></div>
           </div>
