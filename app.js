@@ -402,6 +402,14 @@ let firebaseRealtimeBindingsInitialized = false;
 let firebaseRealtimeRenderTimer = null;
 let firebaseRealtimeHydrationPromise = null;
 
+let firebasePresenceCache = {};
+let presenceHeartbeatTimer = null;
+let presenceConnectedRef = null;
+let presenceSessionRef = null;
+let presenceSessionId = null;
+let forceLogoutUserRef = null;
+let forceLogoutListener = null;
+
 function formatAdminPanelDateTime(value) {
   if (!value) return "-";
   const date = new Date(value);
@@ -415,6 +423,281 @@ function formatAdminPanelDateTime(value) {
   });
 }
 
+function getCurrentPresenceUserId() {
+  const authUser = (typeof getAuthUser === "function" ? getAuthUser() : null) || null;
+  const rawId =
+    authUser?.id ||
+    authUser?.playerId ||
+    state?.settings?.auth?.playerId ||
+    "";
+  return rawId ? sanitizeFirebaseKey(String(rawId)) : "";
+}
+
+function getPresenceUserMeta() {
+  const authUser =
+    (typeof getAuthUser === "function" ? getAuthUser() : null) ||
+    state?.settings?.auth?.user ||
+    null;
+  const player =
+    (typeof getCurrentPlayer === "function" ? getCurrentPlayer() : null) ||
+    (typeof findPlayerForSessionUser === "function"
+      ? findPlayerForSessionUser(authUser)
+      : null) ||
+    null;
+
+  return {
+    id: getCurrentPresenceUserId(),
+    name:
+      player?.name ||
+      authUser?.adSoyad ||
+      authUser?.name ||
+      authUser?.kullaniciAdi ||
+      authUser?.username ||
+      "",
+    username:
+      player?.username ||
+      authUser?.kullaniciAdi ||
+      authUser?.username ||
+      "",
+    role:
+      String(
+        authUser?.rol || player?.role || state?.settings?.auth?.role || "user",
+      ).toLowerCase() === "admin"
+        ? "admin"
+        : "user",
+  };
+}
+
+function getOnlineThresholdMs() {
+  return 35000;
+}
+
+function isPresenceSessionOnline(session) {
+  if (!session || session.online === false) return false;
+  const ts = new Date(session.lastSeen || session.connectedAt || 0).getTime();
+  if (!ts) return false;
+  return Date.now() - ts <= getOnlineThresholdMs();
+}
+
+function getPresenceStatusForUser(userId) {
+  const record =
+    firebasePresenceCache?.[sanitizeFirebaseKey(String(userId || ""))] || {};
+
+  const sessions = Object.values(record.sessions || {}).filter(Boolean);
+
+  const validSessions = sessions.filter((session) => {
+    const ts = new Date(session.lastSeen || session.connectedAt || 0).getTime();
+    if (!ts) return false;
+    if (session.online !== true) return false;
+    return Date.now() - ts <= getOnlineThresholdMs();
+  });
+
+  const latestSession =
+    [...sessions].sort(
+      (a, b) =>
+        new Date(b.lastSeen || b.connectedAt || 0).getTime() -
+        new Date(a.lastSeen || a.connectedAt || 0).getTime(),
+    )[0] || null;
+
+  return {
+    isOnline: validSessions.length > 0,
+    onlineCount: validSessions.length,
+    lastSeen:
+      latestSession?.lastSeen ||
+      latestSession?.connectedAt ||
+      record.lastSeen ||
+      "",
+  };
+}
+
+function stopPresenceTracking(options = {}) {
+  clearInterval(presenceHeartbeatTimer);
+  presenceHeartbeatTimer = null;
+
+  if (presenceConnectedRef?.off) {
+    try {
+      presenceConnectedRef.off("value");
+    } catch {}
+  }
+  presenceConnectedRef = null;
+
+  if (presenceSessionRef) {
+    if (options.removeSession !== false) {
+      presenceSessionRef.remove().catch(() => {});
+    } else {
+      presenceSessionRef
+        .update({
+          online: false,
+          lastSeen: new Date().toISOString(),
+        })
+        .catch(() => {});
+    }
+  }
+
+  presenceSessionRef = null;
+  presenceSessionId = null;
+
+  if (forceLogoutUserRef && forceLogoutListener) {
+    try {
+      forceLogoutUserRef.off("value", forceLogoutListener);
+    } catch {}
+  }
+  forceLogoutUserRef = null;
+  forceLogoutListener = null;
+}
+
+function ensureForcedLogoutWatcher() {
+  if (!isFirebaseReady() || !isAuthenticated()) return;
+  const userId = getCurrentPresenceUserId();
+  if (!userId) return;
+
+  const db = getFirebaseDb();
+  if (!db) return;
+
+  if (forceLogoutUserRef && forceLogoutListener) {
+    try {
+      forceLogoutUserRef.off("value", forceLogoutListener);
+    } catch {}
+  }
+
+  forceLogoutUserRef = db.ref(`users/${userId}`);
+  forceLogoutListener = (snapshot) => {
+    const userData = snapshot?.val?.() || null;
+    const sessionStartedAt =
+      getAuthUser?.()?.sessionStartedAt ||
+      state?.settings?.auth?.user?.sessionStartedAt ||
+      "";
+    const forcedLogoutAt = userData?.forcedLogoutAt || "";
+
+    if (!userData) return;
+    if (userData.aktif === false) {
+      stopPresenceTracking();
+      showAlert("Oturumun sistem tarafından kapatıldı.", {
+        title: "Çıkış yapıldı",
+        type: "warning",
+      });
+      logoutUser();
+      return;
+    }
+
+    if (
+      forcedLogoutAt &&
+      sessionStartedAt &&
+      new Date(forcedLogoutAt).getTime() > new Date(sessionStartedAt).getTime()
+    ) {
+      stopPresenceTracking();
+      showAlert("Admin seni sistemden çıkardı. Tekrar giriş yapman gerekiyor.", {
+        title: "Oturum kapatıldı",
+        type: "warning",
+      });
+      logoutUser();
+    }
+  };
+
+  forceLogoutUserRef.on("value", forceLogoutListener);
+}
+
+function startPresenceTracking() {
+  if (!isFirebaseReady() || !isAuthenticated()) return;
+  const userId = getCurrentPresenceUserId();
+  if (!userId) return;
+
+  stopPresenceTracking({ removeSession: false });
+
+  const db = getFirebaseDb();
+  if (!db) return;
+
+  const authUser = getAuthUser?.() || state?.settings?.auth?.user || {};
+  const sessionStartedAt =
+    authUser.sessionStartedAt || new Date().toISOString();
+
+  if (state?.settings?.auth?.user && !state.settings.auth.user.sessionStartedAt) {
+    state.settings.auth.user.sessionStartedAt = sessionStartedAt;
+  }
+  if (typeof currentSessionUser !== "undefined" && currentSessionUser && !currentSessionUser.sessionStartedAt) {
+    currentSessionUser.sessionStartedAt = sessionStartedAt;
+  }
+
+  presenceSessionId =
+    sessionStorage.getItem(`fikstur_presence_${userId}`) || uid("session");
+  sessionStorage.setItem(`fikstur_presence_${userId}`, presenceSessionId);
+
+  presenceSessionRef = db.ref(`presence/${userId}/sessions/${presenceSessionId}`);
+  presenceConnectedRef = db.ref(".info/connected");
+
+  const heartbeat = () => {
+    const meta = getPresenceUserMeta();
+    if (!presenceSessionRef) return;
+    presenceSessionRef
+      .update({
+        online: true,
+        lastSeen: new Date().toISOString(),
+        connectedAt: authUser.connectedAt || new Date().toISOString(),
+        sessionStartedAt,
+        name: meta.name || "",
+        username: meta.username || "",
+        role: meta.role || "user",
+      })
+      .catch(() => {});
+  };
+
+  presenceConnectedRef.on("value", (snapshot) => {
+    if (!presenceSessionRef) return;
+
+    if (snapshot.val() === true) {
+      presenceSessionRef.onDisconnect().remove();
+      heartbeat();
+      return;
+    }
+
+    presenceSessionRef
+      .update({
+        online: false,
+        lastSeen: new Date().toISOString(),
+      })
+      .catch(() => {});
+  });
+
+  heartbeat();
+  clearInterval(presenceHeartbeatTimer);
+  presenceHeartbeatTimer = setInterval(heartbeat, 25000);
+
+  ensureForcedLogoutWatcher();
+}
+function registerPresenceWindowHooks() {
+  if (window.__presenceWindowHooksBound) return;
+  window.__presenceWindowHooksBound = true;
+
+  window.addEventListener("pagehide", () => {
+    stopPresenceTracking({ removeSession: true });
+  });
+
+  window.addEventListener("beforeunload", () => {
+    stopPresenceTracking({ removeSession: true });
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      if (presenceSessionRef) {
+        presenceSessionRef
+          .update({
+            online: false,
+            lastSeen: new Date().toISOString(),
+          })
+          .catch(() => {});
+      }
+      return;
+    }
+
+    if (
+      document.visibilityState === "visible" &&
+      isFirebaseReady() &&
+      isAuthenticated()
+    ) {
+      startPresenceTracking();
+    }
+  });
+}
 function debounceFirebaseRealtimeRender() {
   clearTimeout(firebaseRealtimeRenderTimer);
   firebaseRealtimeRenderTimer = setTimeout(() => {
@@ -430,8 +713,19 @@ async function hydrateFromFirebaseRealtime(source = "manual") {
     try {
       await ensureFirebaseDefaults();
       await syncUsersFromSheet({ silent: true });
-      await syncOnlineMatchesFromSheet({ silent: true });
-      await syncOnlinePredictions({ silent: true });
+      await syncOnlineMatchesFromSheet({
+        silent: true,
+        seasonLabel: "",
+        replaceRemoteScope: true,
+      });
+      await syncOnlinePredictions({
+        silent: true,
+        seasonId: null,
+        weekId: null,
+        seasonLabel: "",
+        weekNumber: "",
+      });
+      if (isAuthenticated()) startPresenceTracking();
       recordAdminSyncActivity({
         lastAction: `Canlı ${getOnlineSourceLabel()} verisi alındı (${source}).`,
         success: true,
@@ -458,6 +752,11 @@ function ensureFirebaseRealtimeBridge() {
     db.ref(path).on("value", () => {
       hydrateFromFirebaseRealtime(path);
     });
+  });
+
+  db.ref("presence").on("value", (snapshot) => {
+    firebasePresenceCache = snapshot.exists() ? snapshot.val() || {} : {};
+    debounceFirebaseRealtimeRender();
   });
 
   firebaseRealtimeBindingsInitialized = true;
@@ -1368,6 +1667,101 @@ function ensureSeasonFromOnlineLabel(seasonLabel, fallbackLeagueName = "") {
   if (!state.settings.activeSeasonId) state.settings.activeSeasonId = season.id;
   return season;
 }
+function removeMatchesFromLocalState(matchIds = []) {
+  const normalizedIds = new Set(matchIds.map((id) => String(id)));
+  if (!normalizedIds.size) return;
+
+  state.matches = state.matches.filter(
+    (match) => !normalizedIds.has(String(match.id)),
+  );
+  state.predictions = state.predictions.filter(
+    (pred) => !normalizedIds.has(String(pred.matchId)),
+  );
+
+  const remainingWeekIds = new Set(state.matches.map((match) => match.weekId));
+  state.weeks = state.weeks.filter((week) => remainingWeekIds.has(week.id));
+
+  const remainingSeasonIds = new Set(state.weeks.map((week) => week.seasonId));
+  state.seasons = state.seasons.filter((season) =>
+    remainingSeasonIds.has(season.id),
+  );
+
+  const remainingTeamKeys = new Set(
+    state.matches.flatMap((match) => [
+      `${match.seasonId}__${normalizeText(match.homeTeam)}`,
+      `${match.seasonId}__${normalizeText(match.awayTeam)}`,
+    ]),
+  );
+  state.teams = state.teams.filter((team) =>
+    remainingTeamKeys.has(`${team.seasonId}__${normalizeText(team.name)}`),
+  );
+
+  ensureActiveSelections();
+}
+
+function pruneLocalMatchesAgainstRemote(rows = [], requestedSeasonLabel = "") {
+  const remoteRows = Array.isArray(rows) ? rows : [];
+  const affectedSeasonLabels = new Set(
+    remoteRows
+      .map((row) => row.season || row.sezon || row.seasonName || row.sezonAdi || "")
+      .filter(Boolean)
+      .map((value) => normalizeText(value)),
+  );
+
+  if (requestedSeasonLabel) {
+    affectedSeasonLabels.add(normalizeText(requestedSeasonLabel));
+  }
+
+  if (!affectedSeasonLabels.size && !requestedSeasonLabel && !remoteRows.length) {
+    state.matches = [];
+    state.predictions = [];
+    state.weeks = [];
+    state.teams = [];
+    state.seasons = [];
+    ensureActiveSelections();
+    return;
+  }
+
+  const remoteKeysBySeason = new Map();
+
+  remoteRows.forEach((row) => {
+    const seasonLabel = normalizeText(
+      row.season || row.sezon || row.seasonName || row.sezonAdi || requestedSeasonLabel || "",
+    );
+    if (!seasonLabel) return;
+    if (!remoteKeysBySeason.has(seasonLabel)) {
+      remoteKeysBySeason.set(seasonLabel, new Set());
+    }
+
+    const keys = remoteKeysBySeason.get(seasonLabel);
+    const weekNo = String(row.weekNo || row.haftaNo || row.week || row.hafta || "");
+    const homeTeam = normalizeText(row.homeTeam || row.evSahibi || "");
+    const awayTeam = normalizeText(row.awayTeam || row.deplasman || "");
+    const remoteId = String(row.id || row.sheetMatchId || row.macId || "");
+
+    if (remoteId) keys.add(`id:${remoteId}`);
+    keys.add(`fp:${weekNo}__${homeTeam}__${awayTeam}`);
+  });
+
+  const removedMatchIds = state.matches
+    .filter((match) => {
+      const seasonLabel = normalizeText(getSeasonById(match.seasonId)?.name || "");
+      if (!affectedSeasonLabels.has(seasonLabel)) return false;
+
+      const seasonKeys = remoteKeysBySeason.get(seasonLabel) || new Set();
+      const remoteId = String(
+        match.sheetMatchId || match.remoteMatchId || match.macId || "",
+      );
+      const fingerprint = `fp:${getWeekNumberById(match.weekId)}__${normalizeText(match.homeTeam)}__${normalizeText(match.awayTeam)}`;
+
+      if (remoteId && seasonKeys.has(`id:${remoteId}`)) return false;
+      if (seasonKeys.has(fingerprint)) return false;
+      return true;
+    })
+    .map((match) => String(match.id));
+
+  removeMatchesFromLocalState(removedMatchIds);
+}
 
 async function syncOnlineMatchesFromSheet(options = {}) {
   if (!useOnlineMode) return false;
@@ -1388,7 +1782,16 @@ async function syncOnlineMatchesFromSheet(options = {}) {
       rows = normalizeOnlineMatchRows(response);
     }
 
-    if (!rows.length) return false;
+    if (options.replaceRemoteScope !== false) {
+      pruneLocalMatchesAgainstRemote(rows, requestedSeasonLabel || "");
+    }
+
+    if (!rows.length) {
+      recalculateAllPoints();
+      saveState(true);
+      if (!options.silent) renderAll();
+      return false;
+    }
 
     const touchedWeekIds = new Set();
     let lastSeasonId = requestedSeasonId || null;
@@ -1998,13 +2401,20 @@ function getUnsyncedPredictionDraftsForScope(seasonId, weekId = null) {
 async function syncOnlinePredictions(options = {}) {
   if (!useOnlineMode || !isAuthenticated()) return false;
 
-  const seasonId = options.seasonId || getActiveSeasonId();
-  const weekId =
-    options.weekId === undefined ? state.settings.activeWeekId : options.weekId;
-  const seasonLabel =
-    options.seasonLabel || getSeasonById(seasonId)?.name || "";
-  const weekNumber =
-    options.weekNumber || (weekId ? getWeekNumberById(weekId) : "");
+  const seasonId = Object.prototype.hasOwnProperty.call(options, "seasonId")
+    ? options.seasonId
+    : getActiveSeasonId();
+  const weekId = Object.prototype.hasOwnProperty.call(options, "weekId")
+    ? options.weekId
+    : state.settings.activeWeekId;
+  const seasonLabel = Object.prototype.hasOwnProperty.call(options, "seasonLabel")
+    ? options.seasonLabel
+    : getSeasonById(seasonId)?.name || "";
+  const weekNumber = Object.prototype.hasOwnProperty.call(options, "weekNumber")
+    ? options.weekNumber
+    : weekId
+      ? getWeekNumberById(weekId)
+      : "";
 
   try {
     const response = await fetchOnlinePredictions(
@@ -2324,11 +2734,14 @@ function closeLoginOverlay() {
   updateAdminSyncToggleButton();
 }
 function logoutUser() {
+  stopPresenceTracking({ removeSession: true });
+
   currentSessionUser = null;
   state.settings.auth.isAuthenticated = false;
   state.settings.auth.role = "admin";
   state.settings.auth.playerId = null;
   state.settings.auth.user = null;
+
   saveState(true);
   updateLoginOverlay();
   updateAdminSyncToggleButton();
@@ -2386,6 +2799,8 @@ async function loginUser() {
       kullaniciAdi: result.user.kullaniciAdi || "",
       adSoyad: result.user.adSoyad || result.user.name || "",
       rol: result.user.rol || "user",
+      sessionStartedAt: new Date().toISOString(),
+      connectedAt: new Date().toISOString(),
     };
 
     const role = nextUser.rol;
@@ -2404,6 +2819,11 @@ async function loginUser() {
     saveState(true);
     closeLoginOverlay();
     applyRolePermissions();
+    startPresenceTracking();
+    saveState(true);
+closeLoginOverlay();
+applyRolePermissions();
+startPresenceTracking();
 
     await runSessionHydrationWithFastOverlay({
       loadingMessage: "Kayıtlı veriler açılıyor, güncel bilgiler yükleniyor...",
@@ -3550,12 +3970,18 @@ function renderFirebaseAdminPanel() {
   const playerRows = state.players
     .map((player) => {
       const count = state.predictions.filter((p) => p.playerId === player.id && p.homePred !== "" && p.awayPred !== "").length;
+      const presence = getPresenceStatusForUser(player.id);
+      const statusClass = presence.isOnline ? "online" : "offline";      const statusText = presence.isOnline ? "Online" : "Offline";
+      const canForceLogout = String(player.role || "user").toLowerCase() !== "admin";
       return `
         <tr>
           <td>${escapeHtml(player.name)}</td>
           <td>${escapeHtml(player.username || player.name.toLowerCase())}</td>
           <td>${count}</td>
           <td>${escapeHtml(player.password || "1234")}</td>
+          <td><span class="badge ${statusClass}">${statusText}</span></td>
+          <td>${formatAdminPanelDateTime(presence.lastSeen)}</td>
+          <td>${canForceLogout ? `<button type="button" class="small danger" onclick="forceLogoutUserSession('${player.id}')">Sistemden Çıkar</button>` : '<span class="small-meta">Admin</span>'}</td>
         </tr>
       `;
     })
@@ -3617,8 +4043,8 @@ function renderFirebaseAdminPanel() {
           <div class="firebase-admin-table-title">Kullanıcılar</div>
           <div class="firebase-admin-table-scroll">
             <table class="firebase-admin-table">
-              <thead><tr><th>Ad</th><th>Kullanıcı</th><th>Tahmin</th><th>Şifre</th></tr></thead>
-              <tbody>${playerRows || '<tr><td colspan="4">Kayıt yok.</td></tr>'}</tbody>
+              <thead><tr><th>Ad</th><th>Kullanıcı</th><th>Tahmin</th><th>Şifre</th><th>Durum</th><th>Son Görülme</th><th>İşlem</th></tr></thead>
+              <tbody>${playerRows || '<tr><td colspan="7">Kayıt yok.</td></tr>'}</tbody>
             </table>
           </div>
         </div>
@@ -4336,6 +4762,49 @@ window.saveResult = async function (matchId) {
     window.__ALLOW_MATCH_WRITE__ = false;
   }
 };
+window.forceLogoutUserSession = async function (playerId) {
+  if (!isFirebaseReady()) {
+    return showAlert("Bu özellik için Firebase açık olmalı.", {
+      title: "Özellik kullanılamıyor",
+      type: "warning",
+    });
+  }
+
+  const player = getPlayerById(playerId);
+  if (!player) return;
+  if (String(player.role || "user").toLowerCase() === "admin") {
+    return showAlert("Admin kullanıcısı sistemden çıkarılamaz.", {
+      title: "İşlem engellendi",
+      type: "warning",
+    });
+  }
+
+  if (
+    !(await showConfirm(
+      `${player.name} kullanıcısını sistemden çıkarmak istiyor musun?`,
+      { title: "Kullanıcı çıkarılsın mı?", type: "danger", confirmText: "Çıkar" },
+    ))
+  )
+    return;
+
+  try {
+    await firebaseUpdate(`users/${sanitizeFirebaseKey(player.id)}`, {
+      forcedLogoutAt: new Date().toISOString(),
+    });
+    await firebaseRemove(`presence/${sanitizeFirebaseKey(player.id)}`);
+    showAlert(`${player.name} sistemden çıkarıldı.`, {
+      title: "İşlem tamamlandı",
+      type: "success",
+    });
+  } catch (error) {
+    console.error("Kullanıcı sistemden çıkarılamadı:", error);
+    showAlert(error?.message || "Kullanıcı sistemden çıkarılamadı.", {
+      title: "İşlem başarısız",
+      type: "error",
+    });
+  }
+};
+
 window.removeMatch = async function (matchId) {
   if (isReadOnlyMode())
     return showAlert("Kullanıcı görünümünde maç silinemez.", {
@@ -4351,10 +4820,42 @@ window.removeMatch = async function (matchId) {
     ))
   )
     return;
-  state.matches = state.matches.filter((m) => m.id !== matchId);
-  state.predictions = state.predictions.filter((p) => p.matchId !== matchId);
-  saveState();
-  renderAll();
+
+  try {
+    if (useOnlineMode && isFirebaseReady()) {
+      const predictionsMap = (await firebaseRead("predictions")) || {};
+      const remotePredictions = firebaseSnapshotToArray(predictionsMap).filter(
+        (pred) =>
+          String(pred.matchId || "") ===
+            String(match.sheetMatchId || match.remoteMatchId || match.macId || match.id || "") ||
+          String(pred.matchId || "") === String(match.id),
+      );
+
+      await firebaseRemove(
+        `matches/${sanitizeFirebaseKey(match.sheetMatchId || match.remoteMatchId || match.macId || match.id)}`,
+      );
+
+      for (const pred of remotePredictions) {
+        await firebaseRemove(
+          `predictions/${sanitizeFirebaseKey(pred.id || makePredictionRecordId(pred.matchId, pred.playerId))}`,
+        );
+      }
+    }
+
+    removeMatchesFromLocalState([matchId]);
+    saveState();
+    renderAll();
+    showAlert("Maç ve bağlı tahminler silindi.", {
+      title: "Silme tamamlandı",
+      type: "success",
+    });
+  } catch (error) {
+    console.error("Maç silme hatası:", error);
+    showAlert(error?.message || "Maç Firebase üzerinden silinemedi.", {
+      title: "Silme hatası",
+      type: "error",
+    });
+  }
 };
 
 function isPredictionShareMode() {
@@ -6921,6 +7422,7 @@ if (isFirebaseReady()) {
 }
 
 if (isAuthenticated()) {
+  startPresenceTracking();
   renderAll();
   runSessionHydrationWithFastOverlay({
     loadingMessage:
