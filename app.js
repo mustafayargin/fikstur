@@ -6,7 +6,462 @@ const LEAGUE_ID = 4339; // Turkish Super Lig on TheSportsDB
 const GOOGLE_SCRIPT_URL =
   "https://script.google.com/macros/s/AKfycbzcyAI06Rou8EZNr-_5FV21Km53d6BEizVsrd_auXHTRus4gxQe25QT-9CJyOgH7iU-/exec";
 
-let currentSessionUser = null;
+const FIREBASE_DEFAULT_USERS = [
+  {
+    id: "admin-root",
+    kullaniciAdi: "admin",
+    sifre: "1234",
+    adSoyad: "ADMIN",
+    rol: "admin",
+    aktif: true,
+  },
+  {
+    id: "player-mustafa",
+    kullaniciAdi: "mustafa",
+    sifre: "1234",
+    adSoyad: "MUSTAFA",
+    rol: "user",
+    aktif: true,
+  },
+  {
+    id: "player-veli",
+    kullaniciAdi: "veli",
+    sifre: "1234",
+    adSoyad: "VELI",
+    rol: "user",
+    aktif: true,
+  },
+];
+
+function getFirebaseConfig() {
+  return window.FIKSTUR_FIREBASE_CONFIG || null;
+}
+
+function isFirebaseConfigured() {
+  const cfg = getFirebaseConfig();
+  if (!cfg) return false;
+  return Object.values(cfg).every((value) => value && !String(value).startsWith("BURAYA_"));
+}
+
+function getFirebaseDb() {
+  if (!isFirebaseConfigured()) return null;
+  if (!window.firebase || typeof window.firebase.initializeApp !== "function") return null;
+  try {
+    if (!window.__fiksturFirebaseApp) {
+      window.__fiksturFirebaseApp = window.firebase.apps?.length
+        ? window.firebase.app()
+        : window.firebase.initializeApp(getFirebaseConfig());
+    }
+    return window.firebase.database(window.__fiksturFirebaseApp);
+  } catch (error) {
+    console.error("Firebase başlatılamadı:", error);
+    return null;
+  }
+}
+
+function isFirebaseReady() {
+  return !!getFirebaseDb();
+}
+
+function sanitizeFirebaseKey(value) {
+  return String(value || "")
+    .replace(/[.#$\[\]\/]/g, "_")
+    .trim();
+}
+
+function makePredictionRecordId(matchId, playerId) {
+  return sanitizeFirebaseKey(`${matchId}__${playerId}`);
+}
+
+function firebaseSnapshotToArray(value) {
+  if (!value || typeof value !== "object") return [];
+  return Object.entries(value).map(([id, item]) => ({
+    id: item?.id || id,
+    ...(item || {}),
+  }));
+}
+
+async function firebaseRead(path) {
+  const db = getFirebaseDb();
+  if (!db) throw new Error("Firebase henüz yapılandırılmadı.");
+  const snapshot = await db.ref(path).get();
+  return snapshot.exists() ? snapshot.val() : null;
+}
+
+async function firebaseWrite(path, value) {
+  const db = getFirebaseDb();
+  if (!db) throw new Error("Firebase henüz yapılandırılmadı.");
+  await db.ref(path).set(value);
+  return true;
+}
+
+async function firebaseUpdate(path, value) {
+  const db = getFirebaseDb();
+  if (!db) throw new Error("Firebase henüz yapılandırılmadı.");
+  await db.ref(path).update(value);
+  return true;
+}
+
+async function firebaseRemove(path) {
+  const db = getFirebaseDb();
+  if (!db) throw new Error("Firebase henüz yapılandırılmadı.");
+  await db.ref(path).remove();
+  return true;
+}
+
+async function ensureFirebaseDefaults() {
+  if (!isFirebaseReady()) return { success: false, skipped: true };
+
+  const users = (await firebaseRead("users")) || {};
+  const matches = (await firebaseRead("matches")) || {};
+  const predictions = (await firebaseRead("predictions")) || {};
+  const settings = (await firebaseRead("settings")) || {};
+
+  if (!Object.keys(users).length || settings?.init === true) {
+    const seededUsers = {};
+    FIREBASE_DEFAULT_USERS.forEach((user) => {
+      seededUsers[sanitizeFirebaseKey(user.id)] = {
+        ...user,
+        aktif: true,
+      };
+    });
+    await firebaseWrite("users", seededUsers);
+  }
+
+  if (!Object.keys(matches).length) {
+    await firebaseWrite("matches", matches);
+  }
+
+  if (!Object.keys(predictions).length) {
+    await firebaseWrite("predictions", predictions);
+  }
+
+  if (!settings || settings.init === true || !Object.keys(settings).length) {
+    await firebaseWrite("settings", {
+      init: false,
+      source: "firebase",
+      createdAt: new Date().toISOString(),
+      defaultUsersSeeded: true,
+    });
+  }
+
+  return { success: true };
+}
+
+async function firebaseApiGet(action, params = {}) {
+  switch (action) {
+    case "getUsers": {
+      await ensureFirebaseDefaults();
+      const users = firebaseSnapshotToArray(await firebaseRead("users"));
+      return { success: true, users };
+    }
+    case "getMatches": {
+      const sezon = String(params.sezon || "").trim();
+      const haftaNo = String(params.haftaNo || "").trim();
+      let matches = firebaseSnapshotToArray(await firebaseRead("matches"));
+      if (sezon) {
+        matches = matches.filter((item) => String(item.season || item.sezon || "").trim() === sezon);
+      }
+      if (haftaNo) {
+        matches = matches.filter((item) => String(item.weekNo || item.haftaNo || "").trim() === haftaNo);
+      }
+      return { success: true, matches };
+    }
+    case "getPredictions": {
+      const sezon = String(params.sezon || "").trim();
+      const haftaNo = String(params.haftaNo || "").trim();
+      let predictions = firebaseSnapshotToArray(await firebaseRead("predictions"));
+      if (sezon) {
+        predictions = predictions.filter((item) => String(item.season || item.sezon || "").trim() === sezon);
+      }
+      if (haftaNo) {
+        predictions = predictions.filter((item) => String(item.weekNo || item.haftaNo || "").trim() === haftaNo);
+      }
+      return { success: true, predictions };
+    }
+    case "getStandings":
+      return { success: true, rows: [] };
+    default:
+      throw new Error(`Firebase GET aksiyonu tanımlı değil: ${action}`);
+  }
+}
+
+async function firebaseApiPost(action, payload = {}) {
+  switch (action) {
+    case "login": {
+      await ensureFirebaseDefaults();
+      const username = normalizeLoginName(
+        payload.kullaniciAdi || payload.username || "",
+      );
+      const password = String(payload.sifre || payload.password || "");
+      const users = firebaseSnapshotToArray(await firebaseRead("users"));
+      const user = users.find(
+        (item) =>
+          normalizeLoginName(
+            item.kullaniciAdi || item.username || item.adSoyad || "",
+          ) === username &&
+          String(item.sifre || item.password || "") === password &&
+          item.aktif !== false,
+      );
+      if (!user) {
+        return { success: false, message: "Kullanıcı adı veya şifre hatalı." };
+      }
+      return { success: true, user };
+    }
+    case "addUser": {
+      const usersMap = (await firebaseRead("users")) || {};
+
+      const rawDisplayName = String(
+        payload.adSoyad ||
+          payload.name ||
+          payload.kullaniciAdi ||
+          payload.username ||
+          "",
+      )
+        .trim()
+        .toUpperCase();
+
+      const rawUsername = normalizeLoginName(
+        payload.kullaniciAdi ||
+          payload.username ||
+          payload.adSoyad ||
+          payload.name ||
+          "user",
+      );
+
+      const id = sanitizeFirebaseKey(
+        payload.id ||
+          buildPlayerKeyFromName(rawDisplayName || rawUsername, usersMap),
+      );
+
+      if (usersMap[id]) {
+        return {
+          success: false,
+          message: "Bu kullanıcı anahtarı zaten var. Farklı bir isim deneyin.",
+        };
+      }
+
+      const record = {
+        id,
+        kullaniciAdi: rawUsername,
+        sifre: String(payload.sifre || payload.password || "1234"),
+        adSoyad: rawDisplayName,
+        rol:
+          String(payload.rol || "user").toLowerCase() === "admin"
+            ? "admin"
+            : "user",
+        aktif: true,
+        createdAt: new Date().toISOString(),
+      };
+
+      await firebaseWrite(`users/${id}`, record);
+      return { success: true, id, user: record };
+    }
+    case "updateUser": {
+      const id = sanitizeFirebaseKey(payload.id);
+      if (!id) return { success: false, message: "Kullanıcı id gerekli." };
+      const current = (await firebaseRead(`users/${id}`)) || { id };
+      const next = {
+        ...current,
+        ...(payload.adSoyad
+          ? { adSoyad: String(payload.adSoyad).trim().toUpperCase() }
+          : {}),
+        ...(payload.kullaniciAdi
+          ? { kullaniciAdi: normalizeLoginName(payload.kullaniciAdi) }
+          : {}),
+        ...(payload.sifre ? { sifre: String(payload.sifre) } : {}),
+        ...(payload.rol
+          ? {
+              rol:
+                String(payload.rol).toLowerCase() === "admin"
+                  ? "admin"
+                  : "user",
+            }
+          : {}),
+        updatedAt: new Date().toISOString(),
+      };
+      await firebaseWrite(`users/${id}`, next);
+      return { success: true, id, user: next };
+    }
+    case "deleteUser": {
+      const id = sanitizeFirebaseKey(payload.id);
+      if (!id) return { success: false, message: "Kullanıcı id gerekli." };
+      const current = (await firebaseRead(`users/${id}`)) || null;
+      if (current && String(current.rol || "user").toLowerCase() === "admin") {
+        return {
+          success: false,
+          message: "Admin kullanıcısı silinemez.",
+        };
+      }
+      await firebaseRemove(`users/${id}`);
+      const predictions = firebaseSnapshotToArray(
+        await firebaseRead("predictions"),
+      );
+      await Promise.all(
+        predictions
+          .filter((item) => String(item.playerId) === String(id))
+          .map((item) =>
+            firebaseRemove(
+              `predictions/${sanitizeFirebaseKey(item.id || makePredictionRecordId(item.matchId, item.playerId))}`,
+            ),
+          ),
+      );
+      return { success: true };
+    }
+    case "addMatches": {
+      const rawMatches =
+        typeof payload.matches === "string"
+          ? JSON.parse(payload.matches || "[]")
+          : payload.matches || [];
+      for (const match of rawMatches) {
+        if (!match?.id) continue;
+        const id = sanitizeFirebaseKey(match.id);
+        const seasonLabel =
+          match.season ||
+          match.sezon ||
+          getSeasonById(match.seasonId)?.name ||
+          "";
+        const weekNo =
+          match.weekNo ||
+          match.haftaNo ||
+          getWeekNumberById(match.weekId) ||
+          "";
+        await firebaseWrite(`matches/${id}`, {
+          ...match,
+          id,
+          season: seasonLabel,
+          sezon: seasonLabel,
+          weekNo,
+          haftaNo: weekNo,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+      return { success: true };
+    }
+    case "savePrediction": {
+      const id = sanitizeFirebaseKey(
+        payload.predictionId ||
+          payload.id ||
+          makePredictionRecordId(payload.matchId, payload.playerId),
+      );
+      const record = {
+        ...payload,
+        id,
+        season: payload.season || payload.sezon || "",
+        sezon: payload.sezon || payload.season || "",
+        weekNo: payload.weekNo || payload.haftaNo || "",
+        haftaNo: payload.haftaNo || payload.weekNo || "",
+        playerId: String(payload.playerId || payload.kullaniciId || ""),
+        matchId: String(payload.matchId || ""),
+        homePred: payload.homePred,
+        awayPred: payload.awayPred,
+        tahminEv: payload.tahminEv ?? payload.homePred,
+        tahminDep: payload.tahminDep ?? payload.awayPred,
+        updatedAt: new Date().toISOString(),
+      };
+      await firebaseWrite(`predictions/${id}`, record);
+      return { success: true, id, predictionId: id };
+    }
+    case "deletePrediction": {
+      const id = sanitizeFirebaseKey(
+        payload.predictionId ||
+          payload.id ||
+          makePredictionRecordId(payload.matchId, payload.playerId),
+      );
+      await firebaseRemove(`predictions/${id}`);
+      return { success: true, id };
+    }
+    default:
+      throw new Error(`Firebase POST aksiyonu tanımlı değil: ${action}`);
+  }
+}
+
+async function runFirebaseConnectionTest() {
+  if (!isFirebaseReady()) {
+    throw new Error("Önce index.html içindeki Firebase config alanlarını doldur.");
+  }
+  await ensureFirebaseDefaults();
+  const stamp = new Date().toISOString();
+  await firebaseWrite("settings/connectionTest", {
+    ok: true,
+    timestamp: stamp,
+    message: "Firebase bağlantısı başarılı.",
+  });
+  return { success: true, timestamp: stamp };
+}
+
+window.testFirebaseConnection = runFirebaseConnectionTest;
+window.seedFirebaseDefaults = ensureFirebaseDefaults;
+
+function getOnlineSourceLabel() {
+  return isFirebaseReady() ? "Firebase" : "Firebase";
+}
+
+let firebaseRealtimeBindingsInitialized = false;
+let firebaseRealtimeRenderTimer = null;
+let firebaseRealtimeHydrationPromise = null;
+
+function formatAdminPanelDateTime(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("tr-TR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function debounceFirebaseRealtimeRender() {
+  clearTimeout(firebaseRealtimeRenderTimer);
+  firebaseRealtimeRenderTimer = setTimeout(() => {
+    renderAll();
+  }, 180);
+}
+
+async function hydrateFromFirebaseRealtime(source = "manual") {
+  if (!isFirebaseReady()) return false;
+  if (firebaseRealtimeHydrationPromise) return firebaseRealtimeHydrationPromise;
+
+  firebaseRealtimeHydrationPromise = (async () => {
+    try {
+      await ensureFirebaseDefaults();
+      await syncUsersFromSheet({ silent: true });
+      await syncOnlineMatchesFromSheet({ silent: true });
+      await syncOnlinePredictions({ silent: true });
+      recordAdminSyncActivity({
+        lastAction: `Canlı ${getOnlineSourceLabel()} verisi alındı (${source}).`,
+        success: true,
+      });
+      debounceFirebaseRealtimeRender();
+      return true;
+    } catch (error) {
+      console.warn("Firebase canlı veri eşitleme uyarısı:", error);
+      return false;
+    } finally {
+      firebaseRealtimeHydrationPromise = null;
+    }
+  })();
+
+  return firebaseRealtimeHydrationPromise;
+}
+
+function ensureFirebaseRealtimeBridge() {
+  if (!isFirebaseReady() || firebaseRealtimeBindingsInitialized) return;
+  const db = getFirebaseDb();
+  if (!db) return;
+
+  ["users", "matches", "predictions", "settings"].forEach((path) => {
+    db.ref(path).on("value", () => {
+      hydrateFromFirebaseRealtime(path);
+    });
+  });
+
+  firebaseRealtimeBindingsInitialized = true;
+}
+
 let useOnlineMode = true;
 const DEFAULT_TEAM_NAMES = [
   "Adana Demirspor",
@@ -93,7 +548,7 @@ let currentManualRefreshPromise = null;
 const APP_LOADING_DEFAULT_STATE = {
   title: "Veriler yükleniyor",
   message:
-    "Lütfen bekleyin, maçlar ve tahminler Google Sheets üzerinden getiriliyor...",
+    "Lütfen bekleyin, maçlar ve tahminler Firebase üzerinden getiriliyor...",
   percent: 0,
   stepLabel: "Bağlantı hazırlanıyor...",
   showSuccess: false,
@@ -344,7 +799,7 @@ async function refreshSessionData(triggerButton = null) {
       showAlert(
         queueResult?.flushed
           ? `Veriler güncellendi. ${queueResult.flushed} bekleyen tahmin de Google'a gönderildi.`
-          : "Veriler Google ile eşitlendi.",
+          : "Veriler Firebase ile eşitlendi.",
         {
           title: "Güncelleme tamamlandı",
           type: "success",
@@ -759,7 +1214,20 @@ function slugify(value) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
+function buildPlayerKeyFromName(name, existingUsers = {}) {
+  const baseSlug = slugify(name);
+  const safeBase = baseSlug || "oyuncu";
 
+  let candidate = sanitizeFirebaseKey(`player-${safeBase}`);
+  let counter = 2;
+
+  while (existingUsers[candidate]) {
+    candidate = sanitizeFirebaseKey(`player-${safeBase}-${counter}`);
+    counter += 1;
+  }
+
+  return candidate;
+}
 function escapeHtml(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -803,7 +1271,7 @@ function jsonpRequest(action, params = {}) {
 
     script.onerror = () => {
       cleanup();
-      reject(new Error("Google Script isteği yüklenemedi."));
+      reject(new Error("Veri isteği yüklenemedi."));
     };
 
     const url = buildApiUrl(action, { ...params, callback: callbackName });
@@ -813,17 +1281,23 @@ function jsonpRequest(action, params = {}) {
     setTimeout(() => {
       if (window[callbackName]) {
         cleanup();
-        reject(new Error("Google Script isteği zaman aşımına uğradı."));
+        reject(new Error("Veri isteği zaman aşımına uğradı."));
       }
     }, 30000);
   });
 }
 
 async function apiGet(action, params = {}) {
+  if (isFirebaseReady()) {
+    return await firebaseApiGet(action, params);
+  }
   return await jsonpRequest(action, params);
 }
 
 async function apiPost(action, payload = {}) {
+  if (isFirebaseReady()) {
+    return await firebaseApiPost(action, payload);
+  }
   return await jsonpRequest(action, { ...payload, action });
 }
 
@@ -1095,15 +1569,13 @@ async function syncUsersFromSheet(options = {}) {
   if (!result?.success || !Array.isArray(result.users)) {
     throw new Error(result?.message || "Kullanıcı listesi alınamadı.");
   }
-  const users = result.users
-    .filter((user) => String(user.rol || "user").toLowerCase() !== "admin")
-    .map((user) => ({
-      id: String(user.id),
-      name: user.adSoyad || user.kullaniciAdi || "",
-      password: user.sifre || "1234",
-      username: user.kullaniciAdi || "",
-      role: user.rol || "user",
-    }));
+  const users = result.users.map((user) => ({
+    id: String(user.id),
+    name: user.adSoyad || user.kullaniciAdi || "",
+    password: user.sifre || "1234",
+    username: user.kullaniciAdi || "",
+    role: String(user.rol || "user").toLowerCase() === "admin" ? "admin" : "user",
+  }));
   state.players = users;
   const authUser = getAuthUser();
   if (authUser) {
@@ -1186,7 +1658,7 @@ function ensureAuthState(stateObj) {
   stateObj.settings = stateObj.settings || {};
   stateObj.settings.auth = {
     adminUsername: "admin",
-    adminPassword: "admin123",
+    adminPassword: "1234",
     isAuthenticated: false,
     role: "admin",
     playerId: null,
@@ -1250,7 +1722,9 @@ function getPredictionOutcomeClass(pred, match) {
 }
 
 function getVisiblePlayersOrdered() {
-  const players = [...state.players];
+  const players = [...state.players].filter(
+    (player) => String(player.role || "user").toLowerCase() !== "admin",
+  );
   const currentPlayerId = getCurrentPlayerId();
   if (getCurrentRole() !== "user" || !currentPlayerId) return players;
   return players.sort((a, b) => {
@@ -1611,7 +2085,7 @@ async function hydrateOnlineStateForSession(options = {}) {
           : "Verilerin yüklenmesini bekleyin. Yükleme bitmeden işlem yapmayın.",
         stepLabel: isSessionRestore
           ? "Kayıtlı oturum doğrulanıyor..."
-          : "Google Sheets bağlantısı kuruluyor...",
+          : "Veri bağlantısı kuruluyor...",
         percent: 12,
         showSuccess: !isSessionRestore,
       });
@@ -1682,7 +2156,7 @@ async function hydrateOnlineStateForSession(options = {}) {
 
     if (updateLoadingUi) {
       setAppLoading(true, {
-        message: "Bekleyen tahminler Google Sheets ile eşitleniyor...",
+        message: "Bekleyen tahminler Firebase ile eşitleniyor...",
         stepLabel: "Son kontroller yapılıyor...",
         percent: 90,
         showSuccess: false,
@@ -1723,7 +2197,7 @@ async function hydrateOnlineStateForSession(options = {}) {
 
     if (queueResult.flushed) {
       showAlert(
-        `${queueResult.flushed} bekleyen tahmin Google Sheets ile eşitlendi.`,
+        `${queueResult.flushed} bekleyen tahmin Firebase ile eşitlendi.`,
         {
           title: "Bekleyen Kayıtlar Gönderildi",
           type: "success",
@@ -1737,7 +2211,7 @@ async function hydrateOnlineStateForSession(options = {}) {
       setAppLoading(true, {
         title: "Yükleme tamamlanamadı",
         message:
-          error?.message || "Google Sheets verileri alınırken bir sorun oluştu.",
+          error?.message || "Firebase verileri alınırken bir sorun oluştu.",
         stepLabel: "Tekrar giriş yapabilir veya sayfayı yenileyebilirsin.",
         percent: 100,
         showSuccess: false,
@@ -2127,6 +2601,7 @@ function renderMobilePredictions(container, matches) {
   container.innerHTML = `<div class="mobile-prediction-list">${matches
     .map((match) => {
       const locked = isMatchLocked(match);
+      const lockedForUi = locked && getCurrentRole() !== "admin";
       const badge = getMatchBadge(match);
       const visual = getMatchVisualState(match);
 
@@ -2148,10 +2623,10 @@ function renderMobilePredictions(container, matches) {
             const statusClass = hasPrediction
               ? "filled-prediction"
               : "empty-prediction";
-            const lockedClass =
-              locked || !canEdit
-                ? "locked-cell locked-mobile-card"
-                : "editable-cell";
+              const lockedClass =
+                lockedForUi || !canEdit
+                  ? "locked-cell locked-mobile-card"
+                  : "editable-cell";
             const ownClass =
               player.id === currentPlayerId ? "own-player-card" : "";
             const outcomeClass = getPredictionOutcomeClass(pred, match);
@@ -2166,10 +2641,7 @@ function renderMobilePredictions(container, matches) {
               pred.homePred !== "" || pred.awayPred !== ""
                 ? `${pred.homePred !== "" ? pred.homePred : "-"} - ${pred.awayPred !== "" ? pred.awayPred : "-"}`
                 : "--";
-            const showSaveAction =
-              canEdit &&
-              ["dirty", "saving", "queued", "error", "saved", "deleteError", "deleting", "deleteQueued"].includes(uiState);
-
+            const showSaveAction = canEdit && shouldShowPredictionSaveAction(match.id, player.id);
             if (!isOwnPlayer) {
               return `
               <div class="mobile-other-prediction premium-user-card compact-user-row ${pointLabel(pred.points)} ${outcomeClass} ${statusClass}">
@@ -2191,7 +2663,7 @@ function renderMobilePredictions(container, matches) {
             <div class="mobile-user-prediction premium-user-card ${pointLabel(pred.points)} ${outcomeClass} ${statusClass} ${lockedClass} ${ownClass}">
               <div class="mobile-user-head premium-user-head">
                 <strong>${escapeHtml(player.name)}${isOwnPlayer ? '<span class="own-pill">Sen</span>' : ""}</strong>
-                <span class="mini-points premium-points">${ `${pred.points || 0} puan`}</span>
+                <span class="mini-points premium-points">${locked ? "🔒 Kilitli" : `${pred.points || 0} puan`}</span>
               </div>
 
               <div class="score-inputs compact-inputs center-mode premium-score-inputs pred-score-row own-pred-score-row">
@@ -2203,8 +2675,7 @@ function renderMobilePredictions(container, matches) {
                   data-pred-role="input"
                   data-match-id="${match.id}"
                   data-player-id="${player.id}"
-                  ${locked || !canEdit ? "disabled" : ""}
-                  oninput="window.queuePredictionSave && window.queuePredictionSave('${match.id}','${player.id}')"
+                  ${lockedForUi || !canEdit ? "disabled" : ""}                  oninput="window.queuePredictionSave && window.queuePredictionSave('${match.id}','${player.id}')"
                 />
                 <span class="premium-dash">-</span>
                 <input
@@ -2215,13 +2686,11 @@ function renderMobilePredictions(container, matches) {
                   data-pred-role="input"
                   data-match-id="${match.id}"
                   data-player-id="${player.id}"
-                  ${locked || !canEdit ? "disabled" : ""}
-                  oninput="window.queuePredictionSave && window.queuePredictionSave('${match.id}','${player.id}')"
+                  ${lockedForUi || !canEdit ? "disabled" : ""}                  oninput="window.queuePredictionSave && window.queuePredictionSave('${match.id}','${player.id}')"
                 />
               </div>
 
-              ${locked ? `<div class="mobile-lock-warning">🔒 Tahmin kapandı</div>` : ""}
-
+              ${lockedForUi ? `<div class="mobile-lock-warning">🔒 Tahmin kapandı</div>` : ""}
               <div class="pred-action-area own-pred-action-area">
                 ${
                   canEdit
@@ -2234,11 +2703,9 @@ function renderMobilePredictions(container, matches) {
                       data-pred-role="save-btn"
                       data-match-id="${match.id}"
                       data-player-id="${player.id}"
-                      ${locked ? "disabled" : ""}
-                      onclick="if(!this.disabled && window.queuePredictionSave){ event.preventDefault(); event.stopPropagation(); window.queuePredictionSave('${match.id}','${player.id}', true); } return false;"
+                      ${lockedForUi ? "disabled" : ""}                      onclick="if(!this.disabled && window.queuePredictionSave){ event.preventDefault(); event.stopPropagation(); window.queuePredictionSave('${match.id}','${player.id}', true); } return false;"
                     >
-                      ${locked ? "🔒 Kilitli" : getPredictionSaveLabel(match.id, player.id)}
-                    </button>
+                    ${lockedForUi ? "🔒 Kilitli" : getPredictionSaveLabel(match.id, player.id)}                    </button>
                     <button
                       class="prediction-mobile-save-btn danger prediction-delete-btn ${showDeleteAction ? "" : "is-hidden"}"
                       type="button"
@@ -2246,7 +2713,7 @@ function renderMobilePredictions(container, matches) {
                       data-pred-role="delete-btn"
                       data-match-id="${match.id}"
                       data-player-id="${player.id}"
-                      ${locked ? "disabled" : ""}
+                      ${lockedForUi ? "disabled" : ""}
                       onclick="if(!this.disabled && window.deletePredictionEntry){ event.preventDefault(); event.stopPropagation(); window.deletePredictionEntry('${match.id}','${player.id}'); } return false;"
                     >
                       Sil
@@ -2272,7 +2739,6 @@ function renderMobilePredictions(container, matches) {
     .join("")}</div>`;
 
   bindPredictionActionElements(container);
-  enablePredictionTableDragScroll(container);
   saveState(true);
 }
 
@@ -2397,9 +2863,8 @@ if (currentSessionUser && !state.settings?.auth?.playerId) {
   if (matchedPlayer) state.settings.auth.playerId = matchedPlayer.id;
 }
 
-function saveState(skipFileWrite = false) {
+function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  if (!skipFileWrite) writeLocalFileBackup();
 }
 
 function getSeasonById(id) {
@@ -3024,10 +3489,177 @@ function renderDashboardSyncCard() {
   const week = getWeekById(state.settings.activeWeekId);
   const seasonBadge = document.getElementById("dashboardActiveSeasonBadge");
   const weekBadge = document.getElementById("dashboardActiveWeekBadge");
+  const status = document.getElementById("dashboardSyncStatus");
   if (seasonBadge)
     seasonBadge.textContent = `Aktif sezon: ${season?.name || "-"}`;
   if (weekBadge)
     weekBadge.textContent = `Aktif hafta: ${week ? `${week.number}. Hafta` : "-"}`;
+  if (status && isFirebaseReady()) {
+    status.textContent = `Veri kaynağı: ${getOnlineSourceLabel()} • ${getSyncSummaryText()}`;
+  }
+}
+
+function buildFirebaseAdminSummary() {
+  const activeSeasonId = getActiveSeasonId();
+  const activeWeekId = state.settings.activeWeekId;
+  const activeWeekMatches = activeWeekId ? getMatchesByWeekId(activeWeekId) : [];
+  const activeWeekMatchIds = new Set(activeWeekMatches.map((item) => item.id));
+  const activeWeekPredictions = state.predictions.filter((item) => activeWeekMatchIds.has(item.matchId));
+  const lastPrediction = [...state.predictions]
+    .filter((item) => item.updatedAt || item.remoteId || item.id)
+    .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime())[0] || null;
+
+  return {
+    source: getOnlineSourceLabel(),
+    playerCount: state.players.length,
+    seasonCount: state.seasons.length,
+    weekCount: activeSeasonId ? getWeeksBySeasonId(activeSeasonId).length : 0,
+    matchCount: state.matches.length,
+    activeWeekMatchCount: activeWeekMatches.length,
+    predictionCount: state.predictions.filter((item) => item.homePred !== "" && item.awayPred !== "").length,
+    activeWeekPredictionCount: activeWeekPredictions.filter((item) => item.homePred !== "" && item.awayPred !== "").length,
+    queueCount: getPendingPredictionQueue().length,
+    lastPrediction,
+  };
+}
+
+function renderFirebaseAdminPanel() {
+  const panel = document.getElementById("firebaseAdminPanel");
+  if (!panel) return;
+
+  if (!isAuthenticated() || getCurrentRole() !== "admin") {
+    panel.innerHTML = "";
+    panel.classList.add("hidden");
+    return;
+  }
+
+  panel.classList.remove("hidden");
+
+  const summary = buildFirebaseAdminSummary();
+  const recentPredictions = [...state.predictions]
+    .filter((item) => item.homePred !== "" && item.awayPred !== "")
+    .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime())
+    .slice(0, 12);
+
+  const playerRows = state.players
+    .map((player) => {
+      const count = state.predictions.filter((p) => p.playerId === player.id && p.homePred !== "" && p.awayPred !== "").length;
+      return `
+        <tr>
+          <td>${escapeHtml(player.name)}</td>
+          <td>${escapeHtml(player.username || player.name.toLowerCase())}</td>
+          <td>${count}</td>
+          <td>${escapeHtml(player.password || "1234")}</td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  const predictionRows = recentPredictions.length
+    ? recentPredictions
+        .map((pred) => {
+          const player = getPlayerById(pred.playerId);
+          const match = state.matches.find((item) => item.id === pred.matchId);
+          const weekNo = match ? getWeekNumberById(match.weekId) : "-";
+          const seasonName = match ? getSeasonById(match.seasonId)?.name || "-" : "-";
+          const playedLabel = match?.played ? "Oynandı" : isMatchLocked(match) ? "Kilitli" : "Açık";
+          return `
+            <tr>
+              <td>${escapeHtml(player?.name || pred.username || pred.playerId || "-")}</td>
+              <td>${escapeHtml(match ? `${match.homeTeam} - ${match.awayTeam}` : pred.matchId || "-")}</td>
+              <td>${pred.homePred} - ${pred.awayPred}</td>
+              <td>${escapeHtml(String(weekNo))}</td>
+              <td>${escapeHtml(seasonName)}</td>
+              <td>${escapeHtml(playedLabel)}</td>
+              <td>${formatAdminPanelDateTime(pred.updatedAt)}</td>
+            </tr>
+          `;
+        })
+        .join("")
+    : '<tr><td colspan="7">Henüz kayıtlı tahmin yok.</td></tr>';
+
+  panel.innerHTML = `
+    <section class="card firebase-admin-card">
+      <div class="card-header firebase-admin-head">
+        <div>
+          <h3>Firebase Yönetim Özeti</h3>
+          <div class="small-meta">Canlı veri özeti ve hızlı kontrol ekranı</div>
+        </div>
+        <div class="inline-actions wrap-actions">
+          <button type="button" class="secondary small" id="firebaseAdminRefreshBtn">Yenile</button>
+          <button type="button" class="secondary small" id="firebaseAdminTestBtn">Bağlantı Testi</button>
+        </div>
+      </div>
+      <div class="firebase-admin-stat-grid">
+        <div class="firebase-admin-stat"><span>Kaynak</span><strong>${escapeHtml(summary.source)}</strong></div>
+        <div class="firebase-admin-stat"><span>Kullanıcı</span><strong>${summary.playerCount}</strong></div>
+        <div class="firebase-admin-stat"><span>Toplam maç</span><strong>${summary.matchCount}</strong></div>
+        <div class="firebase-admin-stat"><span>Aktif hafta maç</span><strong>${summary.activeWeekMatchCount}</strong></div>
+        <div class="firebase-admin-stat"><span>Toplam tahmin</span><strong>${summary.predictionCount}</strong></div>
+        <div class="firebase-admin-stat"><span>Aktif hafta tahmin</span><strong>${summary.activeWeekPredictionCount}</strong></div>
+        <div class="firebase-admin-stat"><span>Bekleyen sıra</span><strong>${summary.queueCount}</strong></div>
+        <div class="firebase-admin-stat"><span>Aktif sezon hafta</span><strong>${summary.weekCount}</strong></div>
+      </div>
+      <div class="firebase-admin-capabilities">
+        <div class="firebase-admin-capability"><strong>Admin yetkisi</strong><span>Tüm kullanıcı tahminlerini düzenleyebilir ve silebilir.</span></div>
+        <div class="firebase-admin-capability"><strong>Kilit aşımı</strong><span>Maç başlasa bile admin tahmin girebilir ve düzeltme yapabilir.</span></div>
+        <div class="firebase-admin-capability"><strong>Canlı senkron</strong><span>Kaydettiğin değişiklikler tüm kullanıcılara anında düşer.</span></div>
+      </div>
+      <div class="status-note firebase-admin-status" id="firebaseAdminPanelStatus">Son tahmin: ${summary.lastPrediction ? formatAdminPanelDateTime(summary.lastPrediction.updatedAt) : "Henüz yok"}</div>
+      <div class="firebase-admin-table-grid">
+        <div class="firebase-admin-table-wrap">
+          <div class="firebase-admin-table-title">Kullanıcılar</div>
+          <div class="firebase-admin-table-scroll">
+            <table class="firebase-admin-table">
+              <thead><tr><th>Ad</th><th>Kullanıcı</th><th>Tahmin</th><th>Şifre</th></tr></thead>
+              <tbody>${playerRows || '<tr><td colspan="4">Kayıt yok.</td></tr>'}</tbody>
+            </table>
+          </div>
+        </div>
+        <div class="firebase-admin-table-wrap">
+          <div class="firebase-admin-table-title">Son Tahminler</div>
+          <div class="firebase-admin-table-scroll">
+            <table class="firebase-admin-table">
+              <thead><tr><th>Kişi</th><th>Maç</th><th>Tahmin</th><th>Hafta</th><th>Sezon</th><th>Durum</th><th>Güncelleme</th></tr></thead>
+              <tbody>${predictionRows}</tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+async function refreshFirebaseAdminPanel(buttonOrEvent) {
+  const actionButton = getActionButtonFromArg(buttonOrEvent);
+  const status = document.getElementById("firebaseAdminPanelStatus");
+  setAsyncButtonState(actionButton, "loading", { loading: "Yenileniyor..." });
+  if (status) status.textContent = `${getOnlineSourceLabel()} verileri yenileniyor...`;
+  try {
+    await hydrateFromFirebaseRealtime("manuel");
+    renderFirebaseAdminPanel();
+    if (status) status.textContent = `${getOnlineSourceLabel()} verileri güncellendi • ${formatAdminPanelDateTime(new Date().toISOString())}`;
+    setAsyncButtonState(actionButton, "success", { success: "Hazır" });
+  } catch (error) {
+    if (status) status.textContent = error?.message || "Panel yenilenemedi.";
+    setAsyncButtonState(actionButton, "error", { error: "Hata" });
+  }
+}
+
+async function testFirebaseAdminConnection(buttonOrEvent) {
+  const actionButton = getActionButtonFromArg(buttonOrEvent);
+  const status = document.getElementById("firebaseAdminPanelStatus");
+  setAsyncButtonState(actionButton, "loading", { loading: "Test ediliyor..." });
+  try {
+    const result = await runFirebaseConnectionTest();
+    if (status) status.textContent = `Bağlantı başarılı • ${formatAdminPanelDateTime(result.timestamp)}`;
+    showAlert("Firebase bağlantısı başarılı.", { title: "Bağlantı Testi", type: "success" });
+    setAsyncButtonState(actionButton, "success", { success: "Başarılı" });
+  } catch (error) {
+    if (status) status.textContent = error?.message || "Bağlantı testi başarısız.";
+    showAlert(error?.message || "Firebase bağlantı testi başarısız.", { title: "Bağlantı Hatası", type: "warning" });
+    setAsyncButtonState(actionButton, "error", { error: "Hata" });
+  }
 }
 
 async function syncDashboardWeek() {
@@ -3128,18 +3760,19 @@ function renderPlayers() {
   if (!state.players.length)
     return (container.innerHTML = createEmptyState("Henüz kişi eklenmedi."));
   container.innerHTML = `<div class="excel-list">${state.players
-    .map(
-      (player) => `
-    <div class="excel-list-row player-row player-admin-row">
-      <div class="player-name-cell">${escapeHtml(player.name)}</div>
+    .map((player) => {
+      const isAdminUser = String(player.role || "user").toLowerCase() === "admin";
+      return `
+    <div class="excel-list-row player-row player-admin-row ${isAdminUser ? "admin-player-row" : ""}">
+      <div class="player-name-cell">${escapeHtml(player.name)}${isAdminUser ? ' <span class="badge admin">Admin</span>' : ""}</div>
       <div class="small-meta">Şifre: <strong>${escapeHtml(player.password || "1234")}</strong> · ${state.predictions.filter((p) => p.playerId === player.id && p.homePred !== "" && p.awayPred !== "").length} kayıtlı tahmin</div>
       <div class="inline-actions compact wrap-actions">
         <button class="small secondary" onclick="renamePlayer('${player.id}', this)">Adı Düzenle</button>
         <button class="small secondary" onclick="changePlayerPassword('${player.id}', this)">Şifre Değiştir</button>
-        <button class="small danger" onclick="removePlayer('${player.id}', this)">Sil</button>
+        ${isAdminUser ? "" : `<button class="small danger" onclick="removePlayer('${player.id}', this)">Sil</button>`}
       </div>
-    </div>`,
-    )
+    </div>`;
+    })
     .join("")}</div>`;
 }
 
@@ -3182,7 +3815,7 @@ window.renamePlayer = async function (id, buttonOrEvent) {
       return;
     } catch (error) {
       console.error("Kullanıcı güncelleme hatası:", error);
-      showAlert(error?.message || "Google Sheets güncellemesi başarısız.", {
+      showAlert(error?.message || "Firebase güncellemesi başarısız.", {
         title: "Kayıt Hatası",
         type: "warning",
       });
@@ -3239,7 +3872,7 @@ window.changePlayerPassword = async function (id, buttonOrEvent) {
       return;
     } catch (error) {
       console.error("Şifre güncelleme hatası:", error);
-      showAlert(error?.message || "Google Sheets güncellemesi başarısız.", {
+      showAlert(error?.message || "Firebase güncellemesi başarısız.", {
         title: "Kayıt Hatası",
         type: "warning",
       });
@@ -3262,6 +3895,12 @@ window.removePlayer = async function (id, buttonOrEvent) {
   const actionButton = getActionButtonFromArg(buttonOrEvent);
   const player = getPlayerById(id);
   if (!player) return;
+  if (String(player.role || "user").toLowerCase() === "admin") {
+    return showAlert("Admin kullanıcısı silinemez.", {
+      title: "İşlem kapalı",
+      type: "warning",
+    });
+  }
   if (
     !(await showConfirm(
       `${player.name} kaydını ve tüm tahminlerini silmek istiyor musun?`,
@@ -3294,7 +3933,7 @@ window.removePlayer = async function (id, buttonOrEvent) {
       return;
     } catch (error) {
       console.error("Kullanıcı silme hatası:", error);
-      showAlert(error?.message || "Google Sheets silme işlemi başarısız.", {
+      showAlert(error?.message || "Firebase silme işlemi başarısız.", {
         title: "Kayıt Hatası",
         type: "warning",
       });
@@ -3492,26 +4131,106 @@ window.changeWeekStatus = async function (id) {
   renderAll();
 };
 window.removeWeek = async function (id) {
+  if (isReadOnlyMode()) {
+    return showAlert("Kullanıcı görünümünde hafta silinemez.", {
+      title: "Yetki yok",
+      type: "warning",
+    });
+  }
+
   const week = getWeekById(id);
   if (!week) return;
+
   if (
     !(await showConfirm(
       `${week.number}. haftayı ve bu haftadaki tüm maç/tahminleri silmek istiyor musun?`,
       { title: "Hafta silinsin mi?", type: "danger", confirmText: "Sil" },
     ))
-  )
+  ) {
     return;
-  const matchIds = getMatchesByWeekId(id).map((m) => m.id);
-  state.weeks = state.weeks.filter((w) => w.id !== id);
-  state.matches = state.matches.filter((m) => m.weekId !== id);
-  state.predictions = state.predictions.filter(
-    (p) => !matchIds.includes(p.matchId),
-  );
-  if (state.settings.activeWeekId === id)
-    state.settings.activeWeekId =
-      getWeeksBySeasonId(getActiveSeasonId())[0]?.id || null;
-  saveState();
-  renderAll();
+  }
+
+  const weekMatches = getMatchesByWeekId(id);
+  const matchIds = weekMatches.map((m) => String(m.id));
+
+  try {
+    if (useOnlineMode && isFirebaseReady()) {
+      const matchesMap = (await firebaseRead("matches")) || {};
+      const predictionsMap = (await firebaseRead("predictions")) || {};
+
+      const remoteMatches = firebaseSnapshotToArray(matchesMap);
+      const remotePredictions = firebaseSnapshotToArray(predictionsMap);
+
+      const remoteMatchRecordsToDelete = remoteMatches.filter((item) => {
+        const sameWeekNo =
+          String(item.weekNo ?? item.haftaNo ?? "") ===
+          String(week.number ?? "");
+        const sameSeason =
+          String(item.season ?? item.sezon ?? "") ===
+          String(getSeasonById(week.seasonId)?.name ?? "");
+
+        const sameMatchById = matchIds.includes(String(item.id ?? ""));
+        const sameMatchBySheetId = weekMatches.some(
+          (m) =>
+            String(m.sheetMatchId ?? m.remoteMatchId ?? m.macId ?? "") !== "" &&
+            String(m.sheetMatchId ?? m.remoteMatchId ?? m.macId ?? "") ===
+              String(item.id ?? item.sheetMatchId ?? item.macId ?? ""),
+        );
+
+        return (
+          sameMatchById || sameMatchBySheetId || (sameWeekNo && sameSeason)
+        );
+      });
+
+      const remoteMatchIdsToDelete = remoteMatchRecordsToDelete.map((item) =>
+        String(item.id ?? ""),
+      );
+
+      const remotePredictionRecordsToDelete = remotePredictions.filter((pred) =>
+        remoteMatchIdsToDelete.includes(String(pred.matchId ?? "")),
+      );
+
+      for (const match of remoteMatchRecordsToDelete) {
+        await firebaseRemove(`matches/${sanitizeFirebaseKey(match.id)}`);
+      }
+
+      for (const pred of remotePredictionRecordsToDelete) {
+        const predKey = sanitizeFirebaseKey(
+          pred.id || makePredictionRecordId(pred.matchId, pred.playerId),
+        );
+        await firebaseRemove(`predictions/${predKey}`);
+      }
+    }
+
+    state.weeks = state.weeks.filter((w) => w.id !== id);
+    state.matches = state.matches.filter((m) => m.weekId !== id);
+    state.predictions = state.predictions.filter(
+      (p) => !matchIds.includes(String(p.matchId)),
+    );
+
+    if (state.settings.activeWeekId === id) {
+      state.settings.activeWeekId =
+        getWeeksBySeasonId(getActiveSeasonId()).find((w) => w.id !== id)?.id ||
+        null;
+    }
+
+    saveState();
+    renderAll();
+
+    showAlert(`${week.number}. hafta ve bağlı maç/tahminler silindi.`, {
+      title: "Silme tamamlandı",
+      type: "success",
+    });
+  } catch (error) {
+    console.error("Hafta silme hatası:", error);
+    showAlert(
+      error?.message || "Firebase üzerinden hafta kayıtları silinemedi.",
+      {
+        title: "Silme hatası",
+        type: "error",
+      },
+    );
+  }
 };
 
 function renderMatches(
@@ -3827,6 +4546,7 @@ function renderPredictions() {
 
           const statusText = getPredictionBaseStatus(match.id, player.id);
           const showDeleteAction = hasPrediction || pred.remoteId || isSaving;
+          const showSaveAction = canEdit && shouldShowPredictionSaveAction(match.id, player.id);
 
           const pointValue = Number(pred.points || 0);
           const showPointBadge = hasPrediction;
@@ -3876,7 +4596,7 @@ function renderPredictions() {
                 ? `<div class="prediction-save-wrap pred-btn-slot"></div>`
                 : `<div class="prediction-save-wrap pred-btn-slot prediction-button-row">
                     <button
-                      class="secondary small prediction-action-btn"
+                      class="secondary small prediction-action-btn ${showSaveAction ? "" : "is-hidden"}"
                       type="button"
                       id="pred_btn_${match.id}_${player.id}"
                       data-pred-role="save-btn"
@@ -3924,61 +4644,12 @@ function renderPredictions() {
 
   updatePredictionShareModeButton();
   bindPredictionActionElements(container);
-  enablePredictionTableDragScroll(container);
   saveState(true);
 }
 
 const predictionTimers = {};
 const predictionUiState = {};
 const predictionUiResetTimers = {};
-
-function enablePredictionTableDragScroll(root) {
-  const scroller = root && root.querySelector('.excel-predictions');
-  if (!scroller || scroller.dataset.dragScrollBound === '1') return;
-
-  scroller.dataset.dragScrollBound = '1';
-
-  let isDown = false;
-  let startX = 0;
-  let scrollLeft = 0;
-  let moved = false;
-
-  const endDrag = () => {
-    isDown = false;
-    scroller.classList.remove('drag-scrolling');
-  };
-
-  scroller.addEventListener('mousedown', (e) => {
-    const interactive = e.target.closest('button, select, textarea, a, label, input:not(:disabled), .prediction-action-btn, .prediction-delete-btn');
-    if (interactive) return;
-
-    isDown = true;
-    moved = false;
-    startX = e.pageX - scroller.offsetLeft;
-    scrollLeft = scroller.scrollLeft;
-    scroller.classList.add('drag-scrolling');
-  });
-
-  scroller.addEventListener('mousemove', (e) => {
-    if (!isDown) return;
-    const x = e.pageX - scroller.offsetLeft;
-    const walk = x - startX;
-    if (Math.abs(walk) > 4) moved = true;
-    scroller.scrollLeft = scrollLeft - walk;
-  });
-
-  scroller.addEventListener('mouseleave', endDrag);
-  window.addEventListener('mouseup', endDrag);
-
-  scroller.addEventListener('click', (e) => {
-    if (moved) {
-      e.preventDefault();
-      e.stopPropagation();
-      moved = false;
-    }
-  }, true);
-}
-
 
 function getPredictionUiKey(matchId, playerId) {
   return `${matchId}_${playerId}`;
@@ -4046,6 +4717,88 @@ function getPredictionSaveLabel(matchId, playerId) {
   return "Kaydet";
 }
 
+function getPredictionInputElements(matchId, playerId) {
+  return {
+    homeInput: document.getElementById(`pred_home_${matchId}_${playerId}`),
+    awayInput: document.getElementById(`pred_away_${matchId}_${playerId}`),
+  };
+}
+
+function getPredictionInputSnapshot(matchId, playerId) {
+  const pred = ensurePrediction(matchId, playerId);
+  const { homeInput, awayInput } = getPredictionInputElements(matchId, playerId);
+  const homePred = parseNumberOrEmpty(homeInput?.value ?? pred.homePred ?? "");
+  const awayPred = parseNumberOrEmpty(awayInput?.value ?? pred.awayPred ?? "");
+  return {
+    pred,
+    homeInput,
+    awayInput,
+    homePred,
+    awayPred,
+  };
+}
+
+function hasStoredPredictionRecord(matchId, playerId) {
+  const pred = getPrediction(matchId, playerId);
+  return !!(
+    pred &&
+    ((pred.homePred !== "" && pred.awayPred !== "") || pred.remoteId)
+  );
+}
+
+function hasPredictionInputChanged(matchId, playerId) {
+  const { pred, homePred, awayPred } = getPredictionInputSnapshot(matchId, playerId);
+  return homePred !== parseNumberOrEmpty(pred.homePred) || awayPred !== parseNumberOrEmpty(pred.awayPred);
+}
+
+function shouldShowPredictionSaveAction(matchId, playerId) {
+  const key = getPredictionUiKey(matchId, playerId);
+  const uiState = predictionUiState[key] || "idle";
+  if (["saving", "queued", "error", "deleteError"].includes(uiState)) return true;
+
+  if (!hasStoredPredictionRecord(matchId, playerId)) return false;
+
+  const { homePred, awayPred } = getPredictionInputSnapshot(matchId, playerId);
+  if (homePred === "" || awayPred === "") return false;
+
+  return uiState === "dirty" || hasPredictionInputChanged(matchId, playerId);
+}
+
+function shouldAutoSavePrediction(matchId, playerId) {
+  const match = state.matches.find((item) => item.id === matchId);
+  if (!match) return false;
+  if ((isMatchLocked(match) && getCurrentRole() !== "admin") || !canEditPrediction(playerId)) {
+    return false;
+  }
+
+  const key = getPredictionUiKey(matchId, playerId);
+  const uiState = predictionUiState[key] || "idle";
+  if (["saving", "deleting"].includes(uiState)) return false;
+
+  const { homePred, awayPred } = getPredictionInputSnapshot(matchId, playerId);
+  if (homePred === "" || awayPred === "") return false;
+
+  return !hasStoredPredictionRecord(matchId, playerId);
+}
+
+function focusPredictionSiblingInput(target) {
+  if (!target) return;
+  const { matchId, playerId } = target.dataset || {};
+  if (!matchId || !playerId) return;
+
+  const isHomeInput = target.id === `pred_home_${matchId}_${playerId}`;
+  const siblingId = isHomeInput
+    ? `pred_away_${matchId}_${playerId}`
+    : `pred_home_${matchId}_${playerId}`;
+  const sibling = document.getElementById(siblingId);
+  if (!sibling || sibling.disabled) return;
+
+  requestAnimationFrame(() => {
+    sibling.focus();
+    if (typeof sibling.select === "function") sibling.select();
+  });
+}
+
 function setPredictionUiState(matchId, playerId, uiState) {
   const key = getPredictionUiKey(matchId, playerId);
   predictionUiState[key] = uiState;
@@ -4096,13 +4849,13 @@ function setPredictionUiState(matchId, playerId, uiState) {
   const status = document.getElementById(`pred_status_${matchId}_${playerId}`);
   if (status) {
     if (uiState === "saving") {
-      status.textContent = "Google Sheets'e gönderiliyor...";
+      status.textContent = "Firebase'e gönderiliyor...";
       status.dataset.saveState = "saving";
     } else if (uiState === "deleting") {
-      status.textContent = "Tahmin Google Sheets'ten siliniyor...";
+      status.textContent = "Tahmin Firebase'ten siliniyor...";
       status.dataset.saveState = "saving";
     } else if (uiState === "saved") {
-      status.textContent = "Google Sheets ile eşitlendi";
+      status.textContent = "Firebase ile eşitlendi";
       status.dataset.saveState = "saved";
     } else if (uiState === "deleted") {
       status.textContent = "Tahmin silindi";
@@ -4120,7 +4873,7 @@ function setPredictionUiState(matchId, playerId, uiState) {
       status.textContent = "Tahmin silinemedi";
       status.dataset.saveState = "error";
     } else if (uiState === "error") {
-      status.textContent = "Google Sheets kaydı başarısız";
+      status.textContent = "Firebase kaydı başarısız";
       status.dataset.saveState = "error";
     } else {
       status.textContent = getPredictionBaseStatus(matchId, playerId);
@@ -4316,7 +5069,7 @@ window.savePrediction = async function (matchId, playerId) {
     if (!result?.success) {
       console.error("Online tahmin kaydedilemedi:", result);
       setPredictionUiState(matchId, playerId, "error");
-      showAlert(result?.message || "Tahmin Google Sheets'e kaydedilemedi.", {
+      showAlert(result?.message || "Tahmin veritabanına kaydedilemedi.", {
         title: "Kayıt Hatası",
         type: "warning",
       });
@@ -4366,7 +5119,7 @@ window.savePrediction = async function (matchId, playerId) {
         lastAction: `${getPlayerById(playerId)?.name || "Kullanıcı"} tahmini sıraya alındı.`,
       });
       showAlert(
-        "Google Sheets yanıtı geç geldi. Tahmin yerelde korundu ve sıraya alındı. Bağlantı uygun olduğunda otomatik tekrar gönderilecek.",
+        "Veritabanı yanıtı geç geldi. Tahmin yerelde korundu ve sıraya alındı. Bağlantı uygun olduğunda otomatik tekrar gönderilecek.",
         {
           title: "Geciken Yanıt",
           type: "info",
@@ -4382,7 +5135,7 @@ window.savePrediction = async function (matchId, playerId) {
       lastError: error?.message || "Bağlantı gecikmesi",
     });
     showAlert(
-      "Google Sheets bağlantısında hata oluştu. Tahmin kaybolmadı; sıraya alındı ve bağlantı geldiğinde otomatik tekrar gönderilecek.",
+      "Veri bağlantısında hata oluştu. Tahmin kaybolmadı; sıraya alındı ve bağlantı geldiğinde otomatik tekrar gönderilecek.",
       {
         title: "Bağlantı Hatası",
         type: "warning",
@@ -4560,6 +5313,7 @@ function renderAll() {
   renderSelects();
   renderStats();
   renderDashboardSyncCard();
+  renderFirebaseAdminPanel();
   updateAdminSyncPanel();
   renderSeasons();
   renderPlayers();
@@ -4574,7 +5328,7 @@ function renderAll() {
   renderMissingPredictions();
   renderMatches("dashboardMatches", state.settings.activeWeekId);
   renderAdvancedStats();
-  renderBackupStatus();
+  renderBackupPanel();
   updateLoginOverlay();
   updateAdminSyncToggleButton();
   applyRolePermissions();
@@ -4726,11 +5480,11 @@ function addPlayer(buttonOrEvent) {
       type: "warning",
     });
 
-  const newPlayer = {
-    id: uid("player"),
-    name: name.toUpperCase(),
-    password,
-  };
+    const newPlayer = {
+      id: `player-${slugify(name) || "oyuncu"}`,
+      name: name.toUpperCase(),
+      password,
+    };
 
   if (useOnlineMode) {
     addUserOnline(newPlayer, actionButton);
@@ -4771,14 +5525,14 @@ async function addUserOnline(player, actionButton = null) {
     document.getElementById("playerPassword").value = "";
     renderAll();
     setAsyncButtonState(actionButton, "success", { success: "Eklendi" });
-    showAlert("Kullanıcı Google Sheets'e eklendi.", {
+    showAlert("Kullanıcı veritabanına eklendi.", {
       title: "Başarılı",
       type: "success",
     });
   } catch (error) {
     setAsyncButtonState(actionButton, "error", { error: "Hata" });
     console.error("Kullanıcı ekleme hatası:", error);
-    showAlert(error?.message || "Google Sheets kullanıcı kaydı yapılamadı.", {
+    showAlert(error?.message || "Firebase kullanıcı kaydı yapılamadı.", {
       title: "Kayıt Hatası",
       type: "warning",
     });
@@ -4887,146 +5641,511 @@ function switchTab(tabName) {
   saveState(true);
 }
 
-function exportData() {
-  const blob = new Blob([JSON.stringify(state, null, 2)], {
-    type: "application/json",
-  });
+function getBackupSelectedWeekId() {
+  const select = document.getElementById("backupWeekSelect");
+  return select?.value || state.settings.activeWeekId || "";
+}
+
+function getBackupSelectedWeek() {
+  const weekId = getBackupSelectedWeekId();
+  return weekId ? getWeekById(weekId) : null;
+}
+
+function formatBackupDateStamp() {
+  return new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
+}
+
+function downloadTextFile(content, fileName, mimeType = "text/plain;charset=utf-8") {
+  const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `fikstur-yedek-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = fileName;
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-function importData(file) {
+function csvEscape(value) {
+  const text = String(value ?? "");
+  if (/[";,\n]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
+  return text;
+}
+function forceExcelText(value) {
+  const text = String(value ?? "");
+  if (!text) return "";
+  return `="${text.replace(/"/g, '""')}"`;
+}
+function serializeStateForBackup(stateObj = state) {
+  return JSON.parse(JSON.stringify(stateObj));
+}
+
+function buildFullBackupPayload() {
+  return {
+    type: "full-backup",
+    app: "super-lig-tahmin-paneli",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    data: serializeStateForBackup(state),
+  };
+}
+
+function buildWeekExportPayload(weekId) {
+  const week = getWeekById(weekId);
+  if (!week) return null;
+
+  const season = getSeasonById(week.seasonId);
+  const matches = getMatchesByWeekId(weekId);
+  const matchIds = new Set(matches.map((match) => String(match.id)));
+  const predictions = state.predictions.filter((pred) => matchIds.has(String(pred.matchId)));
+  const playerIds = new Set(predictions.map((pred) => String(pred.playerId)));
+  const players = state.players.filter((player) => playerIds.has(String(player.id)));
+  const teams = state.teams.filter((team) => String(team.seasonId) === String(week.seasonId));
+
+  return {
+    type: "week-backup",
+    app: "super-lig-tahmin-paneli",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    season: season ? { ...season } : null,
+    week: { ...week },
+    teams,
+    players,
+    matches,
+    predictions,
+  };
+}
+
+function buildWeekCsv(weekId) {
+  const week = getWeekById(weekId);
+  if (!week) return "";
+
+  const season = getSeasonById(week.seasonId);
+  const matches = getMatchesByWeekId(weekId);
+
+  const orderedPlayers = [...state.players]
+    .filter((player) => String(player.role || "user").toLowerCase() !== "admin")
+    .sort((a, b) =>
+      String(a.name || "").localeCompare(String(b.name || ""), "tr"),
+    );
+
+  const header = [
+    "Sezon",
+    "Hafta",
+    "Tarih",
+    "Ev Sahibi",
+    "Deplasman",
+    "Gerçek Skor",
+    "Durum",
+  ];
+
+  orderedPlayers.forEach((player) => {
+    header.push(`${player.name} Tahmin`);
+    header.push(`${player.name} Puan`);
+  });
+
+  const rows = matches.map((match) => {
+    const dateLabel = match.date ? formatDate(match.date) : "";
+
+    const actualScoreRaw =
+      match.homeScore !== null &&
+      match.homeScore !== undefined &&
+      match.homeScore !== "" &&
+      match.awayScore !== null &&
+      match.awayScore !== undefined &&
+      match.awayScore !== ""
+        ? `${match.homeScore}-${match.awayScore}`
+        : "";
+
+    const actualScore = forceExcelText(actualScoreRaw);
+
+    const row = [
+      season?.name || "",
+      week.number || "",
+      dateLabel,
+      match.homeTeam || "",
+      match.awayTeam || "",
+      actualScore,
+      match.played ? "Oynandı" : isMatchLocked(match) ? "Kilitli" : "Açık",
+    ];
+
+    orderedPlayers.forEach((player) => {
+      const pred = state.predictions.find(
+        (item) =>
+          String(item.matchId) === String(match.id) &&
+          String(item.playerId) === String(player.id),
+      );
+
+      const predictionRaw =
+        pred && (pred.homePred !== "" || pred.awayPred !== "")
+          ? `${pred.homePred !== "" ? pred.homePred : "-"}-${pred.awayPred !== "" ? pred.awayPred : "-"}`
+          : "";
+
+      const predictionText = forceExcelText(predictionRaw);
+
+      row.push(predictionText);
+      row.push(pred ? Number(pred.points || 0) : "");
+    });
+
+    return row;
+  });
+
+  return [header, ...rows]
+    .map((row) => row.map(csvEscape).join(";"))
+    .join("\n");
+}
+
+async function syncBackupStateToFirebase(stateObj) {
+  if (!isFirebaseReady()) return true;
+
+  const safeState = migrateLegacyState(serializeStateForBackup(stateObj));
+  ensureAuthState(safeState);
+  const stamp = new Date().toISOString();
+
+  const usersMap = {};
+  (safeState.players || []).forEach((player) => {
+    const id = sanitizeFirebaseKey(player.id || buildPlayerKeyFromName(player.name || "oyuncu", usersMap));
+    usersMap[id] = {
+      id,
+      kullaniciAdi: normalizeLoginName(player.username || player.name || id),
+      sifre: String(player.password || "1234"),
+      adSoyad: String(player.name || player.username || id).trim().toUpperCase(),
+      rol: String(player.role || "user").toLowerCase() === "admin" ? "admin" : "user",
+      aktif: true,
+      importedAt: stamp,
+    };
+  });
+
+  if (!Object.values(usersMap).some((item) => item.rol === "admin")) {
+    FIREBASE_DEFAULT_USERS.filter((item) => String(item.rol || "user").toLowerCase() === "admin").forEach((item) => {
+      usersMap[sanitizeFirebaseKey(item.id)] = { ...item, importedAt: stamp };
+    });
+  }
+
+  const matchesMap = {};
+  (safeState.matches || []).forEach((match) => {
+    const season = safeState.seasons?.find((item) => String(item.id) === String(match.seasonId));
+    const week = safeState.weeks?.find((item) => String(item.id) === String(match.weekId));
+    const id = sanitizeFirebaseKey(match.id || uid("match"));
+    matchesMap[id] = {
+      ...match,
+      id,
+      season: season?.name || "",
+      sezon: season?.name || "",
+      weekNo: Number(week?.number || 0),
+      haftaNo: Number(week?.number || 0),
+      importedAt: stamp,
+    };
+  });
+
+  const predictionsMap = {};
+  (safeState.predictions || []).forEach((pred) => {
+    const match = (safeState.matches || []).find((item) => String(item.id) === String(pred.matchId));
+    const season = safeState.seasons?.find((item) => String(item.id) === String(match?.seasonId));
+    const week = safeState.weeks?.find((item) => String(item.id) === String(match?.weekId));
+    const player = (safeState.players || []).find((item) => String(item.id) === String(pred.playerId));
+    const id = sanitizeFirebaseKey(pred.id || makePredictionRecordId(pred.matchId, pred.playerId));
+    predictionsMap[id] = {
+      ...pred,
+      id,
+      season: season?.name || "",
+      sezon: season?.name || "",
+      weekNo: Number(week?.number || 0),
+      haftaNo: Number(week?.number || 0),
+      playerName: player?.name || "",
+      adSoyad: player?.name || "",
+      kullaniciAdi: player?.username || "",
+      importedAt: stamp,
+    };
+  });
+
+  await Promise.all([
+    firebaseWrite("users", usersMap),
+    firebaseWrite("matches", matchesMap),
+    firebaseWrite("predictions", predictionsMap),
+    firebaseUpdate("settings", {
+      init: false,
+      source: "firebase",
+      lastImportAt: stamp,
+      backupVersion: 1,
+    }),
+  ]);
+
+  return true;
+}
+
+async function applyImportedState(nextState, options = {}) {
+  const currentAuth = state.settings?.auth ? { ...state.settings.auth } : null;
+  let safeState = migrateLegacyState(serializeStateForBackup(nextState));
+  ensureAuthState(safeState);
+
+  if (currentAuth) {
+    safeState.settings.auth = {
+      ...safeState.settings.auth,
+      ...currentAuth,
+    };
+  }
+
+  ensureDefaultSeason(safeState);
+  state = safeState;
+  recalculateAllPoints();
+  saveState(true);
+
+  if (options.syncFirebase !== false) {
+    await syncBackupStateToFirebase(state);
+  }
+
+  renderAll();
+  return true;
+}
+
+async function exportFullBackup() {
+  const payload = buildFullBackupPayload();
+  downloadTextFile(
+    JSON.stringify(payload, null, 2),
+    `fikstur-full-backup-${formatBackupDateStamp()}.json`,
+    "application/json",
+  );
+  setBackupImportStatus("Tam yedek indirildi.");
+}
+
+async function exportSelectedWeekJson() {
+  const week = getBackupSelectedWeek();
+  if (!week) {
+    showAlert("Önce dışa aktarmak istediğin haftayı seçmelisin.", {
+      title: "Hafta seçilmedi",
+      type: "warning",
+    });
+    return;
+  }
+
+  const payload = buildWeekExportPayload(week.id);
+  const season = getSeasonById(week.seasonId);
+  downloadTextFile(
+    JSON.stringify(payload, null, 2),
+    `fikstur-${slugify(season?.name || "sezon")}-hafta-${week.number || "x"}.json`,
+    "application/json",
+  );
+  setBackupImportStatus(`Hafta ${week.number} JSON olarak indirildi.`);
+}
+
+async function exportSelectedWeekCsv() {
+  const week = getBackupSelectedWeek();
+  if (!week) {
+    showAlert("Önce dışa aktarmak istediğin haftayı seçmelisin.", {
+      title: "Hafta seçilmedi",
+      type: "warning",
+    });
+    return;
+  }
+
+  const season = getSeasonById(week.seasonId);
+  const csv = buildWeekCsv(week.id);
+  downloadTextFile(
+    "﻿" + csv,
+    `fikstur-${slugify(season?.name || "sezon")}-hafta-${week.number || "x"}.csv`,
+    "text/csv;charset=utf-8",
+  );
+  setBackupImportStatus(`Hafta ${week.number} CSV olarak indirildi.`);
+}
+
+function mergeWeekBackupIntoState(payload) {
+  const next = serializeStateForBackup(state);
+  const season = payload.season || null;
+  const week = payload.week || null;
+  if (!week) throw new Error("Hafta bilgisi bulunamadı.");
+
+  let targetSeasonId = season?.id || null;
+  if (season) {
+    const existingSeason = next.seasons.find((item) => normalizeText(item.name) === normalizeText(season.name || ""));
+    if (existingSeason) {
+      targetSeasonId = existingSeason.id;
+    } else {
+      targetSeasonId = season.id || uid("season");
+      next.seasons.push({ ...season, id: targetSeasonId });
+    }
+  }
+
+  let targetWeekId = week.id || uid("week");
+  const existingWeek = next.weeks.find(
+    (item) => String(item.seasonId) === String(targetSeasonId) && Number(item.number) === Number(week.number),
+  );
+  if (existingWeek) {
+    targetWeekId = existingWeek.id;
+  } else {
+    next.weeks.push({ ...week, id: targetWeekId, seasonId: targetSeasonId });
+  }
+
+  (payload.teams || []).forEach((team) => {
+    if (
+      !next.teams.some(
+        (item) => String(item.seasonId) === String(targetSeasonId) && normalizeText(item.name) === normalizeText(team.name || ""),
+      )
+    ) {
+      next.teams.push({ ...team, id: team.id || uid("team"), seasonId: targetSeasonId });
+    }
+  });
+
+  (payload.players || []).forEach((player) => {
+    if (!next.players.some((item) => String(item.id) === String(player.id))) {
+      next.players.push({ ...player });
+    }
+  });
+
+  const incomingMatches = (payload.matches || []).map((match) => ({ ...match }));
+  const incomingPredictions = (payload.predictions || []).map((pred) => ({ ...pred }));
+  const matchIdMap = new Map();
+
+  const removedMatchIds = new Set(
+    next.matches
+      .filter((match) => String(match.weekId) === String(targetWeekId))
+      .map((match) => String(match.id)),
+  );
+
+  next.matches = next.matches.filter((match) => String(match.weekId) !== String(targetWeekId));
+  next.predictions = next.predictions.filter((pred) => !removedMatchIds.has(String(pred.matchId)));
+
+  incomingMatches.forEach((match) => {
+    const newId = uid("match");
+    matchIdMap.set(String(match.id), newId);
+    next.matches.push({ ...match, id: newId, seasonId: targetSeasonId, weekId: targetWeekId });
+  });
+
+  incomingPredictions.forEach((pred) => {
+    const mappedMatchId = matchIdMap.get(String(pred.matchId));
+    if (!mappedMatchId) return;
+    next.predictions.push({
+      ...pred,
+      id: pred.id || uid("pred"),
+      matchId: mappedMatchId,
+    });
+  });
+
+  next.settings.activeSeasonId = targetSeasonId || next.settings.activeSeasonId || null;
+  next.settings.activeWeekId = targetWeekId;
+  return next;
+}
+
+async function importData(file) {
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     try {
-      state = migrateLegacyState(JSON.parse(e.target.result));
-      saveState();
-      renderAll();
-      showAlert("Yedek başarıyla yüklendi.", {
+      const parsed = JSON.parse(e.target.result);
+      let nextState = null;
+
+      if (parsed?.type === "full-backup" && parsed?.data) {
+        nextState = parsed.data;
+      } else if (parsed?.type === "week-backup" && parsed?.week) {
+        nextState = mergeWeekBackupIntoState(parsed);
+      } else if (parsed?.seasons || parsed?.matches || parsed?.players || parsed?.predictions) {
+        nextState = parsed;
+      } else {
+        throw new Error("Geçersiz yedek formatı.");
+      }
+
+      await applyImportedState(nextState, { syncFirebase: true });
+      setBackupImportStatus("Yedek başarıyla yüklendi.");
+      showAlert("Yedek başarıyla yüklendi ve Firebase ile eşitlendi.", {
         title: "İşlem tamam",
         type: "success",
       });
-    } catch {
-      showAlert("Geçerli bir JSON dosyası seçmelisin.", {
+    } catch (error) {
+      console.error("Yedek yükleme hatası:", error);
+      setBackupImportStatus("Yükleme başarısız oldu.");
+      showAlert("Geçerli bir yedek / JSON dosyası seçmelisin.", {
         title: "Dosya hatası",
         type: "danger",
       });
+    } finally {
+      const input = document.getElementById("importFile");
+      if (input) input.value = "";
     }
   };
   reader.readAsText(file);
 }
 
-async function saveHandleToDb(handle) {
-  try {
-    const db = await openHandleDb();
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction(DB_STORE, "readwrite");
-      tx.objectStore(DB_STORE).put(handle, HANDLE_KEY);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
+function setBackupImportStatus(message) {
+  const el = document.getElementById("backupImportStatus");
+  if (el) el.textContent = message || "Hazır.";
+}
+
+function renderBackupPanel() {
+  const select = document.getElementById("backupWeekSelect");
+  const summary = document.getElementById("backupWeekSummary");
+  if (!select || !summary) return;
+
+  const seasonId = getActiveSeasonId();
+  const season = getSeasonById(seasonId);
+  const weeks = getWeeksBySeasonId(seasonId);
+  const selectedWeekId = select.value || state.settings.activeWeekId || weeks[0]?.id || "";
+
+  select.innerHTML = weeks.length
+    ? weeks
+        .map(
+          (week) => `<option value="${week.id}" ${String(week.id) === String(selectedWeekId) ? "selected" : ""}>Hafta ${week.number}</option>`,
+        )
+        .join("")
+    : '<option value="">Hafta bulunamadı</option>';
+
+  const activeWeek = selectedWeekId ? getWeekById(selectedWeekId) : null;
+  const matches = activeWeek ? getMatchesByWeekId(activeWeek.id) : [];
+  const matchIds = new Set(matches.map((match) => String(match.id)));
+  const predictionCount = state.predictions.filter((pred) => matchIds.has(String(pred.matchId))).length;
+
+  summary.textContent = activeWeek
+    ? `${season?.name || "Sezon seçilmedi"} • Hafta ${activeWeek.number} • ${matches.length} maç • ${predictionCount} tahmin`
+    : "Önce aktif sezonda bir hafta oluşturmalısın.";
+
+  setBackupImportStatus(document.getElementById("backupImportStatus")?.textContent || "Hazır.");
+}
+
+async function handleDangerousReset() {
+  const approved = await showConfirm(
+    "Bu işlem tüm sezonları, haftaları, maçları ve tahminleri silecek. Admin hesabı korunur. Devam etmek istiyor musun?",
+    {
+      title: "Tüm veriler silinsin mi?",
+      type: "danger",
+      confirmText: "Devam et",
+      cancelText: "Vazgeç",
+    },
+  );
+  if (!approved) return;
+
+  const typed = await showPrompt(
+    'Onay için kutuya SIL yaz.',
+    '',
+    {
+      title: 'Son güvenlik adımı',
+      placeholder: 'SIL',
+      confirmText: 'Verileri sil',
+      cancelText: 'Vazgeç',
+    },
+  );
+
+  if (String(typed || '').trim().toUpperCase() !== 'SIL') {
+    showAlert('İşlem iptal edildi. Onay metni doğru girilmedi.', {
+      title: 'Silme durduruldu',
+      type: 'warning',
     });
-  } catch {}
-}
-async function loadHandleFromDb() {
-  try {
-    const db = await openHandleDb();
-    return await new Promise((resolve) => {
-      const tx = db.transaction(DB_STORE, "readonly");
-      const req = tx.objectStore(DB_STORE).get(HANDLE_KEY);
-      req.onsuccess = () => resolve(req.result || null);
-      req.onerror = () => resolve(null);
-    });
-  } catch {
-    return null;
-  }
-}
-async function verifyPermission(handle, readWrite = true) {
-  if (!handle) return false;
-  const options = readWrite ? { mode: "readwrite" } : {};
-  if ((await handle.queryPermission(options)) === "granted") return true;
-  return (await handle.requestPermission(options)) === "granted";
-}
-async function connectLocalBackupFile() {
-  if (!window.showSaveFilePicker)
-    return showAlert("Bu özellik için Chrome veya Edge kullanmalısın.", {
-      title: "Tarayıcı desteği yok",
-      type: "warning",
-    });
-  try {
-    const handle = await window.showSaveFilePicker({
-      suggestedName: "fikstur-verileri.json",
-      types: [
-        { description: "JSON", accept: { "application/json": [".json"] } },
-      ],
-    });
-    backupHandle = handle;
-    await saveHandleToDb(handle);
-    localBackupStatus = `Yerel dosya bağlı: ${handle.name}`;
-    await writeLocalFileBackup(true);
-    renderBackupStatus();
-  } catch (error) {
-    if (error?.name !== "AbortError")
-      showAlert("Yerel dosya bağlanırken bir hata oluştu.", {
-        title: "Dosya bağlantı hatası",
-        type: "danger",
-      });
-  }
-}
-async function writeLocalFileBackup(showAlert = false) {
-  if (!backupHandle) return false;
-  try {
-    const allowed = await verifyPermission(backupHandle, true);
-    if (!allowed) {
-      localBackupStatus =
-        "Yerel dosya izni verilmedi. Sadece tarayıcı hafızası aktif.";
-      renderBackupStatus();
-      return false;
-    }
-    const writable = await backupHandle.createWritable();
-    await writable.write(JSON.stringify(state, null, 2));
-    await writable.close();
-    localBackupStatus = `Yerel dosyaya kaydedildi: ${backupHandle.name}`;
-    renderBackupStatus();
-    if (showAlert)
-      window.showAlert("Yerel dosyaya kayıt tamamlandı.", {
-        title: "Kayıt tamam",
-        type: "success",
-      });
-    return true;
-  } catch {
-    localBackupStatus =
-      "Yerel dosyaya yazılamadı. Tarayıcı hafızası açık kalmaya devam ediyor.";
-    renderBackupStatus();
-    return false;
-  }
-}
-async function restoreBackupHandle() {
-  if (!window.showSaveFilePicker) {
-    localBackupStatus =
-      "Bu tarayıcı yerel dosya bağlantısını desteklemiyor. JSON yedek kullanabilirsin.";
-    renderBackupStatus();
     return;
   }
-  backupHandle = await loadHandleFromDb();
-  if (!backupHandle) {
-    localBackupStatus =
-      "Yerel dosya bağlı değil. İstersen aşağıdan bağlayabilirsin.";
-    renderBackupStatus();
-    return;
-  }
-  const allowed = await verifyPermission(backupHandle, true);
-  localBackupStatus = allowed
-    ? `Yerel dosya hazır: ${backupHandle.name}`
-    : "Kayıt dosyası bulundu ama izin bekliyor. Dosyayı tekrar bağla.";
-  renderBackupStatus();
-}
-function renderBackupStatus() {
-  const el = document.getElementById("localSaveStatus");
-  if (el) el.textContent = localBackupStatus;
+
+  const adminPlayers = (state.players || []).filter(
+    (player) => String(player.role || 'user').toLowerCase() === 'admin',
+  );
+  const preservedAuth = state.settings?.auth ? { ...state.settings.auth } : null;
+
+  state = createInitialState();
+  state.players = adminPlayers;
+  ensureAuthState(state);
+  if (preservedAuth) state.settings.auth = { ...state.settings.auth, ...preservedAuth };
+  saveState(true);
+  await syncBackupStateToFirebase(state);
+  renderAll();
+  setBackupImportStatus('Tüm veriler temizlendi.');
+  showAlert('Tüm veriler silindi. Admin erişimi korundu.', {
+    title: 'Temizleme tamamlandı',
+    type: 'success',
+  });
 }
 
 function parseApiEvent(item) {
@@ -5485,7 +6604,50 @@ function bindEvents() {
       const { matchId, playerId } = target.dataset;
       if (!matchId || !playerId) return;
 
-      window.queuePredictionSave(matchId, playerId);
+      const value = String(target.value ?? "").trim();
+      if (!value) return;
+
+      const isHomeInput = target.id === `pred_home_${matchId}_${playerId}`;
+      if (isHomeInput) {
+        focusPredictionSiblingInput(target);
+        return;
+      }
+
+      requestAnimationFrame(() => {
+        target.blur();
+      });
+
+      if (shouldAutoSavePrediction(matchId, playerId)) {
+        setTimeout(() => {
+          window.queuePredictionSave?.(matchId, playerId, true);
+        }, 40);
+      }
+    },
+    true,
+  );
+
+  document.addEventListener(
+    "keydown",
+    (e) => {
+      const target = e.target.closest?.('input[data-pred-role="input"]');
+      if (!target) return;
+
+      const { matchId, playerId } = target.dataset;
+      if (!matchId || !playerId) return;
+
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const isHomeInput = target.id === `pred_home_${matchId}_${playerId}`;
+        if (isHomeInput) {
+          focusPredictionSiblingInput(target);
+          return;
+        }
+
+        target.blur();
+        if (shouldAutoSavePrediction(matchId, playerId)) {
+          window.queuePredictionSave?.(matchId, playerId, true);
+        }
+      }
     },
     true,
   );
@@ -5570,15 +6732,17 @@ function bindEvents() {
   on("addPlayerBtn", "click", (event) => addPlayer(event.currentTarget));
   on("addWeekBtn", "click", addWeek);
   on("addMatchBtn", "click", addMatch);
-  on("exportBtn", "click", exportData);
-  on("connectLocalFileBtn", "click", connectLocalBackupFile);
-  on("saveLocalFileBtn", "click", () => writeLocalFileBackup(true));
+  on("exportWeekCsvBtn", "click", exportSelectedWeekCsv);
+  on("exportWeekJsonBtn", "click", exportSelectedWeekJson);
+  on("exportFullBackupBtn", "click", exportFullBackup);
   on("apiImportFixturesBtn", "click", () => importFixturesFromApi(false));
   on("apiUpdateResultsBtn", "click", () => importFixturesFromApi(true));
   on("apiSyncWeekBtn", "click", syncSelectedWeekFromApi);
   on("dashboardSyncWeekBtn", "click", syncDashboardWeek);
   on("dashboardSyncSeasonBtn", "click", syncDashboardSeason);
   on("adminSyncToggleBtn", "click", toggleAdminSyncOverview);
+  on("firebaseAdminRefreshBtn", "click", refreshFirebaseAdminPanel);
+  on("firebaseAdminTestBtn", "click", testFirebaseAdminConnection);
   on("toggleShareModeBtn", "click", togglePredictionShareMode);
   document.addEventListener("click", (event) => {
     const syncBtn = event.target.closest('[data-role="global-sync-btn"]');
@@ -5596,20 +6760,7 @@ function bindEvents() {
   on("closeChampionModalBtn", "click", () =>
     document.getElementById("championModal")?.classList.add("hidden"),
   );
-  on("resetBtn", "click", async () => {
-    if (
-      !(await showConfirm("Tüm veriler silinsin mi?", {
-        title: "Tüm veriler silinsin mi?",
-        type: "danger",
-        confirmText: "Sil",
-      }))
-    )
-      return;
-    state = createInitialState();
-    ensureDefaultSeason(state);
-    saveState();
-    renderAll();
-  });
+  on("resetBtn", "click", handleDangerousReset);
   on(
     "importFile",
     "change",
@@ -5691,6 +6842,12 @@ function bindEvents() {
   ].forEach((id) => {
     on(id, "change", (e) => setActiveWeek(e.target.value));
   });
+  on("backupWeekSelect", "change", (e) => {
+    const weekId = e.target.value;
+    if (weekId) state.settings.activeWeekId = weekId;
+    saveState();
+    renderBackupPanel();
+  });
 }
 window.addEventListener("online", () => {
   flushPendingPredictionQueue({ renderAfterFlush: true }).then((result) => {
@@ -5714,10 +6871,16 @@ window.addEventListener("online", () => {
 
 bindEvents();
 ensureHeaderSyncButtons();
-restoreBackupHandle();
 switchTab(state.settings.currentTab || "dashboard");
 updateLoginOverlay();
 updateAdminSyncToggleButton();
+
+if (isFirebaseReady()) {
+  ensureFirebaseDefaults().catch((error) =>
+    console.warn("Firebase varsayılanları hazırlanamadı:", error),
+  );
+  ensureFirebaseRealtimeBridge();
+}
 
 if (isAuthenticated()) {
   renderAll();
