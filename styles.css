@@ -4658,3 +4658,16 @@ textarea {
 #weeksList::-webkit-scrollbar-track {
   background: transparent;
 }
+.badge.online {
+  background: #16a34a;
+  color: #ffffff;
+  border: 1px solid rgba(22, 163, 74, 0.45);
+  box-shadow: 0 0 10px rgba(22, 163, 74, 0.28);
+}
+
+.badge.offline {
+  background: #dc2626;
+  color: #ffffff;
+  border: 1px solid rgba(220, 38, 38, 0.45);
+  box-shadow: 0 0 10px rgba(220, 38, 38, 0.22);
+}
