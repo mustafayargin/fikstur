@@ -2178,7 +2178,7 @@ function renderMobilePredictions(container, matches) {
                   <span class="compact-score-pill">${scoreDisplay}</span>
                 </div>
                 <div class="compact-user-meta">
-                  <span class="mini-points premium-points compact-points">${locked ? "Kilitli" : `${pred.points || 0} puan`}</span>
+                  <span class="mini-points premium-points compact-points">${ `${pred.points || 0} puan`}</span>
                   <div class="prediction-status-chip ${outcomeClass} compact-status" id="pred_status_${match.id}_${player.id}">
                     ${statusText}
                   </div>
@@ -2191,7 +2191,7 @@ function renderMobilePredictions(container, matches) {
             <div class="mobile-user-prediction premium-user-card ${pointLabel(pred.points)} ${outcomeClass} ${statusClass} ${lockedClass} ${ownClass}">
               <div class="mobile-user-head premium-user-head">
                 <strong>${escapeHtml(player.name)}${isOwnPlayer ? '<span class="own-pill">Sen</span>' : ""}</strong>
-                <span class="mini-points premium-points">${locked ? "Kilitli" : `${pred.points || 0} puan`}</span>
+                <span class="mini-points premium-points">${ `${pred.points || 0} puan`}</span>
               </div>
 
               <div class="score-inputs compact-inputs center-mode premium-score-inputs pred-score-row own-pred-score-row">
@@ -2237,7 +2237,7 @@ function renderMobilePredictions(container, matches) {
                       ${locked ? "disabled" : ""}
                       onclick="if(!this.disabled && window.queuePredictionSave){ event.preventDefault(); event.stopPropagation(); window.queuePredictionSave('${match.id}','${player.id}', true); } return false;"
                     >
-                      ${locked ? "Kilitli" : getPredictionSaveLabel(match.id, player.id)}
+                      ${locked ? "🔒 Kilitli" : getPredictionSaveLabel(match.id, player.id)}
                     </button>
                     <button
                       class="prediction-mobile-save-btn danger prediction-delete-btn ${showDeleteAction ? "" : "is-hidden"}"
@@ -2272,6 +2272,7 @@ function renderMobilePredictions(container, matches) {
     .join("")}</div>`;
 
   bindPredictionActionElements(container);
+  enablePredictionTableDragScroll(container);
   saveState(true);
 }
 
@@ -2772,7 +2773,7 @@ function getMatchBadge(match) {
   if (visual === "played") return { text: "Bitti", cls: "" };
   if (visual === "postponed") return { text: "Ertelendi", cls: "warn" };
   if (visual === "live") return { text: "Canlı", cls: "red" };
-  if (visual === "locked") return { text: "Kilitli", cls: "red" };
+  if (visual === "locked") return { text: "🔒 Kilitli", cls: "red" };
   return { text: "Bekliyor", cls: "warn" };
 }
 
@@ -3724,7 +3725,7 @@ function renderPredictionShareTable(container, matches, players) {
                 ? `${pred.points || 0}P`
                 : ""
               : locked && !match.played
-                ? "Kilitli"
+                ? "🔒 Kilitli"
                 : "";
 
           return `
@@ -3923,12 +3924,61 @@ function renderPredictions() {
 
   updatePredictionShareModeButton();
   bindPredictionActionElements(container);
+  enablePredictionTableDragScroll(container);
   saveState(true);
 }
 
 const predictionTimers = {};
 const predictionUiState = {};
 const predictionUiResetTimers = {};
+
+function enablePredictionTableDragScroll(root) {
+  const scroller = root && root.querySelector('.excel-predictions');
+  if (!scroller || scroller.dataset.dragScrollBound === '1') return;
+
+  scroller.dataset.dragScrollBound = '1';
+
+  let isDown = false;
+  let startX = 0;
+  let scrollLeft = 0;
+  let moved = false;
+
+  const endDrag = () => {
+    isDown = false;
+    scroller.classList.remove('drag-scrolling');
+  };
+
+  scroller.addEventListener('mousedown', (e) => {
+    const interactive = e.target.closest('button, select, textarea, a, label, input:not(:disabled), .prediction-action-btn, .prediction-delete-btn');
+    if (interactive) return;
+
+    isDown = true;
+    moved = false;
+    startX = e.pageX - scroller.offsetLeft;
+    scrollLeft = scroller.scrollLeft;
+    scroller.classList.add('drag-scrolling');
+  });
+
+  scroller.addEventListener('mousemove', (e) => {
+    if (!isDown) return;
+    const x = e.pageX - scroller.offsetLeft;
+    const walk = x - startX;
+    if (Math.abs(walk) > 4) moved = true;
+    scroller.scrollLeft = scrollLeft - walk;
+  });
+
+  scroller.addEventListener('mouseleave', endDrag);
+  window.addEventListener('mouseup', endDrag);
+
+  scroller.addEventListener('click', (e) => {
+    if (moved) {
+      e.preventDefault();
+      e.stopPropagation();
+      moved = false;
+    }
+  }, true);
+}
+
 
 function getPredictionUiKey(matchId, playerId) {
   return `${matchId}_${playerId}`;
@@ -3943,7 +3993,7 @@ function getPredictionBaseStatus(matchId, playerId) {
   const hasAnyValue = pred.homePred !== "" || pred.awayPred !== "";
 
   if (!match) return "";
-  if (!match.played && isMatchLocked(match)) return "Kilitli";
+  if (!match.played && isMatchLocked(match)) return "🔒 Kilitli";
   if (match.played) {
     if ((pred.points || 0) === 3) return "Tam skor";
     if ((pred.points || 0) === 1) return "Yakın";
