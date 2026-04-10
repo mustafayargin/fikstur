@@ -1,3 +1,4 @@
+window.__ALLOW_MATCH_WRITE__ = false;
 const STORAGE_KEY = "fikstur_tahmin_paneli_v4";
 const DB_NAME = "fiksturLocalDb";
 const DB_STORE = "handles";
@@ -1587,7 +1588,12 @@ async function syncUsersFromSheet(options = {}) {
   return users;
 }
 
-async function sendMatchesToSheet(matches) {
+async function sendMatchesToSheet(matches, options = {}) {
+  const forceWrite = !!options.force;
+  if (!forceWrite && !window.__ALLOW_MATCH_WRITE__) {
+    console.log("Firebase write engellendi (auto sync)");
+    return null;
+  }
   if (!useOnlineMode || !Array.isArray(matches) || !matches.length) return null;
 
   const payloadMatches = matches
@@ -1641,13 +1647,13 @@ async function sendMatchesToSheet(matches) {
 async function syncWeekMatchesToSheet(weekId) {
   const matches = getMatchesByWeekId(weekId);
   if (!matches.length) return null;
-  return await sendMatchesToSheet(matches);
+  return await sendMatchesToSheet(matches, { force: true });
 }
 
 async function syncSeasonMatchesToSheet(seasonId) {
   const matches = getMatchesBySeasonId(seasonId);
   if (!matches.length) return null;
-  return await sendMatchesToSheet(matches);
+  return await sendMatchesToSheet(matches, { force: true });
 }
 
 function isMobileView() {
@@ -4285,7 +4291,7 @@ window.queueResultSave = function (matchId) {
   clearTimeout(resultSaveTimers[matchId]);
   resultSaveTimers[matchId] = setTimeout(() => saveResult(matchId), 350);
 };
-window.saveResult = function (matchId) {
+window.saveResult = async function (matchId) {
   if (isReadOnlyMode())
     return showAlert("Kullanıcı görünümünde skor işlenemez.", {
       title: "Yetki yok",
@@ -4296,12 +4302,39 @@ window.saveResult = function (matchId) {
   const homeScore = document.getElementById(`homeScore_${matchId}`)?.value;
   const awayScore = document.getElementById(`awayScore_${matchId}`)?.value;
   if (homeScore === "" || awayScore === "") return;
+
   match.homeScore = Number(homeScore);
   match.awayScore = Number(awayScore);
   match.played = true;
   recalculateAllPoints();
   saveState();
   renderAll();
+
+  if (!useOnlineMode) return;
+
+  try {
+    window.__ALLOW_MATCH_WRITE__ = true;
+    await sendMatchesToSheet([match], { force: true });
+    await syncOnlineMatchesFromSheet({
+      seasonId: match.seasonId,
+      seasonLabel: getSeasonById(match.seasonId)?.name || "",
+      silent: true,
+    });
+    recalculateAllPoints();
+    saveState();
+    renderAll();
+  } catch (error) {
+    console.error("Skor Firebase senkron hatası:", error);
+    showAlert(
+      "Skor yerelde kaydedildi ama Firebase'e yazılırken hata oluştu.",
+      {
+        title: "Senkron hatası",
+        type: "warning",
+      },
+    );
+  } finally {
+    window.__ALLOW_MATCH_WRITE__ = false;
+  }
 };
 window.removeMatch = async function (matchId) {
   if (isReadOnlyMode())
@@ -5615,9 +5648,14 @@ function addMatch() {
   };
   state.matches.push(newMatch);
   if (useOnlineMode) {
-    sendMatchesToSheet([newMatch]).catch((error) =>
-      console.error("Tek maç Sheets senkron hatası:", error),
-    );
+    window.__ALLOW_MATCH_WRITE__ = true;
+    sendMatchesToSheet([newMatch], { force: true })
+      .catch((error) =>
+        console.error("Tek maç Sheets senkron hatası:", error),
+      )
+      .finally(() => {
+        window.__ALLOW_MATCH_WRITE__ = false;
+      });
   }
   document.getElementById("homeTeam").value = "";
   document.getElementById("awayTeam").value = "";
