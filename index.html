@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fikstür Tahmin Paneli Pro</title>
     <link rel="stylesheet" href="styles.css" />
+    <link rel="icon" href="favicon.png">
   </head>
   <body>
     <button type="button" class="landscape-sidebar-toggle" id="landscapeSidebarToggle" aria-label="Menüyü aç">☰</button>
@@ -153,6 +154,8 @@
               <div class="status-note" id="adminSyncFooter">Henüz senkron yapılmadı.</div>
             </div>
           </section>
+
+          <div id="firebaseAdminPanel" class="firebase-admin-panel hidden"></div>
 
           <div class="dashboard-grid">
             <section class="card">
@@ -464,6 +467,10 @@
               >
             </div>
             <div id="predictionLockBanner" class="prediction-lock-banner is-hidden"></div>
+            <div class="admin-prediction-note admin-only">
+              <strong>Admin hızlı notu</strong>
+              <span>Bu ekranda tüm kullanıcıların tahminlerine müdahale edebilir, kilitli maçlarda bile giriş yapabilir ve gerektiğinde düzeltme/silme işlemi uygulayabilirsin.</span>
+            </div>
             <div id="predictionsTable"></div>
           </div>
         </section>
@@ -522,38 +529,47 @@
             <div>
               <h2>Yedekleme</h2>
               <p>
-                JSON dışa aktar, içe aktar ve yerel dosya bağlantısını yönet.
+                Hafta bazlı CSV/JSON indir, tam yedek al, geri yükle ve güvenli temizleme yap.
               </p>
             </div>
           </div>
 
-          <div class="dashboard-grid backup-layout">
-            <section class="card stack-actions">
-              <div class="card-header"><h3>JSON Yedeği</h3></div>
-              <button id="exportBtn">Yedeği İndir</button>
-              <label class="file-label" for="importFile">Yedek Yükle</label>
+          <div class="dashboard-grid backup-layout backup-layout-redesign">
+            <section class="card stack-actions backup-main-card">
+              <div class="card-header"><h3>Haftalık Dışa Aktarma</h3></div>
+              <label for="backupWeekSelect">Hafta seç</label>
+              <select id="backupWeekSelect"></select>
+              <div class="status-note" id="backupWeekSummary">Hafta bilgisi hazırlanıyor...</div>
+              <div class="backup-action-grid">
+                <button id="exportWeekCsvBtn">Seçili Haftayı CSV İndir</button>
+                <button class="secondary" id="exportWeekJsonBtn">Seçili Haftayı JSON İndir</button>
+              </div>
+            </section>
+
+            <section class="card stack-actions backup-main-card">
+              <div class="card-header"><h3>Tam Yedek ve Geri Yükleme</h3></div>
+              <div class="status-note">
+                Tam yedek tüm sezonları, haftaları, maçları, kullanıcıları ve tahminleri içerir.
+              </div>
+              <div class="backup-action-grid single-col">
+                <button id="exportFullBackupBtn">Tüm Veriyi Yedekle</button>
+                <label class="file-label" for="importFile">Yedek / JSON Yükle</label>
+              </div>
               <input
                 type="file"
                 id="importFile"
                 accept="application/json"
                 hidden
               />
+              <div class="status-note" id="backupImportStatus">Hazır.</div>
             </section>
 
-            <section class="card stack-actions">
-              <div class="card-header"><h3>Yerel Dosya Kaydı</h3></div>
-              <button class="secondary" id="connectLocalFileBtn">
-                Yerel Dosya Bağla
-              </button>
-              <button class="secondary" id="saveLocalFileBtn">
-                Şimdi Dosyaya Yaz
-              </button>
-              <div class="status-note" id="localSaveStatus">Hazır.</div>
-            </section>
-
-            <section class="card stack-actions">
-              <div class="card-header"><h3>Temizlik</h3></div>
-              <button class="danger" id="resetBtn">Tüm Verileri Sıfırla</button>
+            <section class="card stack-actions backup-danger-card">
+              <div class="card-header"><h3>Tehlikeli İşlemler</h3></div>
+              <div class="status-note">
+                Bu işlem sezonları, haftaları, maçları ve tahminleri temizler. Güvenlik için iki adımlı onay ister.
+              </div>
+              <button class="danger" id="resetBtn">Tüm Verileri Sil</button>
             </section>
           </div>
         </section>
@@ -698,7 +714,7 @@
           <div class="app-loading-success hidden" id="appLoadingSuccess">✓</div>
         </div>
         <h3 id="appLoadingTitle">Veriler yükleniyor</h3>
-        <p id="appLoadingMessage">Lütfen bekleyin, maçlar ve tahminler Google Sheets üzerinden getiriliyor...</p>
+        <p id="appLoadingMessage">Lütfen bekleyin, maçlar ve tahminler hazırlanıyor...</p>
         <div class="app-loading-progress-wrap">
           <div class="app-loading-progress-top">
             <span id="appLoadingStepLabel">Bağlantı hazırlanıyor...</span>
@@ -716,6 +732,41 @@
         </div>
       </div>
     </div>
+    <style>
+      .hidden { display: none !important; }
+      .firebase-admin-panel { margin-bottom: 18px; }
+      .firebase-admin-card { overflow: hidden; }
+      .firebase-admin-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+      .firebase-admin-stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-bottom:12px; }
+      .firebase-admin-stat { border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:12px; background:rgba(255,255,255,.03); }
+      .firebase-admin-stat span { display:block; font-size:12px; opacity:.7; margin-bottom:6px; }
+      .firebase-admin-stat strong { font-size:18px; }
+      .firebase-admin-table-grid { display:grid; grid-template-columns:1fr 1.35fr; gap:14px; }
+      .firebase-admin-table-wrap { border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:10px; background:rgba(255,255,255,.02); }
+      .firebase-admin-table-title { font-weight:700; margin-bottom:8px; }
+      .firebase-admin-table-scroll { overflow:auto; max-height:320px; }
+      .firebase-admin-table { width:100%; border-collapse:collapse; font-size:13px; }
+      .firebase-admin-table th, .firebase-admin-table td { padding:8px 10px; text-align:left; border-bottom:1px solid rgba(255,255,255,.08); white-space:nowrap; }
+      .firebase-admin-table thead th { position:sticky; top:0; background:#111827; z-index:1; }
+      .firebase-admin-status { margin-bottom:12px; }
+      @media (max-width: 980px) { .firebase-admin-table-grid { grid-template-columns:1fr; } }
+    </style>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  
+      <script>
+window.FIKSTUR_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDNBlZiB--PvK2QGJbumfvrt16mkD-fPQ0",
+  authDomain: "superlig-tahmin-panel.firebaseapp.com",
+  databaseURL: "https://superlig-tahmin-panel-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "superlig-tahmin-panel",
+  storageBucket: "superlig-tahmin-panel.firebasestorage.app",
+  messagingSenderId: "89142067230",
+  appId: "1:89142067230:web:96a69696dc1dbcac16ee0f",
+  measurementId: "G-9E1VX0KTQH"
+};
+</script>
+
     <script src="app.js"></script>
   </body>
 </html>
