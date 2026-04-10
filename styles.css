@@ -121,11 +121,11 @@ option {
   backdrop-filter: blur(4px);
   z-index: 1090;
 }
-
 .app-shell {
   display: grid;
-  grid-template-columns: 230px minmax(0, 1fr);
+  grid-template-columns: clamp(210px, 22vw, 230px) minmax(0, 1fr);
   min-height: 100vh;
+  align-items: start;
 }
 
 .sidebar {
@@ -140,7 +140,18 @@ option {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
+
+.content {
+  min-width: 0;
+}
+
 
 .brand-card {
   display: flex;
@@ -158,13 +169,13 @@ option {
 }
 
 .brand-icon {
-  width: 44px;
-  height: 44px;
+  width: 70px;
+  height: 70px;
   display: grid;
   place-items: center;
   border-radius: 14px;
   background: linear-gradient(135deg, var(--accent-2), var(--accent));
-  font-size: 24px;
+  font-size: 50px;
 }
 
 .brand-card h1 {
@@ -361,6 +372,34 @@ option {
 
 .backup-layout {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.backup-layout-redesign {
+  align-items: stretch;
+}
+
+.backup-main-card,
+.backup-danger-card {
+  min-height: 100%;
+}
+
+.backup-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.backup-action-grid.single-col {
+  grid-template-columns: 1fr;
+}
+
+#backupWeekSelect {
+  width: 100%;
+}
+
+#backupImportStatus,
+#backupWeekSummary {
+  min-height: 44px;
 }
 
 .stat-card {
@@ -662,7 +701,6 @@ option {
 .played-row {
   background: rgba(255, 255, 255, 0.02);
 }
-
 .excel-predictions {
   --prediction-match-col: 360px;
   --prediction-player-col-min: 170px;
@@ -671,20 +709,32 @@ option {
   overflow-x: auto;
   overflow-y: hidden;
   background: rgba(255, 255, 255, 0.03);
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+  overscroll-behavior-x: contain;
+  cursor: grab;
+}
+
+.excel-predictions.drag-scrolling {
+  cursor: grabbing;
+  user-select: none;
 }
 
 .prediction-grid-head,
 .prediction-grid-row {
   display: grid;
   align-items: stretch;
-  width: max(
+  width: max-content;
+  min-width: max(
     100%,
     calc(
       var(--prediction-match-col) +
         (var(--player-count, 1) * var(--prediction-player-col-min))
     )
   );
-  min-width: 100%;
   grid-template-columns: var(--prediction-match-col) repeat(
       var(--player-count, 1),
       minmax(var(--prediction-player-col-min), 1fr)
@@ -730,12 +780,14 @@ option {
   display: grid;
   gap: 6px;
   align-content: center;
-  background: rgba(255, 255, 255, 0.02);
-  min-width: 0;
+  background: #162133;
+  min-width: var(--prediction-match-col);
+  width: var(--prediction-match-col);
+  max-width: var(--prediction-match-col);
   overflow: hidden;
   position: sticky;
   left: 0;
-  z-index: 1;
+  z-index: 3;
 }
 
 .player-head-col {
@@ -846,7 +898,11 @@ option {
   opacity: 0.55;
   cursor: not-allowed;
 }
-
+.prediction-cell input[readonly] {
+  opacity: 0.55;
+  cursor: default;
+  pointer-events: none;
+}
 .mini-points {
   color: var(--muted);
   font-size: 11px;
@@ -1210,16 +1266,20 @@ option {
   .form-grid.four {
     grid-template-columns: 1fr;
   }
+
+  .backup-action-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 1040px) {
   .app-shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: 210px minmax(0, 1fr);
   }
 
   .sidebar {
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+    border-bottom: 0;
   }
 
   .page-header {
@@ -1451,6 +1511,9 @@ input[type="number"] {
 @media (max-width: 720px) {
   .sidebar {
     display: none;
+    position: static;
+    height: auto;
+    overflow: visible;
   }
 
   .app-shell {
@@ -4461,4 +4524,137 @@ textarea {
     font-size: 18px;
     line-height: 1;
   }
+}
+.main-layout,
+.content,
+.tab-panel,
+.card {
+  min-width: 0;
+}
+/* ===== Tahmin tablosu kolon hizalama düzeltmesi (2026-04-10 v2) ===== */
+.excel-predictions:not(.share-mode-table) .prediction-grid-head {
+  align-items: stretch;
+}
+
+.excel-predictions:not(.share-mode-table) .prediction-grid-head > div:first-child {
+  display: flex;
+  align-items: center;
+  min-height: 78px;
+}
+
+.excel-predictions:not(.share-mode-table) .prediction-grid-head > .player-head-col {
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  width: 100%;
+  min-width: var(--prediction-player-col-min);
+  max-width: none;
+  padding: 0;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.excel-predictions:not(.share-mode-table) .prediction-grid-head > .player-head-col .player-head-pill {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  min-height: 78px;
+  margin: 0;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 0;
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(16, 26, 44, 0.98), rgba(13, 22, 38, 0.98));
+  box-shadow: none;
+  text-align: center;
+  line-height: 1.2;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.excel-predictions:not(.share-mode-table) .prediction-grid-head > .player-head-col:first-of-type .player-head-pill {
+  border-left: 0;
+}
+
+.excel-predictions:not(.share-mode-table) .prediction-grid-row > .prediction-cell {
+  min-width: var(--prediction-player-col-min);
+  max-width: none;
+  box-sizing: border-box;
+}
+/* Haftalar sayfası: sağ liste alanı sabit kalsın, içi scroll olsun */
+.weeks-grid {
+  align-items: start;
+}
+
+.week-list {
+  min-height: 0;
+}
+
+.week-list .panel-card,
+.week-list-card,
+.weeks-list-card {
+  height: 540px;
+  max-height: 540px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.week-list .panel-card-body,
+.week-list-body,
+.weeks-list-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 6px;
+}
+
+/* Eğer liste direkt kartın içindeyse bunu da güvenceye al */
+.week-list-items,
+.week-items,
+#weekList,
+#weeksList {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 6px;
+}
+
+/* Scroll bar biraz daha temiz görünsün */
+.week-list .panel-card-body::-webkit-scrollbar,
+.week-list-body::-webkit-scrollbar,
+.weeks-list-body::-webkit-scrollbar,
+.week-list-items::-webkit-scrollbar,
+.week-items::-webkit-scrollbar,
+#weekList::-webkit-scrollbar,
+#weeksList::-webkit-scrollbar {
+  width: 8px;
+}
+
+.week-list .panel-card-body::-webkit-scrollbar-thumb,
+.week-list-body::-webkit-scrollbar-thumb,
+.weeks-list-body::-webkit-scrollbar-thumb,
+.week-list-items::-webkit-scrollbar-thumb,
+.week-items::-webkit-scrollbar-thumb,
+#weekList::-webkit-scrollbar-thumb,
+#weeksList::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+}
+
+.week-list .panel-card-body::-webkit-scrollbar-track,
+.week-list-body::-webkit-scrollbar-track,
+.weeks-list-body::-webkit-scrollbar-track,
+.week-list-items::-webkit-scrollbar-track,
+.week-items::-webkit-scrollbar-track,
+#weekList::-webkit-scrollbar-track,
+#weeksList::-webkit-scrollbar-track {
+  background: transparent;
 }
