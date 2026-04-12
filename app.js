@@ -1128,6 +1128,7 @@ async function refreshSessionData(triggerButton = null) {
 function ensureHeaderSyncButtons() {
   document.querySelectorAll(".page-header").forEach((header) => {
     let actions = header.querySelector(".header-actions");
+
     if (!actions) {
       actions = document.createElement("div");
       actions.className = "header-actions";
@@ -1135,6 +1136,7 @@ function ensureHeaderSyncButtons() {
     }
 
     let btn = actions.querySelector('[data-role="global-sync-btn"]');
+
     if (!btn) {
       btn = document.createElement("button");
       btn.type = "button";
@@ -1142,7 +1144,25 @@ function ensureHeaderSyncButtons() {
       btn.dataset.role = "global-sync-btn";
       btn.innerHTML =
         '<span class="sync-btn-icon" aria-hidden="true">↻</span><span>Verileri Çek</span>';
+    }
+
+    const seasonSelect =
+      actions.querySelector("#dashboardSeasonSelect") ||
+      actions.querySelector('select[id*="Season"]') ||
+      actions.querySelector("select");
+
+    if (seasonSelect) {
+      if (seasonSelect.nextElementSibling !== btn) {
+        seasonSelect.insertAdjacentElement("afterend", btn);
+      }
+    } else if (!actions.contains(btn)) {
       actions.appendChild(btn);
+    }
+
+    if (actions.querySelector("#dashboardSeasonSelect")) {
+      actions.classList.add("dashboard-top-actions");
+    } else {
+      actions.classList.remove("dashboard-top-actions");
     }
   });
 }
@@ -2638,23 +2658,110 @@ async function hydrateOnlineStateForSession(options = {}) {
 }
 
 function updateSessionCard() {
-  const summary = document.getElementById("sessionSummaryText");
-  const mobileSummary = document.getElementById("mobileMoreSessionText");
+  const isAuth = isAuthenticated();
+  const isAdmin = getCurrentRole() === "admin";
+  const currentName = isAuth
+    ? (isAdmin ? (currentSessionUser?.name || "Admin") : (getCurrentPlayer()?.name || currentSessionUser?.name || "Kullanıcı"))
+    : "Giriş yapılmadı";
+  const online = isAuth ? navigator.onLine : false;
+  const statusText = online ? "Online" : "Offline";
+  const roleText = !isAuth ? "Misafir" : isAdmin ? "Admin" : "Kullanıcı";
+
+  const mappings = [
+    ["desktopAccountName", currentName],
+    ["mobileAccountName", currentName],
+    ["desktopAccountStatus", statusText],
+    ["mobileAccountStatus", statusText],
+    ["desktopAccountRole", roleText],
+    ["mobileAccountRole", roleText],
+  ];
+  mappings.forEach(([id, value]) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  });
+
+  ["desktopAccountDot", "mobileAccountDot"].forEach((id) => {
+    const dot = document.getElementById(id);
+    if (!dot) return;
+    dot.classList.toggle("is-online", online);
+    dot.classList.toggle("is-offline", !online);
+  });
+
   const logoutBtn = document.getElementById("logoutBtn");
   const mobileLogoutBtn = document.getElementById("mobileLogoutBtn");
+  if (logoutBtn) logoutBtn.disabled = !isAuth;
+  if (mobileLogoutBtn) mobileLogoutBtn.disabled = !isAuth;
 
-  const sessionText = !isAuthenticated()
-    ? "Giriş yapılmadı."
-    : getCurrentRole() === "admin"
-      ? "Admin oturumu açık. Tüm alanları yönetebilirsin."
-      : `${getCurrentPlayer()?.name || "Kullanıcı"} olarak giriş yapıldı. Sadece kendi tahminini düzenleyebilirsin.`;
+  const desktopChangeBtn = document.getElementById("desktopChangePasswordBtn");
+  const mobileChangeBtn = document.getElementById("mobileChangePasswordBtn");
+  const showPassword = isAuth && !isAdmin;
+  if (desktopChangeBtn) desktopChangeBtn.hidden = !showPassword;
+  if (mobileChangeBtn) mobileChangeBtn.hidden = !showPassword;
+}
 
-  const syncText = isAuthenticated() ? ` • ${getSyncSummaryText()}` : "";
+function closeAccountMenus() {
+  const desktopMenu = document.getElementById("desktopAccountMenu");
+  const mobileMenu = document.getElementById("mobileAccountMenu");
+  const desktopBtn = document.getElementById("desktopAccountBtn");
+  const mobileBtn = document.getElementById("mobileAccountBtn");
+  if (desktopMenu) desktopMenu.hidden = true;
+  if (mobileMenu) mobileMenu.hidden = true;
+  desktopBtn?.classList.remove("is-open");
+  mobileBtn?.classList.remove("is-open");
+}
 
-  if (summary) summary.textContent = `${sessionText}${syncText}`;
-  if (mobileSummary) mobileSummary.textContent = `${sessionText}${syncText}`;
-  if (logoutBtn) logoutBtn.disabled = !isAuthenticated();
-  if (mobileLogoutBtn) mobileLogoutBtn.disabled = !isAuthenticated();
+function toggleAccountMenu(type = "mobile") {
+  const isMobileMenu = type === "mobile";
+  const menu = document.getElementById(isMobileMenu ? "mobileAccountMenu" : "desktopAccountMenu");
+  const btn = document.getElementById(isMobileMenu ? "mobileAccountBtn" : "desktopAccountBtn");
+  const otherMenu = document.getElementById(isMobileMenu ? "desktopAccountMenu" : "mobileAccountMenu");
+  const otherBtn = document.getElementById(isMobileMenu ? "desktopAccountBtn" : "mobileAccountBtn");
+  if (!menu || !btn) return;
+  const willOpen = menu.hidden;
+  if (otherMenu) otherMenu.hidden = true;
+  otherBtn?.classList.remove("is-open");
+  menu.hidden = !willOpen;
+  btn.classList.toggle("is-open", willOpen);
+}
+
+async function changeOwnPassword() {
+  if (!isAuthenticated() || getCurrentRole() === "admin") return;
+  const player = getCurrentPlayer();
+  if (!player) return;
+  const password = await showPrompt(
+    "Yeni şifreni yaz:",
+    player.password || "1234",
+    {
+      title: "Şifre değiştir",
+      placeholder: "Örn: 1234",
+    },
+  );
+  if (!password?.trim()) return;
+
+  if (useOnlineMode) {
+    try {
+      const result = await updateOnlineUser({ id: player.id, sifre: password.trim() });
+      if (!result?.success) {
+        showAlert(result?.message || "Şifre güncellenemedi.", { title: "Kayıt Hatası", type: "warning" });
+        return;
+      }
+      await syncUsersFromSheet();
+    } catch (error) {
+      console.error("Kendi şifre güncelleme hatası:", error);
+      showAlert(error?.message || "Şifre güncellenemedi.", { title: "Kayıt Hatası", type: "warning" });
+      return;
+    }
+  } else {
+    player.password = password.trim();
+  }
+
+  if (currentSessionUser) currentSessionUser.password = password.trim();
+  if (state?.settings?.auth?.user) state.settings.auth.user.password = password.trim();
+  saveState(true);
+  updateSessionCard();
+  closeAccountMenus();
+  renderAll();
+  showAlert("Şifren başarıyla güncellendi.", { title: "İşlem tamam", type: "success" });
 }
 
 function clearLoginErrorState() {
@@ -2734,6 +2841,7 @@ function closeLoginOverlay() {
   updateAdminSyncToggleButton();
 }
 function logoutUser() {
+  closeAccountMenus();
   stopPresenceTracking({ removeSession: true });
 
   currentSessionUser = null;
@@ -2839,28 +2947,7 @@ startPresenceTracking();
 }
 
 
-function closeLandscapeSidebar() {
-  document.body.classList.remove("landscape-sidebar-open");
-}
-
-function openLandscapeSidebar() {
-  if (window.matchMedia("(max-width: 950px) and (orientation: landscape)").matches) {
-    document.body.classList.add("landscape-sidebar-open");
-  }
-}
-
-function toggleLandscapeSidebar() {
-  if (!window.matchMedia("(max-width: 950px) and (orientation: landscape)").matches) return;
-  document.body.classList.toggle("landscape-sidebar-open");
-}
-
-function closeMobileMoreSheet() {
-  document.getElementById("mobileMoreSheet")?.classList.remove("open");
-}
-
-function openMobileMoreSheet() {
-  document.getElementById("mobileMoreSheet")?.classList.add("open");
-}
+function closeLandscapeSidebar() {}
 
 function updateNavSelection(tabName) {
   document
@@ -2870,11 +2957,6 @@ function updateNavSelection(tabName) {
     );
   document
     .querySelectorAll(".mobile-nav-btn")
-    .forEach((btn) =>
-      btn.classList.toggle("active", btn.dataset.tab === tabName),
-    );
-  document
-    .querySelectorAll(".mobile-more-item")
     .forEach((btn) =>
       btn.classList.toggle("active", btn.dataset.tab === tabName),
     );
@@ -2896,7 +2978,7 @@ function applyRolePermissions() {
   const currentTab = state.settings.currentTab || "dashboard";
   if (
     role !== "admin" &&
-    (currentTab === "players" || currentTab === "backup")
+    ["players", "backup", "seasons", "weeks", "matches"].includes(currentTab)
   ) {
     switchTab("dashboard");
     return;
@@ -3060,6 +3142,7 @@ function renderMobilePredictions(container, matches) {
             const uiState = predictionUiState[uiKey] || "idle";
             const isSaving = uiState === "saving";
             const isOwnPlayer = player.id === currentPlayerId;
+            const isAdmin = getCurrentRole() === "admin";
 
             const statusText = getPredictionBaseStatus(match.id, player.id);
             const showDeleteAction = hasPrediction || pred.remoteId || isSaving;
@@ -3068,7 +3151,7 @@ function renderMobilePredictions(container, matches) {
                 ? `${pred.homePred !== "" ? pred.homePred : "-"} - ${pred.awayPred !== "" ? pred.awayPred : "-"}`
                 : "--";
             const showSaveAction = canEdit && shouldShowPredictionSaveAction(match.id, player.id);
-            if (!isOwnPlayer) {
+            if (!isOwnPlayer && !isAdmin) {
               return `
               <div class="mobile-other-prediction premium-user-card compact-user-row ${pointLabel(pred.points)} ${outcomeClass} ${statusClass}">
                 <div class="compact-user-main">
@@ -3088,7 +3171,7 @@ function renderMobilePredictions(container, matches) {
             return `
             <div class="mobile-user-prediction premium-user-card ${pointLabel(pred.points)} ${outcomeClass} ${statusClass} ${lockedClass} ${ownClass}">
               <div class="mobile-user-head premium-user-head">
-                <strong>${escapeHtml(player.name)}${isOwnPlayer ? '<span class="own-pill">Sen</span>' : ""}</strong>
+                <strong>${escapeHtml(player.name)}${isOwnPlayer ? '<span class="own-pill">Sen</span>' : isAdmin ? '<span class="own-pill">Yönet</span>' : ""}</strong>
                 <span class="mini-points premium-points">${locked ? "🔒 Kilitli" : `${pred.points || 0} puan`}</span>
               </div>
 
@@ -3183,7 +3266,7 @@ function standingsRowsMobile(rows, showPredictionCount = true, options = {}) {
         <span>Tam skor: ${row.exact}</span>
         <span>Yakın: ${row.resultOnly}</span>
         ${showPredictionCount ? `<span>Tahmin: ${row.predictionCount}</span>` : `<span>Hafta puanı: ${row.total}</span>`}
-        ${row.id === leaderId ? `<span class="weekly-leader-pill">Haftalık lider</span>` : ""}
+        ${row.id === leaderId ? `<span class="weekly-leader-pill">${options.weeklyMode ? "Haftalık lider" : "Lider"}</span>` : ""}
       </div>
     </article>`,
     )
@@ -3686,25 +3769,28 @@ function recalculateAllPoints() {
 
 function getGeneralStandings(seasonId = getActiveSeasonId()) {
   const matchIds = getMatchesBySeasonId(seasonId).map((m) => m.id);
+
   return state.players
+    .filter((player) => String(player.role || "user").toLowerCase() !== "admin")
     .map((player) => {
       const preds = state.predictions.filter(
         (p) => p.playerId === player.id && matchIds.includes(p.matchId),
       );
-      const total = preds.reduce((sum, p) => sum + (p.points || 0), 0);
-      const exact = preds.filter((p) => p.points === 3).length;
-      const resultOnly = preds.filter((p) => p.points === 1).length;
+
+      const predictionCount = preds.filter(
+        (p) => p.homePred !== "" && p.awayPred !== "",
+      ).length;
+
       return {
         id: player.id,
         name: player.name,
-        total,
-        exact,
-        resultOnly,
-        predictionCount: preds.filter(
-          (p) => p.homePred !== "" && p.awayPred !== "",
-        ).length,
+        total: preds.reduce((sum, p) => sum + (p.points || 0), 0),
+        exact: preds.filter((p) => p.points === 3).length,
+        resultOnly: preds.filter((p) => p.points === 1).length,
+        predictionCount,
       };
     })
+    .filter((player) => player.predictionCount > 0)
     .sort(
       (a, b) =>
         b.total - a.total ||
@@ -3713,25 +3799,30 @@ function getGeneralStandings(seasonId = getActiveSeasonId()) {
         a.name.localeCompare(b.name, "tr"),
     );
 }
-
 function getWeeklyStandings(weekId) {
   const matchIds = getMatchesByWeekId(weekId).map((m) => m.id);
+
   return state.players
+    .filter((player) => String(player.role || "user").toLowerCase() !== "admin")
     .map((player) => {
       const preds = state.predictions.filter(
         (p) => p.playerId === player.id && matchIds.includes(p.matchId),
       );
+
+      const predictionCount = preds.filter(
+        (p) => p.homePred !== "" && p.awayPred !== "",
+      ).length;
+
       return {
         id: player.id,
         name: player.name,
         total: preds.reduce((sum, p) => sum + (p.points || 0), 0),
         exact: preds.filter((p) => p.points === 3).length,
         resultOnly: preds.filter((p) => p.points === 1).length,
-        predictionCount: preds.filter(
-          (p) => p.homePred !== "" && p.awayPred !== "",
-        ).length,
+        predictionCount,
       };
     })
+    .filter((player) => player.predictionCount > 0)
     .sort(
       (a, b) =>
         b.total - a.total ||
@@ -4011,17 +4102,19 @@ function renderFirebaseAdminPanel() {
     : '<tr><td colspan="7">Henüz kayıtlı tahmin yok.</td></tr>';
 
   panel.innerHTML = `
-    <section class="card firebase-admin-card">
-      <div class="card-header firebase-admin-head">
+    <section class="card firebase-admin-card collapsible-card is-open" id="firebaseAdminCard">
+      <div class="card-header firebase-admin-head collapsible-card-header">
         <div>
           <h3>Firebase Yönetim Özeti</h3>
           <div class="small-meta">Canlı veri özeti ve hızlı kontrol ekranı</div>
         </div>
         <div class="inline-actions wrap-actions">
-          <button type="button" class="secondary small" id="firebaseAdminRefreshBtn">Yenile</button>
-          <button type="button" class="secondary small" id="firebaseAdminTestBtn">Bağlantı Testi</button>
+          <button type="button" class="secondary small" id="firebaseAdminRefreshBtn" onclick="refreshFirebaseAdminPanel(this)">Yenile</button>
+          <button type="button" class="secondary small" id="firebaseAdminTestBtn" onclick="testFirebaseAdminConnection(this)">Bağlantı Testi</button>
+          <button type="button" class="secondary card-collapse-btn" id="firebaseAdminToggleBtn" onclick="toggleFirebaseAdminCard()" aria-expanded="true" aria-controls="firebaseAdminCardBody" title="Daralt / genişlet"><span class="collapse-arrow" aria-hidden="true">⌄</span></button>
         </div>
       </div>
+      <div class="collapsible-card-body" id="firebaseAdminCardBody">
       <div class="firebase-admin-stat-grid">
         <div class="firebase-admin-stat"><span>Kaynak</span><strong>${escapeHtml(summary.source)}</strong></div>
         <div class="firebase-admin-stat"><span>Kullanıcı</span><strong>${summary.playerCount}</strong></div>
@@ -4033,9 +4126,9 @@ function renderFirebaseAdminPanel() {
         <div class="firebase-admin-stat"><span>Aktif sezon hafta</span><strong>${summary.weekCount}</strong></div>
       </div>
       <div class="firebase-admin-capabilities">
-        <div class="firebase-admin-capability"><strong>Admin yetkisi</strong><span>Tüm kullanıcı tahminlerini düzenleyebilir ve silebilir.</span></div>
-        <div class="firebase-admin-capability"><strong>Kilit aşımı</strong><span>Maç başlasa bile admin tahmin girebilir ve düzeltme yapabilir.</span></div>
-        <div class="firebase-admin-capability"><strong>Canlı senkron</strong><span>Kaydettiğin değişiklikler tüm kullanıcılara anında düşer.</span></div>
+        <div class="firebase-admin-capability"><strong>Admin yetkisi</strong> : <span>Tüm kullanıcı tahminlerini düzenleyebilir ve silebilir.</span></div>
+        <div class="firebase-admin-capability"><strong>Kilit aşımı</strong> : <span>Maç başlasa bile admin tahmin girebilir ve düzeltme yapabilir.</span></div>
+        <div class="firebase-admin-capability"><strong>Canlı senkron</strong> : <span>Kaydettiğin değişiklikler tüm kullanıcılara anında düşer.</span></div>
       </div>
       <div class="status-note firebase-admin-status" id="firebaseAdminPanelStatus">Son tahmin: ${summary.lastPrediction ? formatAdminPanelDateTime(summary.lastPrediction.updatedAt) : "Henüz yok"}</div>
       <div class="firebase-admin-table-grid">
@@ -4057,6 +4150,7 @@ function renderFirebaseAdminPanel() {
             </table>
           </div>
         </div>
+      </div>
       </div>
     </section>
   `;
@@ -4104,7 +4198,7 @@ async function syncDashboardWeek() {
       type: "warning",
     });
   if (status)
-    status.textContent = `${season.name} / ${week.number}. hafta için API güncellemesi başlatıldı...`;
+    status.textContent = `${season.name} / ${week.number}. hafta için seçili hafta güncellemesi başlatıldı...`;
   recordAdminSyncActivity({
     lastAction: `${season.name} / ${week.number}. hafta güncellemesi başladı...`,
   });
@@ -4115,7 +4209,7 @@ async function syncDashboardWeek() {
       "Aktif hafta güncellendi.";
     if (status) status.textContent = `${weekStatus} • ${getSyncSummaryText()}`;
     recordAdminSyncActivity({
-      lastAction: `${season.name} / ${week.number}. hafta güncellendi.`,
+      lastAction: `${season.name} / ${week.number}. hafta API'den güncellendi.`,
       success: true,
     });
   } catch (error) {
@@ -4137,7 +4231,7 @@ async function syncDashboardSeason() {
       type: "warning",
     });
   if (status)
-    status.textContent = `${season.name} sezonu için API güncellemesi başlatıldı...`;
+    status.textContent = `${season.name} sezonu için API'den veri çekiliyor...`;
   recordAdminSyncActivity({
     lastAction: `${season.name} sezon güncellemesi başladı...`,
   });
@@ -4147,7 +4241,7 @@ async function syncDashboardSeason() {
       document.getElementById("apiStatus")?.textContent || "Sezon güncellendi.";
     if (status) status.textContent = `${apiStatus} • ${getSyncSummaryText()}`;
     recordAdminSyncActivity({
-      lastAction: `${season.name} sezonu güncellendi.`,
+      lastAction: `${season.name} sezonu API'den güncellendi.`,
       success: true,
     });
   } catch (error) {
@@ -4167,16 +4261,21 @@ function renderStats() {
   const season = getSeasonById(activeSeasonId);
   const leader = getGeneralStandings(activeSeasonId)[0];
   const cards = [
-    ["Aktif Sezon", season?.name || "-"],
-    ["Kişi Sayısı", state.players.length],
-    ["Haftadaki Maç", matches.length],
-    ["Oynanmış Maç", matches.filter((m) => m.played).length],
-    ["Eksik Tahmin", activeWeekId ? countMissingPredictions(activeWeekId) : 0],
-    ["Lider", leader ? `${leader.name} (${leader.total})` : "-"],
+    { label: "Aktif Sezon", value: escapeHtml(season?.name || "-") },
+    { label: "Kişi Sayısı", value: String(state.players.length) },
+    { label: "Haftadaki Maç", value: String(matches.length) },
+    { label: "Oynanmış Maç", value: String(matches.filter((m) => m.played).length) },
+    { label: "Eksik Tahmin", value: String(activeWeekId ? countMissingPredictions(activeWeekId) : 0) },
+    {
+      label: "Lider",
+      value: leader
+        ? `${escapeHtml(leader.name)} (${leader.total})<span class="leader-badge">👑 1.</span>`
+        : "-",
+    },
   ];
   document.getElementById("statsGrid").innerHTML = cards
     .map(
-      ([label, value]) => `
+      ({ label, value }) => `
     <div class="stat-card"><div class="stat-label">${label}</div><div class="stat-value">${value}</div></div>
   `,
     )
@@ -5174,10 +5273,11 @@ function renderPredictions() {
     })
     .join("");
 
-  container.innerHTML = `<div class="excel-predictions" style="--player-count:${players.length};"><div class="prediction-grid-head"><div>Maç</div>${headerPlayers}</div><div class="prediction-grid-body">${rows}</div></div>`;
+  container.innerHTML = `<div class="predictions-scroll-shell"><div class="excel-predictions" style="--player-count:${players.length};"><div class="prediction-grid-head"><div>Maç</div>${headerPlayers}</div><div class="prediction-grid-body">${rows}</div></div></div>`;
 
   updatePredictionShareModeButton();
   bindPredictionActionElements(container);
+  bindPredictionTableDesktopScroll();
   saveState(true);
 }
 
@@ -5208,6 +5308,66 @@ function getPredictionBaseStatus(matchId, playerId) {
   if (!canEdit) return "Sadece görüntüle";
   if (hasAnyValue && !hasPrediction) return "İki skor da girilmeli";
   return "Düzenlenebilir";
+}
+
+function bindPredictionTableDesktopScroll() {
+  const shell = document.querySelector("#predictionsTable .predictions-scroll-shell");
+  if (!shell) return;
+
+  if (shell._dragScrollBound) return;
+  shell._dragScrollBound = true;
+
+  let pointerId = null;
+  let startX = 0;
+  let startY = 0;
+  let startScrollLeft = 0;
+  let startScrollTop = 0;
+  let dragging = false;
+
+  const stopDrag = () => {
+    if (pointerId !== null) {
+      try {
+        shell.releasePointerCapture(pointerId);
+      } catch (error) {}
+    }
+    pointerId = null;
+    dragging = false;
+    shell.classList.remove("is-dragging");
+  };
+
+  shell.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    if (event.target.closest("button, input, select, textarea, label, a")) return;
+
+    pointerId = event.pointerId;
+    startX = event.clientX;
+    startY = event.clientY;
+    startScrollLeft = shell.scrollLeft;
+    startScrollTop = shell.scrollTop;
+    dragging = false;
+    shell.classList.add("can-drag");
+    try {
+      shell.setPointerCapture(pointerId);
+    } catch (error) {}
+  });
+
+  shell.addEventListener("pointermove", (event) => {
+    if (pointerId !== event.pointerId) return;
+    const deltaX = event.clientX - startX;
+    const deltaY = event.clientY - startY;
+    if (!dragging && (Math.abs(deltaX) > 6 || Math.abs(deltaY) > 6)) {
+      dragging = true;
+      shell.classList.add("is-dragging");
+    }
+    if (!dragging) return;
+    shell.scrollLeft = startScrollLeft - deltaX;
+    shell.scrollTop = startScrollTop - deltaY;
+    event.preventDefault();
+  });
+
+  shell.addEventListener("pointerup", stopDrag);
+  shell.addEventListener("pointercancel", stopDrag);
+  shell.addEventListener("lostpointercapture", stopDrag);
 }
 
 function hasPredictionValue(matchId, playerId) {
@@ -5687,7 +5847,7 @@ function standingsRows(rows, showPredictionCount = true, options = {}) {
       const leaderClass = row.id === leaderId ? " weekly-leader-row" : "";
       const badge =
         i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i + 1}`;
-      return `<div class="excel-tr standings-tr ${i === 0 ? "leader-row" : ""}${rankClass}${leaderClass}"><div class="rank-pill">${badge}</div><div class="standing-name-cell">${escapeHtml(row.name)}${row.id === leaderId ? '<span class="weekly-leader-pill">Haftanın Lideri</span>' : ""}</div><div><strong>${row.total}</strong></div><div>${row.exact}</div><div>${row.resultOnly}</div><div>${showPredictionCount ? row.predictionCount : row.total}</div></div>`;
+      return `<div class="excel-tr standings-tr ${i === 0 ? "leader-row" : ""}${rankClass}${leaderClass}"><div class="rank-pill">${badge}</div><div class="standing-name-cell">${escapeHtml(row.name)}${row.id === leaderId ? `<span class="weekly-leader-pill">${options.weeklyMode ? "Haftanın Lideri" : "Lider"}</span>` : ""}</div><div><strong>${row.total}</strong></div><div>${row.exact}</div><div>${row.resultOnly}</div><div>${showPredictionCount ? row.predictionCount : row.total}</div></div>`;
     })
     .join("")}</div></div>`;
 }
@@ -5697,12 +5857,16 @@ function renderStandings() {
   const general = getGeneralStandings(seasonId);
   const weekId = state.settings.activeWeekId;
   const weekly = weekId ? getWeeklyStandings(weekId) : [];
+
+  const generalLeaderId = general[0]?.id || null;
   const weeklyLeaderId = weekly[0]?.id || null;
+
   document.getElementById("standingsTable").innerHTML = general.length
     ? isMobileView()
-      ? standingsRowsMobile(general, true, { leaderId: weeklyLeaderId })
-      : standingsRows(general, true, { leaderId: weeklyLeaderId })
+      ? standingsRowsMobile(general, true, { leaderId: generalLeaderId })
+      : standingsRows(general, true, { leaderId: generalLeaderId })
     : createEmptyState("Henüz puan tablosu oluşmadı.");
+
   document.getElementById("weeklyStandings").innerHTML = weekly.length
     ? isMobileView()
       ? standingsRowsMobile(weekly, false, {
@@ -5723,14 +5887,16 @@ function renderMissingPredictions() {
     return (container.innerHTML = createEmptyState("Önce aktif hafta seç."));
   const rows = [];
   getMatchesByWeekId(weekId).forEach((match) => {
-    state.players.forEach((player) => {
-      const pred = getPrediction(match.id, player.id);
-      if (!pred || pred.homePred === "" || pred.awayPred === "")
-        rows.push({
-          player: player.name,
-          match: `${match.homeTeam} - ${match.awayTeam}`,
-        });
-    });
+    state.players
+      .filter((player) => String(player.role || "user").toLowerCase() !== "admin")
+      .forEach((player) => {
+        const pred = getPrediction(match.id, player.id);
+        if (!pred || pred.homePred === "" || pred.awayPred === "")
+          rows.push({
+            player: player.name,
+            match: `${match.homeTeam} - ${match.awayTeam}`,
+          });
+      });
   });
   if (!rows.length)
     return (container.innerHTML = createEmptyState(
@@ -5739,10 +5905,87 @@ function renderMissingPredictions() {
   container.innerHTML = `<div class="excel-table compact-table"><div class="excel-thead missing-head"><div>Kişi</div><div>Maç</div></div><div class="excel-tbody">${rows.map((row) => `<div class="excel-tr missing-tr"><div>${escapeHtml(row.player)}</div><div>${escapeHtml(row.match)}</div></div>`).join("")}</div></div>`;
 }
 
+function getSortedSeasonMatches(seasonId = getActiveSeasonId()) {
+  return [...getMatchesBySeasonId(seasonId)].sort((a, b) => {
+    const aTs = a.date ? new Date(a.date).getTime() : 0;
+    const bTs = b.date ? new Date(b.date).getTime() : 0;
+    if (aTs !== bTs) return aTs - bTs;
+    return String(a.id).localeCompare(String(b.id), "tr");
+  });
+}
+
+function getPlayerSeasonStats(seasonId = getActiveSeasonId()) {
+  const seasonMatches = getSortedSeasonMatches(seasonId);
+  const matchIdSet = new Set(seasonMatches.map((match) => String(match.id)));
+  const players = state.players.filter(
+    (player) => String(player.role || "user").toLowerCase() !== "admin",
+  );
+
+  return players
+    .map((player) => {
+      const preds = state.predictions.filter(
+        (pred) =>
+          String(pred.playerId) === String(player.id) &&
+          matchIdSet.has(String(pred.matchId)),
+      );
+      const filledPreds = preds.filter(
+        (pred) => pred.homePred !== "" && pred.awayPred !== "",
+      );
+      const total = preds.reduce((sum, pred) => sum + (pred.points || 0), 0);
+      const exact = preds.filter((pred) => pred.points === 3).length;
+      const resultOnly = preds.filter((pred) => pred.points === 1).length;
+      const average = filledPreds.length ? (total / filledPreds.length).toFixed(2) : "0.00";
+      const recentForm = seasonMatches
+        .map((match) => preds.find((pred) => String(pred.matchId) === String(match.id)))
+        .filter(Boolean)
+        .filter((pred) => pred.homePred !== "" && pred.awayPred !== "")
+        .slice(-5)
+        .map((pred) => Number(pred.points || 0));
+
+      return {
+        id: player.id,
+        name: player.name,
+        total,
+        exact,
+        resultOnly,
+        predictionCount: filledPreds.length,
+        average,
+        recentForm,
+      };
+    })
+    .sort(
+      (a, b) =>
+        b.total - a.total ||
+        b.exact - a.exact ||
+        b.resultOnly - a.resultOnly ||
+        a.name.localeCompare(b.name, "tr"),
+    )
+    .map((item, index, arr) => ({
+      ...item,
+      rank: index + 1,
+      gapToLeader: arr[0] ? arr[0].total - item.total : 0,
+    }));
+}
+
 function renderAdvancedStats() {
   const seasonId = getActiveSeasonId();
   const info = getSeasonInsights(seasonId);
   const champion = getChampion(seasonId);
+  const playerStats = getPlayerSeasonStats(seasonId);
+  const liveLeader = playerStats[0] || null;
+  const risingStar = [...playerStats].sort(
+    (a, b) =>
+      b.recentForm.reduce((sum, point) => sum + point, 0) -
+        a.recentForm.reduce((sum, point) => sum + point, 0) ||
+      b.average - a.average,
+  )[0] || null;
+  const sharpShooter = [...playerStats].sort(
+    (a, b) => b.exact - a.exact || b.total - a.total,
+  )[0] || null;
+  const safePredictor = [...playerStats].sort(
+    (a, b) => b.resultOnly - a.resultOnly || b.total - a.total,
+  )[0] || null;
+
   document.getElementById("advancedStatsGrid").innerHTML = [
     ["Sezon Maçı", info.totalMatches],
     ["Oynanan", info.playedMatches],
@@ -5770,31 +6013,82 @@ function renderAdvancedStats() {
     )
     .join("");
 
-  const insights = [
-    info.bestExact
-      ? `${info.bestExact.name}, ${info.bestExact.exact} kez tam skor buldu.`
-      : "Henüz tam skor verisi yok.",
-    info.bestResult
-      ? `${info.bestResult.name}, ${info.bestResult.resultOnly} maçta doğru sonucu bildi.`
-      : "Henüz doğru sonuç verisi yok.",
-    info.mostPredictions
-      ? `${info.mostPredictions.name}, en istikrarlı tahmin girişini yaptı.`
-      : "Henüz tahmin verisi yok.",
-    champion
-      ? `${champion.name}, sezonu ${champion.total} puanla şampiyon kapattı.`
-      : "Şampiyonluk için tüm maçların oynanması gerekiyor.",
-  ];
-  document.getElementById("insightsList").innerHTML =
-    `<div class="excel-list">${insights.map((text) => `<div class="excel-list-row"><div class="soft-text">${escapeHtml(text)}</div></div>`).join("")}</div>`;
-  document.getElementById("championCard").innerHTML = champion
+  document.getElementById("insightsList").innerHTML = playerStats.length
+    ? `<div class="player-stats-grid">${playerStats
+        .map((player) => {
+          const formMarkup = player.recentForm.length
+            ? player.recentForm
+                .map(
+                  (point) => `<span class="form-pill">${point}p</span>`,
+                )
+                .join("")
+            : '<span class="small-meta">Henüz tahmin yok</span>';
+          return `
+            <article class="player-stat-card ${player.rank === 1 ? "is-leader" : ""}">
+              <div class="player-stat-head">
+                <div>
+                  <div class="player-stat-name">${escapeHtml(player.name)}</div>
+                  <div class="small-meta">Genel sıra: #${player.rank}</div>
+                </div>
+                <div class="player-rank-badge">#${player.rank}</div>
+              </div>
+              <div class="player-stat-metrics">
+                <div class="player-mini-stat"><span>Puan</span><strong>${player.total}</strong></div>
+                <div class="player-mini-stat"><span>Tam skor</span><strong>${player.exact}</strong></div>
+                <div class="player-mini-stat"><span>Doğru sonuç</span><strong>${player.resultOnly}</strong></div>
+                <div class="player-mini-stat"><span>Tahmin</span><strong>${player.predictionCount}</strong></div>
+                <div class="player-mini-stat"><span>Ortalama</span><strong>${player.average}</strong></div>
+                <div class="player-mini-stat"><span>Lidere fark</span><strong>${player.rank === 1 ? "Lider" : `-${player.gapToLeader}`}</strong></div>
+              </div>
+              <div class="player-form-row">
+                <span class="small-meta">Son 5 maç</span>
+                <div class="player-form-pills">${formMarkup}</div>
+              </div>
+            </article>`;
+        })
+        .join("")}</div>`
+    : createEmptyState("Henüz oyuncu istatistiği oluşmadı.");
+
+  const championLabel = champion
+    ? `${champion.name}, sezonu ${champion.total} puanla şampiyon kapattı.`
+    : liveLeader
+      ? `${liveLeader.name}, sezon bugün bitse ${liveLeader.total} puanla şampiyon olur.`
+      : "Henüz canlı lider oluşmadı.";
+
+  document.getElementById("championCard").innerHTML = liveLeader
     ? `
-    <div class="champion-inner">
-      <div class="champion-name">🏆 ${escapeHtml(champion.name)}</div>
-      <div class="champion-score">${champion.total} puan</div>
-      <div class="small-meta">Sezon şampiyonu hazır. Kutlama için butona bas.</div>
-      <button onclick="celebrateChampion('${seasonId}', true)">Şampiyonu Kutla</button>
+    <div class="champion-inner live-champion-card">
+      <div class="champion-kicker">Haftalık canlı şampiyon görünümü</div>
+      <div class="champion-name">👑 ${escapeHtml(liveLeader.name)}</div>
+      <div class="champion-score">${liveLeader.total} puan</div>
+      <div class="champion-summary">Sezon bugün bitse lider bu oyuncu olur.</div>
+      <div class="champion-highlights">
+        <div class="champion-highlight"><span>Sıra</span><strong>#${liveLeader.rank}</strong></div>
+        <div class="champion-highlight"><span>Tam skor</span><strong>${liveLeader.exact}</strong></div>
+        <div class="champion-highlight"><span>Doğru sonuç</span><strong>${liveLeader.resultOnly}</strong></div>
+        <div class="champion-highlight"><span>Ortalama</span><strong>${liveLeader.average}</strong></div>
+      </div>
+      <div class="champion-side-notes">
+        <div class="champion-note-card">
+          <span>Yükselen oyuncu</span>
+          <strong>${risingStar ? escapeHtml(risingStar.name) : "-"}</strong>
+          <small>${risingStar ? `${risingStar.recentForm.reduce((sum, point) => sum + point, 0)} puan / son 5 maç` : "Veri yok"}</small>
+        </div>
+        <div class="champion-note-card">
+          <span>Keskin nişancı</span>
+          <strong>${sharpShooter ? escapeHtml(sharpShooter.name) : "-"}</strong>
+          <small>${sharpShooter ? `${sharpShooter.exact} tam skor` : "Veri yok"}</small>
+        </div>
+        <div class="champion-note-card">
+          <span>En güvenli tahminci</span>
+          <strong>${safePredictor ? escapeHtml(safePredictor.name) : "-"}</strong>
+          <small>${safePredictor ? `${safePredictor.resultOnly} doğru sonuç` : "Veri yok"}</small>
+        </div>
+      </div>
+      <div class="small-meta champion-footer-note">${escapeHtml(championLabel)}</div>
+      ${champion ? `<button onclick="celebrateChampion('${seasonId}', true)">Şampiyonu Kutla</button>` : ""}
     </div>`
-    : createEmptyState("Şampiyon kartı, sezon tamamlanınca burada görünür.");
+    : createEmptyState("Şampiyon kartı için henüz yeterli veri yok.");
 
   if (champion && !state.settings.celebratedChampions[seasonId])
     celebrateChampion(seasonId, false);
@@ -6175,7 +6469,6 @@ function switchTab(tabName) {
     .forEach((panel) =>
       panel.classList.toggle("active", panel.id === `tab-${tabName}`),
     );
-  closeMobileMoreSheet();
   closeLandscapeSidebar();
   saveState(true);
 }
@@ -7088,32 +7381,100 @@ async function importFixturesFromApi(updateResultsOnly = false) {
   }
 }
 
-function updateAdminSyncToggleButton() {
-  const card = document.getElementById("adminSyncOverviewCard");
-  const btn = document.getElementById("adminSyncToggleBtn");
-  if (!card || !btn) return;
-  const isMobile = window.innerWidth <= 640;
-  if (!isMobile) {
-    card.classList.add("is-open");
-    btn.textContent = "Gizle";
-    btn.setAttribute("aria-expanded", "true");
-    return;
+const DASHBOARD_CARD_STATE_STORAGE_PREFIX = "dashboardCardState:";
+
+function getStoredDashboardCardOpen(key, defaultOpen = true) {
+  try {
+    const saved = localStorage.getItem(`${DASHBOARD_CARD_STATE_STORAGE_PREFIX}${key}`);
+    if (saved === null) return defaultOpen;
+    return saved !== "closed";
+  } catch {
+    return defaultOpen;
   }
-  const isOpen = card.classList.contains("is-open");
-  btn.textContent = isOpen ? "Gizle" : "Göster";
-  btn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+}
+
+function setStoredDashboardCardOpen(key, isOpen) {
+  try {
+    localStorage.setItem(
+      `${DASHBOARD_CARD_STATE_STORAGE_PREFIX}${key}`,
+      isOpen ? "open" : "closed",
+    );
+  } catch {}
+}
+
+function applyCollapsibleCardState({ cardId, buttonId, storageKey, defaultOpen = true }) {
+  const card = document.getElementById(cardId);
+  const button = document.getElementById(buttonId);
+  if (!card || !button) return;
+  const isOpen = getStoredDashboardCardOpen(storageKey, defaultOpen);
+  card.classList.toggle("is-open", isOpen);
+  button.setAttribute("aria-expanded", isOpen ? "true" : "false");
+  button.setAttribute("title", isOpen ? "Daralt" : "Genişlet");
+}
+
+function toggleCollapsibleCard(cardId, buttonId, storageKey, defaultOpen = true) {
+  const card = document.getElementById(cardId);
+  const button = document.getElementById(buttonId);
+  if (!card || !button) return;
+  const nextOpen = !card.classList.contains("is-open");
+  card.classList.toggle("is-open", nextOpen);
+  button.setAttribute("aria-expanded", nextOpen ? "true" : "false");
+  button.setAttribute("title", nextOpen ? "Daralt" : "Genişlet");
+  setStoredDashboardCardOpen(storageKey, nextOpen);
+}
+
+function applyDashboardCollapseStates() {
+  applyCollapsibleCardState({
+    cardId: "dashboardSyncCard",
+    buttonId: "dashboardSyncToggleBtn",
+    storageKey: "dashboardSyncCard",
+    defaultOpen: true,
+  });
+  applyCollapsibleCardState({
+    cardId: "adminSyncOverviewCard",
+    buttonId: "adminSyncToggleBtn",
+    storageKey: "adminSyncOverviewCard",
+    defaultOpen: true,
+  });
+  applyCollapsibleCardState({
+    cardId: "firebaseAdminCard",
+    buttonId: "firebaseAdminToggleBtn",
+    storageKey: "firebaseAdminCard",
+    defaultOpen: true,
+  });
+}
+
+function toggleDashboardSyncCard() {
+  toggleCollapsibleCard(
+    "dashboardSyncCard",
+    "dashboardSyncToggleBtn",
+    "dashboardSyncCard",
+    true,
+  );
 }
 
 function toggleAdminSyncOverview() {
-  const card = document.getElementById("adminSyncOverviewCard");
-  if (!card) return;
-  if (window.innerWidth > 640) {
-    card.classList.add("is-open");
-  } else {
-    card.classList.toggle("is-open");
-  }
-  updateAdminSyncToggleButton();
+  toggleCollapsibleCard(
+    "adminSyncOverviewCard",
+    "adminSyncToggleBtn",
+    "adminSyncOverviewCard",
+    true,
+  );
 }
+
+function toggleFirebaseAdminCard() {
+  toggleCollapsibleCard(
+    "firebaseAdminCard",
+    "firebaseAdminToggleBtn",
+    "firebaseAdminCard",
+    true,
+  );
+}
+
+function updateAdminSyncToggleButton() {
+  applyDashboardCollapseStates();
+}
+
 
 function bindEvents() {
   on("appModal", "click", (e) => {
@@ -7279,6 +7640,7 @@ function bindEvents() {
   on("apiSyncWeekBtn", "click", syncSelectedWeekFromApi);
   on("dashboardSyncWeekBtn", "click", syncDashboardWeek);
   on("dashboardSyncSeasonBtn", "click", syncDashboardSeason);
+  on("dashboardSyncToggleBtn", "click", toggleDashboardSyncCard);
   on("adminSyncToggleBtn", "click", toggleAdminSyncOverview);
   on("firebaseAdminRefreshBtn", "click", refreshFirebaseAdminPanel);
   on("firebaseAdminTestBtn", "click", testFirebaseAdminConnection);
@@ -7316,28 +7678,12 @@ function bindEvents() {
     .forEach((btn) =>
       btn.addEventListener("click", () => switchTab(btn.dataset.tab)),
     );
-  document
-    .querySelectorAll(".mobile-more-item[data-tab]")
-    .forEach((btn) =>
-      btn.addEventListener("click", () => switchTab(btn.dataset.tab)),
-    );
-
-  on("mobileMoreBtn", "click", openMobileMoreSheet);
-  on("mobileMoreCloseBtn", "click", closeMobileMoreSheet);
-  on("mobileMoreBackdrop", "click", closeMobileMoreSheet);
-  on("landscapeSidebarToggle", "click", toggleLandscapeSidebar);
-  on("sidebarBackdrop", "click", closeLandscapeSidebar);
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      closeMobileMoreSheet();
-      closeLandscapeSidebar();
-    }
-  });
   on("logoutBtn", "click", logoutUser);
-  on("mobileLogoutBtn", "click", () => {
-    closeMobileMoreSheet();
-    logoutUser();
-  });
+  on("mobileLogoutBtn", "click", logoutUser);
+  on("desktopAccountBtn", "click", () => toggleAccountMenu("desktop"));
+  on("mobileAccountBtn", "click", () => toggleAccountMenu("mobile"));
+  on("desktopChangePasswordBtn", "click", changeOwnPassword);
+  on("mobileChangePasswordBtn", "click", changeOwnPassword);
   on("loginBtn", "click", loginUser);
   on("loginPassword", "keydown", (e) => {
     if (e.key === "Enter") loginUser();
@@ -7348,15 +7694,13 @@ function bindEvents() {
   let lastWindowWidth = window.innerWidth;
   window.addEventListener("resize", () => {
     if (!window.matchMedia("(max-width: 950px) and (orientation: landscape)").matches) {
-      closeLandscapeSidebar();
     }
     const currentWidth = window.innerWidth;
     if (currentWidth !== lastWindowWidth) {
       lastWindowWidth = currentWidth;
       renderAll();
       updateAdminSyncToggleButton();
-      closeMobileMoreSheet();
-    }
+        }
   });
 
   [
@@ -7435,3 +7779,9 @@ if (isAuthenticated()) {
 } else {
   renderAll();
 }
+
+window.refreshFirebaseAdminPanel = refreshFirebaseAdminPanel;
+window.testFirebaseAdminConnection = testFirebaseAdminConnection;
+window.toggleFirebaseAdminCard = toggleFirebaseAdminCard;
+window.toggleDashboardSyncCard = toggleDashboardSyncCard;
+window.toggleAdminSyncOverview = toggleAdminSyncOverview;
