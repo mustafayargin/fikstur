@@ -5,11 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fikstür Tahmin Paneli Pro</title>
     <link rel="stylesheet" href="styles.css" />
-    <link rel="icon" href="favicon.png">
+    <link rel="icon" href="favicon.png" />
   </head>
   <body>
-    <button type="button" class="landscape-sidebar-toggle" id="landscapeSidebarToggle" aria-label="Menüyü aç">☰</button>
-    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
     <div class="app-shell">
       <aside class="sidebar" id="sidebar">
         <div>
@@ -40,25 +38,50 @@
               Yedekleme
             </button>
           </nav>
-          <div class="role-switch-card session-card" id="sessionCard">
-            <div>
-              <div class="role-switch-title">Oturum</div>
-              <div class="small-meta" id="sessionSummaryText">
-                Giriş yapılmadı.
+          <div
+            class="role-switch-card session-card compact-account-card"
+            id="sessionCard"
+          >
+            <button
+              class="secondary full account-trigger"
+              type="button"
+              id="desktopAccountBtn"
+            >
+              Hesap
+            </button>
+            <div class="account-menu" id="desktopAccountMenu" hidden>
+              <div class="account-menu-head">
+                <div>
+                  <div class="account-menu-name" id="desktopAccountName">
+                    Giriş yapılmadı
+                  </div>
+                  <div class="account-menu-status-row">
+                    <span
+                      class="account-live-dot"
+                      id="desktopAccountDot"
+                    ></span>
+                    <span class="account-menu-status" id="desktopAccountStatus"
+                      >Offline</span
+                    >
+                    <span class="account-role-badge" id="desktopAccountRole"
+                      >Misafir</span
+                    >
+                  </div>
+                </div>
+              </div>
+              <div class="account-menu-actions">
+                <button
+                  class="secondary full"
+                  type="button"
+                  id="desktopChangePasswordBtn"
+                >
+                  Şifre Değiştir
+                </button>
+                <button class="danger full" type="button" id="logoutBtn">
+                  Çıkış Yap
+                </button>
               </div>
             </div>
-            <div class="session-actions">
-              <button class="secondary full" type="button" id="logoutBtn">
-                Çıkış Yap
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div class="sidebar-footer">
-          <div class="mini-note">
-            Veriler tarayıcıda saklanır. İstersen ayrıca bilgisayarındaki bir
-            JSON dosyasına otomatik kaydedebilirsin.
           </div>
         </div>
       </aside>
@@ -74,7 +97,7 @@
               </p>
             </div>
 
-            <div class="header-actions double-selects">
+            <div class="header-actions double-selects dashboard-top-actions">
               <select id="dashboardSeasonSelect"></select>
               <select id="dashboardWeekSelect"></select>
             </div>
@@ -82,38 +105,56 @@
 
           <div class="stats-grid" id="statsGrid"></div>
 
-          <section class="card dashboard-sync-card">
-            <div class="card-header">
+          <section
+            class="card dashboard-sync-card collapsible-card is-open"
+            id="dashboardSyncCard"
+          >
+            <div class="card-header collapsible-card-header">
               <h3>Akıllı Güncelleme</h3>
+              <button
+                type="button"
+                class="secondary card-collapse-btn"
+                id="dashboardSyncToggleBtn"
+                aria-expanded="true"
+                aria-controls="dashboardSyncCardBody"
+                title="Daralt / genişlet"
+              >
+                <span class="collapse-arrow" aria-hidden="true">⌄</span>
+              </button>
             </div>
-            <div class="dashboard-sync-grid">
-              <div>
-                <div class="small-meta">
-                  Sistem sadece aktif sezon ve aktif hafta üzerinden çalışır.
-                  Yanlış hafta ya da yanlış sezon seçme riski olmaz.
+            <div class="collapsible-card-body" id="dashboardSyncCardBody">
+              <div class="dashboard-sync-grid">
+                <div>
+                  <div class="small-meta">
+                    Sistem sadece aktif sezon ve aktif hafta üzerinden çalışır.
+                    Yanlış hafta ya da yanlış sezon seçme riski olmaz.
+                  </div>
+                  <div class="dashboard-sync-meta">
+                    <span class="badge gray" id="dashboardActiveSeasonBadge"
+                      >Aktif sezon: -</span
+                    >
+                    <span class="badge gray" id="dashboardActiveWeekBadge"
+                      >Aktif hafta: -</span
+                    >
+                  </div>
                 </div>
-                <div class="dashboard-sync-meta">
-                  <span class="badge gray" id="dashboardActiveSeasonBadge"
-                    >Aktif sezon: -</span
-                  >
-                  <span class="badge gray" id="dashboardActiveWeekBadge"
-                    >Aktif hafta: -</span
-                  >
+                <div class="inline-actions dashboard-sync-actions">
+                  <button class="secondary" id="dashboardSyncSeasonBtn">
+                    API'den Veri Çek
+                  </button>
+                  <button class="secondary" id="dashboardSyncWeekBtn">
+                    Seçili Haftayı Güncelle
+                  </button>
                 </div>
               </div>
-              <div class="inline-actions">
-                <button class="secondary" id="dashboardSyncWeekBtn">
-                  Aktif Haftayı Güncelle
-                </button>
-                <button class="secondary" id="dashboardSyncSeasonBtn">
-                  Tüm Sezonu Güncelle
-                </button>
-              </div>
+              <div class="status-note" id="dashboardSyncStatus">Hazır.</div>
             </div>
-            <div class="status-note" id="dashboardSyncStatus">Hazır.</div>
           </section>
 
-          <section class="card admin-sync-overview-card admin-only is-open" id="adminSyncOverviewCard">
+          <section
+            class="card admin-sync-overview-card admin-only is-open"
+            id="adminSyncOverviewCard"
+          >
             <div class="card-header admin-sync-header-row">
               <div>
                 <h3>Senkron Durumu</h3>
@@ -121,12 +162,12 @@
               </div>
               <button
                 type="button"
-                class="secondary admin-sync-toggle-btn"
+                class="secondary admin-sync-toggle-btn card-collapse-btn"
                 id="adminSyncToggleBtn"
                 aria-expanded="true"
                 aria-controls="adminSyncOverviewBody"
               >
-                Gizle
+                <span class="collapse-arrow" aria-hidden="true">⌄</span>
               </button>
             </div>
             <div class="admin-sync-overview-body" id="adminSyncOverviewBody">
@@ -144,18 +185,26 @@
                   <strong id="adminSyncQueueCount">0</strong>
                 </div>
                 <div class="admin-sync-stat">
-                  <span class="admin-sync-label">Son işlemde etkilenen maç</span>
+                  <span class="admin-sync-label"
+                    >Son işlemde etkilenen maç</span
+                  >
                   <strong id="adminSyncUpdatedMatches">0</strong>
                 </div>
               </div>
               <div class="status-note admin-sync-last-error">
-                <strong>Son hata:</strong> <span id="adminSyncLastError">Yok</span>
+                <strong>Son hata:</strong>
+                <span id="adminSyncLastError">Yok</span>
               </div>
-              <div class="status-note" id="adminSyncFooter">Henüz senkron yapılmadı.</div>
+              <div class="status-note" id="adminSyncFooter">
+                Henüz senkron yapılmadı.
+              </div>
             </div>
           </section>
 
-          <div id="firebaseAdminPanel" class="firebase-admin-panel hidden"></div>
+          <div
+            id="firebaseAdminPanel"
+            class="firebase-admin-panel hidden"
+          ></div>
 
           <div class="dashboard-grid">
             <section class="card">
@@ -437,16 +486,42 @@
                 <select id="predictionSeasonSelect"></select>
                 <select id="predictionWeekSelect"></select>
               </div>
-              <button id="toggleShareModeBtn" type="button" class="secondary share-mode-btn">Paylaşım Modu: Kapalı</button>
+              <button
+                id="toggleShareModeBtn"
+                type="button"
+                class="secondary share-mode-btn"
+              >
+                Paylaşım Modu: Kapalı
+              </button>
             </div>
           </div>
 
-          <div id="predictionShareToolbar" class="share-toolbar hidden" aria-hidden="true">
+          <div
+            id="predictionShareToolbar"
+            class="share-toolbar hidden"
+            aria-hidden="true"
+          >
             <div class="share-toolbar-group">
               <span class="share-toolbar-label">Görünüm</span>
-              <div class="share-segmented" role="group" aria-label="Paylaşım görünümü">
-                <button id="shareViewPreBtn" type="button" class="share-segment-btn is-active">Maç Öncesi</button>
-                <button id="shareViewPostBtn" type="button" class="share-segment-btn">Maç Sonrası</button>
+              <div
+                class="share-segmented"
+                role="group"
+                aria-label="Paylaşım görünümü"
+              >
+                <button
+                  id="shareViewPreBtn"
+                  type="button"
+                  class="share-segment-btn is-active"
+                >
+                  Maç Öncesi
+                </button>
+                <button
+                  id="shareViewPostBtn"
+                  type="button"
+                  class="share-segment-btn"
+                >
+                  Maç Sonrası
+                </button>
               </div>
             </div>
             <label class="share-toggle-inline" for="shareCompactToggle">
@@ -463,13 +538,21 @@
             <div class="card-header">
               <h3>Tahmin Tablosu</h3>
               <span class="small-meta"
-                >Değişiklikler otomatik kaydedilir. Haftanın ilk maçına 10 dk kala tüm tahminler kilitlenir.</span
+                >Değişiklikler otomatik kaydedilir. Haftanın ilk maçına 10 dk
+                kala tüm tahminler kilitlenir.</span
               >
             </div>
-            <div id="predictionLockBanner" class="prediction-lock-banner is-hidden"></div>
+            <div
+              id="predictionLockBanner"
+              class="prediction-lock-banner is-hidden"
+            ></div>
             <div class="admin-prediction-note admin-only">
               <strong>Admin hızlı notu</strong>
-              <span>Bu ekranda tüm kullanıcıların tahminlerine müdahale edebilir, kilitli maçlarda bile giriş yapabilir ve gerektiğinde düzeltme/silme işlemi uygulayabilirsin.</span>
+              <span
+                >Bu ekranda tüm kullanıcıların tahminlerine müdahale edebilir,
+                kilitli maçlarda bile giriş yapabilir ve gerektiğinde
+                düzeltme/silme işlemi uygulayabilirsin.</span
+              >
             </div>
             <div id="predictionsTable"></div>
           </div>
@@ -490,15 +573,15 @@
           <div class="dashboard-grid standings-layout">
             <section class="card">
               <div class="card-header">
-                <h3>Genel Sıralama</h3>
-              </div>
-              <div id="standingsTable"></div>
-            </section>
-            <section class="card">
-              <div class="card-header">
                 <h3>Seçili Hafta Puanları</h3>
               </div>
               <div id="weeklyStandings"></div>
+            </section>
+            <section class="card">
+              <div class="card-header">
+                <h3>Genel Sıralama</h3>
+              </div>
+              <div id="standingsTable"></div>
             </section>
           </div>
         </section>
@@ -507,7 +590,10 @@
           <div class="page-header">
             <div>
               <h2>İstatistikler</h2>
-              <p>Detaylı başarı verileri ve sezon şampiyonluğu.</p>
+              <p>
+                Detaylı başarı verileri, oyuncu kartları ve canlı sezon lideri
+                burada.
+              </p>
             </div>
             <div class="header-actions">
               <select id="statsSeasonSelect"></select>
@@ -517,7 +603,7 @@
           <div class="stats-grid" id="advancedStatsGrid"></div>
           <div class="dashboard-grid standings-layout">
             <section class="card">
-              <div class="card-header"><h3>Başarı Özeti</h3></div>
+              <div class="card-header"><h3>Oyuncu İstatistik Kartları</h3></div>
               <div id="insightsList"></div>
             </section>
             <section class="card champion-card" id="championCard"></section>
@@ -529,7 +615,8 @@
             <div>
               <h2>Yedekleme</h2>
               <p>
-                Hafta bazlı CSV/JSON indir, tam yedek al, geri yükle ve güvenli temizleme yap.
+                Hafta bazlı CSV/JSON indir, tam yedek al, geri yükle ve güvenli
+                temizleme yap.
               </p>
             </div>
           </div>
@@ -539,21 +626,28 @@
               <div class="card-header"><h3>Haftalık Dışa Aktarma</h3></div>
               <label for="backupWeekSelect">Hafta seç</label>
               <select id="backupWeekSelect"></select>
-              <div class="status-note" id="backupWeekSummary">Hafta bilgisi hazırlanıyor...</div>
+              <div class="status-note" id="backupWeekSummary">
+                Hafta bilgisi hazırlanıyor...
+              </div>
               <div class="backup-action-grid">
                 <button id="exportWeekCsvBtn">Seçili Haftayı CSV İndir</button>
-                <button class="secondary" id="exportWeekJsonBtn">Seçili Haftayı JSON İndir</button>
+                <button class="secondary" id="exportWeekJsonBtn">
+                  Seçili Haftayı JSON İndir
+                </button>
               </div>
             </section>
 
             <section class="card stack-actions backup-main-card">
               <div class="card-header"><h3>Tam Yedek ve Geri Yükleme</h3></div>
               <div class="status-note">
-                Tam yedek tüm sezonları, haftaları, maçları, kullanıcıları ve tahminleri içerir.
+                Tam yedek tüm sezonları, haftaları, maçları, kullanıcıları ve
+                tahminleri içerir.
               </div>
               <div class="backup-action-grid single-col">
                 <button id="exportFullBackupBtn">Tüm Veriyi Yedekle</button>
-                <label class="file-label" for="importFile">Yedek / JSON Yükle</label>
+                <label class="file-label" for="importFile"
+                  >Yedek / JSON Yükle</label
+                >
               </div>
               <input
                 type="file"
@@ -567,7 +661,8 @@
             <section class="card stack-actions backup-danger-card">
               <div class="card-header"><h3>Tehlikeli İşlemler</h3></div>
               <div class="status-note">
-                Bu işlem sezonları, haftaları, maçları ve tahminleri temizler. Güvenlik için iki adımlı onay ister.
+                Bu işlem sezonları, haftaları, maçları ve tahminleri temizler.
+                Güvenlik için iki adımlı onay ister.
               </div>
               <button class="danger" id="resetBtn">Tüm Verileri Sil</button>
             </section>
@@ -586,62 +681,42 @@
       <button class="mobile-nav-btn" type="button" data-tab="standings">
         Puan
       </button>
-      <button
-        class="mobile-nav-btn more-trigger"
-        type="button"
-        id="mobileMoreBtn"
-      >
-        Daha
+      <button class="mobile-nav-btn" type="button" data-tab="stats">
+        İstatistikler
+      </button>
+      <button class="mobile-nav-btn" type="button" id="mobileAccountBtn">
+        Hesap
       </button>
     </nav>
 
-    <div class="mobile-more-sheet" id="mobileMoreSheet">
-      <div class="mobile-more-backdrop" id="mobileMoreBackdrop"></div>
-      <div class="mobile-more-panel">
-        <div class="mobile-more-header">
-          <h3>Daha Fazla Sayfa</h3>
-          <button class="secondary small" type="button" id="mobileMoreCloseBtn">
-            Kapat
-          </button>
+    <div class="mobile-account-menu" id="mobileAccountMenu" hidden>
+      <div class="account-menu-head">
+        <div>
+          <div class="account-menu-name" id="mobileAccountName">
+            Giriş yapılmadı
+          </div>
+          <div class="account-menu-status-row">
+            <span class="account-live-dot" id="mobileAccountDot"></span>
+            <span class="account-menu-status" id="mobileAccountStatus"
+              >Offline</span
+            >
+            <span class="account-role-badge" id="mobileAccountRole"
+              >Misafir</span
+            >
+          </div>
         </div>
-        <div class="mobile-more-grid" id="mobileMoreGrid">
-          <button class="mobile-more-item" type="button" data-tab="seasons">
-            Sezonlar & Takımlar
-          </button>
-          <button class="mobile-more-item" type="button" data-tab="weeks">
-            Haftalar
-          </button>
-          <button class="mobile-more-item" type="button" data-tab="matches">
-            Maçlar
-          </button>
-          <button class="mobile-more-item" type="button" data-tab="stats">
-            İstatistikler
-          </button>
-          <button
-            class="mobile-more-item admin-only"
-            type="button"
-            data-tab="players"
-          >
-            Kişiler
-          </button>
-          <button
-            class="mobile-more-item admin-only"
-            type="button"
-            data-tab="backup"
-          >
-            Yedekleme
-          </button>
-          <button
-            class="mobile-more-item mobile-logout-item"
-            type="button"
-            id="mobileLogoutBtn"
-          >
-            Çıkış Yap
-          </button>
-        </div>
-        <div class="mobile-more-session" id="mobileMoreSessionText">
-          Giriş yapılmadı.
-        </div>
+      </div>
+      <div class="account-menu-actions">
+        <button
+          class="secondary full"
+          type="button"
+          id="mobileChangePasswordBtn"
+        >
+          Şifre Değiştir
+        </button>
+        <button class="danger full" type="button" id="mobileLogoutBtn">
+          Çıkış Yap
+        </button>
       </div>
     </div>
 
@@ -714,58 +789,140 @@
           <div class="app-loading-success hidden" id="appLoadingSuccess">✓</div>
         </div>
         <h3 id="appLoadingTitle">Veriler yükleniyor</h3>
-        <p id="appLoadingMessage">Lütfen bekleyin, maçlar ve tahminler hazırlanıyor...</p>
+        <p id="appLoadingMessage">
+          Lütfen bekleyin, maçlar ve tahminler hazırlanıyor...
+        </p>
         <div class="app-loading-progress-wrap">
           <div class="app-loading-progress-top">
             <span id="appLoadingStepLabel">Bağlantı hazırlanıyor...</span>
             <strong id="appLoadingPercent">0%</strong>
           </div>
           <div class="app-loading-progress-track">
-            <div class="app-loading-progress-bar" id="appLoadingProgressBar"></div>
+            <div
+              class="app-loading-progress-bar"
+              id="appLoadingProgressBar"
+            ></div>
           </div>
         </div>
         <div class="app-loading-checklist" id="appLoadingChecklist">
-          <div class="app-loading-checkitem pending" id="loadingCheckLogin">Giriş bekleniyor</div>
-          <div class="app-loading-checkitem pending" id="loadingCheckUsers">Kullanıcılar hazırlanıyor</div>
-          <div class="app-loading-checkitem pending" id="loadingCheckMatches">Maç verileri yükleniyor</div>
-          <div class="app-loading-checkitem pending" id="loadingCheckPredictions">Tahminler yükleniyor</div>
+          <div class="app-loading-checkitem pending" id="loadingCheckLogin">
+            Giriş bekleniyor
+          </div>
+          <div class="app-loading-checkitem pending" id="loadingCheckUsers">
+            Kullanıcılar hazırlanıyor
+          </div>
+          <div class="app-loading-checkitem pending" id="loadingCheckMatches">
+            Maç verileri yükleniyor
+          </div>
+          <div
+            class="app-loading-checkitem pending"
+            id="loadingCheckPredictions"
+          >
+            Tahminler yükleniyor
+          </div>
         </div>
       </div>
     </div>
     <style>
-      .hidden { display: none !important; }
-      .firebase-admin-panel { margin-bottom: 18px; }
-      .firebase-admin-card { overflow: hidden; }
-      .firebase-admin-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-      .firebase-admin-stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-bottom:12px; }
-      .firebase-admin-stat { border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:12px; background:rgba(255,255,255,.03); }
-      .firebase-admin-stat span { display:block; font-size:12px; opacity:.7; margin-bottom:6px; }
-      .firebase-admin-stat strong { font-size:18px; }
-      .firebase-admin-table-grid { display:grid; grid-template-columns:1fr 1.35fr; gap:14px; }
-      .firebase-admin-table-wrap { border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:10px; background:rgba(255,255,255,.02); }
-      .firebase-admin-table-title { font-weight:700; margin-bottom:8px; }
-      .firebase-admin-table-scroll { overflow:auto; max-height:320px; }
-      .firebase-admin-table { width:100%; border-collapse:collapse; font-size:13px; }
-      .firebase-admin-table th, .firebase-admin-table td { padding:8px 10px; text-align:left; border-bottom:1px solid rgba(255,255,255,.08); white-space:nowrap; }
-      .firebase-admin-table thead th { position:sticky; top:0; background:#111827; z-index:1; }
-      .firebase-admin-status { margin-bottom:12px; }
-      @media (max-width: 980px) { .firebase-admin-table-grid { grid-template-columns:1fr; } }
+      .hidden {
+        display: none !important;
+      }
+      .firebase-admin-panel {
+        margin-bottom: 18px;
+      }
+      .firebase-admin-card {
+        overflow: hidden;
+      }
+      .firebase-admin-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .firebase-admin-stat-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+      .firebase-admin-stat {
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.03);
+      }
+      .firebase-admin-stat span {
+        display: block;
+        font-size: 12px;
+        opacity: 0.7;
+        margin-bottom: 6px;
+      }
+      .firebase-admin-stat strong {
+        font-size: 18px;
+      }
+      .firebase-admin-table-grid {
+        display: grid;
+        grid-template-columns: 1fr 1.35fr;
+        gap: 14px;
+      }
+      .firebase-admin-table-wrap {
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        padding: 10px;
+        background: rgba(255, 255, 255, 0.02);
+      }
+      .firebase-admin-table-title {
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+      .firebase-admin-table-scroll {
+        overflow: auto;
+        max-height: 320px;
+      }
+      .firebase-admin-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      .firebase-admin-table th,
+      .firebase-admin-table td {
+        padding: 8px 10px;
+        text-align: left;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        white-space: nowrap;
+      }
+      .firebase-admin-table thead th {
+        position: sticky;
+        top: 0;
+        background: #111827;
+        z-index: 1;
+      }
+      .firebase-admin-status {
+        margin-bottom: 12px;
+      }
+      @media (max-width: 980px) {
+        .firebase-admin-table-grid {
+          grid-template-columns: 1fr;
+        }
+      }
     </style>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-  
-      <script>
-window.FIKSTUR_FIREBASE_CONFIG = {
-  apiKey: "AIzaSyDNBlZiB--PvK2QGJbumfvrt16mkD-fPQ0",
-  authDomain: "superlig-tahmin-panel.firebaseapp.com",
-  databaseURL: "https://superlig-tahmin-panel-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "superlig-tahmin-panel",
-  storageBucket: "superlig-tahmin-panel.firebasestorage.app",
-  messagingSenderId: "89142067230",
-  appId: "1:89142067230:web:96a69696dc1dbcac16ee0f",
-  measurementId: "G-9E1VX0KTQH"
-};
-</script>
+
+    <script>
+      window.FIKSTUR_FIREBASE_CONFIG = {
+        apiKey: "AIzaSyDNBlZiB--PvK2QGJbumfvrt16mkD-fPQ0",
+        authDomain: "superlig-tahmin-panel.firebaseapp.com",
+        databaseURL:
+          "https://superlig-tahmin-panel-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "superlig-tahmin-panel",
+        storageBucket: "superlig-tahmin-panel.firebasestorage.app",
+        messagingSenderId: "89142067230",
+        appId: "1:89142067230:web:96a69696dc1dbcac16ee0f",
+        measurementId: "G-9E1VX0KTQH",
+      };
+    </script>
 
     <script src="app.js"></script>
   </body>
