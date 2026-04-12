@@ -95,32 +95,6 @@ option {
 }
 
 
-.landscape-sidebar-toggle {
-  display: none;
-  position: fixed;
-  top: 10px;
-  left: 10px;
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(6, 14, 28, 0.92);
-  color: #f8fafc;
-  font-size: 24px;
-  line-height: 1;
-  z-index: 1200;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
-  backdrop-filter: blur(16px);
-}
-
-.sidebar-backdrop {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(2, 6, 23, 0.52);
-  backdrop-filter: blur(4px);
-  z-index: 1090;
-}
 .app-shell {
   display: grid;
   grid-template-columns: clamp(210px, 22vw, 230px) minmax(0, 1fr);
@@ -718,10 +692,6 @@ option {
   cursor: grab;
 }
 
-.excel-predictions.drag-scrolling {
-  cursor: grabbing;
-  user-select: none;
-}
 
 .prediction-grid-head,
 .prediction-grid-row {
@@ -742,8 +712,8 @@ option {
 }
 
 .prediction-grid-head {
-  position: sticky;
-  top: 0;
+  position: relative;
+  top: auto;
   z-index: 2;
   background: #101a2c;
   border-bottom: 1px solid var(--line);
@@ -995,6 +965,168 @@ option {
   font-size: 40px;
   font-weight: 900;
   line-height: 1;
+}
+
+
+#tab-stats .header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  width: auto;
+}
+
+#tab-stats .header-actions select {
+  width: 190px;
+}
+
+#tab-stats .header-actions .header-sync-btn {
+  width: auto;
+  flex: 0 0 auto;
+}
+
+.player-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.player-stat-card {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.025));
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.player-stat-card.is-leader {
+  border-color: rgba(250, 204, 21, 0.42);
+  box-shadow: 0 10px 30px rgba(250, 204, 21, 0.08);
+}
+
+.player-stat-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.player-stat-name {
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.player-rank-badge {
+  min-width: 48px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0 12px;
+  background: rgba(34, 197, 94, 0.14);
+  border: 1px solid rgba(255,255,255,0.12);
+  font-weight: 800;
+}
+
+.player-stat-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.player-mini-stat {
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.04);
+  padding: 10px;
+  display: grid;
+  gap: 4px;
+}
+
+.player-mini-stat span,
+.champion-highlight span,
+.champion-note-card span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.player-mini-stat strong,
+.champion-highlight strong,
+.champion-note-card strong {
+  font-size: 18px;
+}
+
+.player-form-row {
+  display: grid;
+  gap: 8px;
+}
+
+.player-form-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.form-pill {
+  min-width: 42px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.18);
+  font-weight: 800;
+}
+
+.live-champion-card {
+  width: 100%;
+}
+
+.champion-kicker {
+  font-size: 12px;
+  font-weight: 800;
+  color: #facc15;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.champion-summary {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.champion-highlights {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.champion-highlight,
+.champion-note-card {
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.04);
+  padding: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.champion-side-notes {
+  display: grid;
+  gap: 10px;
+}
+
+.champion-note-card small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.champion-footer-note {
+  display: block;
+  line-height: 1.45;
 }
 
 .leader-toast {
@@ -1400,8 +1532,7 @@ input[type="number"] {
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.mobile-bottom-nav,
-.mobile-more-sheet {
+.mobile-bottom-nav {
   display: none;
 }
 
@@ -1558,7 +1689,7 @@ input[type="number"] {
 
   .mobile-bottom-nav {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 8px;
     position: fixed;
     left: 10px;
@@ -3111,8 +3242,7 @@ input[type="number"] {
 }
 
 .admin-sync-toggle-btn {
-  display: none;
-  min-width: 74px;
+  min-width: 38px;
   white-space: nowrap;
 }
 
@@ -3128,23 +3258,14 @@ input[type="number"] {
   .admin-sync-header-row {
     align-items: center;
   }
+}
 
-  .admin-sync-toggle-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 8px 14px;
-    border-radius: 999px;
-    font-size: 12px;
-  }
+.admin-sync-overview-card:not(.is-open) .admin-sync-overview-body {
+  display: none;
+}
 
-  .admin-sync-overview-card:not(.is-open) .admin-sync-overview-body {
-    display: none;
-  }
-
-  .admin-sync-overview-card:not(.is-open) {
-    padding-bottom: 14px;
-  }
+.admin-sync-overview-card:not(.is-open) {
+  padding-bottom: 14px;
 }
 
 
@@ -3417,14 +3538,14 @@ button.btn-error {
 }
 
 #tab-predictions .page-header {
-  position: sticky;
-  top: 12px;
-  z-index: 35;
-  padding: 10px 12px;
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  border-radius: 18px;
-  background: rgba(6, 14, 28, 0.92);
-  backdrop-filter: blur(10px);
+  position: static;
+  top: auto;
+  z-index: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
 }
 
 .prediction-header-actions {
@@ -3480,109 +3601,6 @@ button.btn-error {
 
 
 @media (max-width: 950px) and (orientation: landscape) {
-  body.landscape-sidebar-open {
-    overflow: hidden;
-  }
-
-  .landscape-sidebar-toggle {
-    display: inline-grid;
-    place-items: center;
-  }
-
-  .sidebar-backdrop {
-    display: block;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.22s ease;
-  }
-
-  body.landscape-sidebar-open .sidebar-backdrop {
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  .app-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: min(320px, 82vw);
-    max-width: 320px;
-    z-index: 1150;
-    transform: translateX(-105%);
-    transition: transform 0.24s ease;
-    border-right: 1px solid var(--line);
-    border-bottom: 0;
-    overflow-y: auto;
-    box-shadow: 0 18px 40px rgba(0,0,0,0.42);
-  }
-
-  body.landscape-sidebar-open .sidebar {
-    transform: translateX(0);
-  }
-
-  .content {
-    padding-top: 60px;
-  }
-
-  #tab-predictions .page-header {
-    position: static;
-    top: auto;
-    padding: 8px 10px;
-    margin-bottom: 10px;
-    border-radius: 16px;
-  }
-
-  #tab-predictions .page-header h2 {
-    font-size: 18px;
-    margin-bottom: 0;
-  }
-
-  #tab-predictions .page-header p {
-    display: none;
-  }
-
-  .prediction-header-actions {
-    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr);
-    gap: 8px;
-    align-items: center;
-  }
-
-  .prediction-header-actions .double-selects {
-    grid-column: auto;
-    min-width: 0;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
-
-  .prediction-header-actions .header-sync-btn,
-  .prediction-header-actions .share-mode-btn,
-  .prediction-header-actions select {
-    height: 38px;
-    min-height: 38px;
-    font-size: 13px;
-    padding-inline: 10px;
-  }
-
-  .header-sync-btn {
-    gap: 6px;
-  }
-
-  .sync-btn-icon {
-    font-size: 13px;
-  }
-
-  
-.mobile-other-prediction.compact-user-row {
-  display: grid;
-  gap: 8px;
-  padding: 10px 12px;
-}
 
 .compact-user-main {
   display: flex;
@@ -4413,118 +4431,6 @@ textarea {
   min-width: 132px;
 }
 
-/* ===== Tahmin tablosu kullanılabilirlik düzenleri (2026-04-10) ===== */
-#predictionsTable {
-  width: 100%;
-  overflow-x: auto;
-  overflow-y: visible;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-x pan-y;
-  overscroll-behavior-x: contain;
-  scrollbar-gutter: stable both-edges;
-}
-
-#predictionsTable::-webkit-scrollbar {
-  height: 10px;
-}
-
-#predictionsTable::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.32);
-  border-radius: 999px;
-}
-
-#predictionsTable::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 999px;
-}
-
-.sidebar {
-  position: sticky;
-  top: 0;
-  align-self: start;
-  max-height: 100vh;
-  overflow-y: auto;
-}
-
-#tab-predictions .page-header {
-  position: static;
-  top: auto;
-}
-
-@media (max-width: 950px) and (orientation: landscape) {
-  #predictionsTable {
-    overflow-x: auto;
-  }
-
-  .mobile-scorecard-teams,
-  .mobile-prediction-match .fixture-cell,
-  #tab-matches .fixture-cell,
-  .dashboard-fixtures .fixture-cell {
-    grid-template-columns: 1fr auto 1fr;
-    gap: 10px;
-    align-items: center;
-    text-align: center;
-  }
-
-  .mobile-team,
-  .mobile-team-away,
-  .mobile-prediction-match .home-team,
-  .mobile-prediction-match .away-team,
-  #tab-matches .home-team,
-  #tab-matches .away-team,
-  .dashboard-fixtures .home-team,
-  .dashboard-fixtures .away-team {
-    width: 100%;
-    justify-content: center;
-    align-items: center;
-  }
-
-  .mobile-team,
-  .mobile-team-away,
-  .mobile-prediction-match .team-inline,
-  #tab-matches .team-inline,
-  .dashboard-fixtures .team-inline {
-    width: 100%;
-    justify-content: center;
-    text-align: center;
-    gap: 8px;
-  }
-
-  .mobile-team strong,
-  .mobile-prediction-match .team-name,
-  #tab-matches .team-name,
-  .dashboard-fixtures .team-name {
-    max-width: 92px;
-    font-size: 12px;
-    line-height: 1.15;
-    text-align: center;
-    white-space: normal;
-    word-break: break-word;
-    overflow-wrap: anywhere;
-  }
-
-  .mobile-team .team-logo,
-  .mobile-team .team-logo-img,
-  .mobile-prediction-match .team-logo,
-  .mobile-prediction-match .team-logo-img,
-  #tab-matches .team-logo,
-  #tab-matches .team-logo-img,
-  .dashboard-fixtures .team-logo,
-  .dashboard-fixtures .team-logo-img {
-    width: 40px;
-    height: 40px;
-    min-width: 40px;
-    min-height: 40px;
-  }
-
-  .mobile-score-main,
-  .mobile-prediction-match .versus-tag,
-  #tab-matches .versus-tag,
-  .dashboard-fixtures .versus-tag {
-    font-size: 18px;
-    line-height: 1;
-  }
-}
 .main-layout,
 .content,
 .tab-panel,
@@ -4670,4 +4576,396 @@ textarea {
   color: #ffffff;
   border: 1px solid rgba(220, 38, 38, 0.45);
   box-shadow: 0 0 10px rgba(220, 38, 38, 0.22);
+}
+
+/* ===== Tahmin tablosu masaüstü yatay kaydırma güçlendirmesi (2026-04-12) ===== */
+#tab-predictions .card {
+  overflow: visible;
+}
+
+#predictionsTable {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+
+#predictionsTable .excel-predictions {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+@media (min-width: 769px) {
+  #predictionsTable .excel-predictions {
+    padding-bottom: 8px;
+    scrollbar-width: thin;
+  }
+}
+
+
+/* ===== Tahmin tablosu yeni yatay kaydırma tasarımı ===== */
+#predictionsTable {
+  width: 100%;
+  min-width: 0;
+}
+
+.predictions-scroll-shell {
+  width: 100%;
+  overflow: auto;
+  cursor: grab;
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable both-edges;
+}
+
+.predictions-scroll-shell.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.predictions-scroll-shell.is-dragging * {
+  user-select: none;
+}
+
+.predictions-scroll-shell::-webkit-scrollbar {
+  height: 12px;
+}
+
+.predictions-scroll-shell::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.38);
+  border-radius: 999px;
+}
+
+.predictions-scroll-shell::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 999px;
+}
+
+.excel-predictions {
+  --prediction-match-col: 340px;
+  --prediction-player-col-min: 168px;
+  width: max-content;
+  min-width: max(100%, calc(var(--prediction-match-col) + (var(--player-count, 1) * var(--prediction-player-col-min))));
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
+  position: relative;
+  max-width: none;
+  min-height: 100%;
+}
+
+.prediction-grid-head,
+.prediction-grid-row {
+  width: 100%;
+  min-width: 100%;
+}
+
+.prediction-grid-head {
+  position: relative;
+  top: auto;
+  z-index: 4;
+}
+
+.match-sticky-cell {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  box-shadow: 8px 0 20px rgba(2, 6, 23, 0.18);
+}
+
+.prediction-grid-head > .match-sticky-cell,
+.prediction-grid-head > div:first-child {
+  z-index: 5;
+}
+
+.player-head-col {
+  min-width: var(--prediction-player-col-min);
+  max-width: none;
+}
+
+.prediction-cell {
+  min-width: var(--prediction-player-col-min);
+  max-width: none;
+  min-height: 108px;
+  padding: 16px 10px 12px;
+  box-sizing: border-box;
+}
+
+.pred-action-area {
+  width: 100%;
+}
+
+.dashboard-sync-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.dashboard-sync-actions > button {
+  width: 100%;
+}
+
+@media (max-width: 950px) {
+  .excel-predictions {
+    --prediction-match-col: 280px;
+    --prediction-player-col-min: 150px;
+  }
+}
+
+@media (max-width: 768px) {
+  .predictions-scroll-shell {
+    border-radius: 16px;
+  }
+
+  .excel-predictions {
+    --prediction-match-col: 250px;
+    --prediction-player-col-min: 140px;
+  }
+
+  .match-sticky-cell {
+    position: sticky;
+    left: 0;
+  }
+}
+
+
+.mobile-more-sheet,
+.mobile-more-backdrop,
+.mobile-more-panel,
+.mobile-more-header,
+.mobile-more-grid,
+.mobile-more-item,
+.mobile-more-session {
+  display: none !important;
+}
+
+
+.compact-account-card {
+  position: relative;
+  padding: 10px;
+}
+
+.account-trigger {
+  min-height: 42px;
+}
+
+.account-trigger.is-open {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.24), rgba(14, 165, 233, 0.18));
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.account-menu,
+.mobile-account-menu {
+  background: linear-gradient(180deg, rgba(10, 18, 32, 0.98), rgba(7, 14, 26, 0.98));
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 18px 42px rgba(0,0,0,0.35);
+  border-radius: 16px;
+  padding: 12px;
+}
+
+.account-menu {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: calc(100% + 8px);
+  z-index: 30;
+}
+
+.mobile-account-menu {
+  position: fixed;
+  right: 10px;
+  bottom: 74px;
+  width: min(260px, calc(100vw - 20px));
+  z-index: 95;
+}
+
+.account-menu-head {
+  margin-bottom: 10px;
+}
+
+.account-menu-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-menu-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.account-live-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  display: inline-block;
+  background: #64748b;
+  box-shadow: 0 0 0 3px rgba(100,116,139,0.14);
+}
+
+.account-live-dot.is-online {
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34,197,94,0.18);
+}
+
+.account-live-dot.is-offline {
+  background: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239,68,68,0.16);
+}
+
+.account-menu-status {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.account-role-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text);
+  background: rgba(59,130,246,0.14);
+  border: 1px solid rgba(59,130,246,0.24);
+}
+
+.account-menu-actions {
+  display: grid;
+  gap: 8px;
+}
+
+@media (max-width: 768px) {
+  .session-card {
+    display: none;
+  }
+
+  .mobile-account-menu {
+    bottom: 78px;
+    width: min(240px, calc(100vw - 20px));
+    padding: 10px;
+    border-radius: 14px;
+  }
+
+  .account-menu-name {
+    font-size: 13px;
+  }
+
+  .account-menu-actions .full {
+    min-height: 40px;
+    font-size: 12px;
+  }
+}
+
+
+@media (max-width: 1100px) {
+  .player-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  #tab-stats .header-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  #tab-stats .header-actions select,
+  #tab-stats .header-actions .header-sync-btn {
+    width: 100%;
+  }
+
+  .player-stat-metrics,
+  .champion-highlights {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+
+/* Dashboard üst sağ alan */
+.dashboard-top-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.dashboard-top-actions .header-sync-btn {
+  min-width: 132px;
+  white-space: nowrap;
+}
+
+/* Aç / kapa kartları */
+.collapsible-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.card-collapse-btn {
+  min-width: 38px;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.collapse-arrow {
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 0.22s ease;
+}
+
+.collapsible-card:not(.is-open) .collapsible-card-body {
+  display: none;
+}
+
+.collapsible-card:not(.is-open) .collapse-arrow {
+  transform: rotate(-90deg);
+}
+
+.leader-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(250, 204, 21, 0.16);
+  border: 1px solid rgba(250, 204, 21, 0.34);
+  color: #fde68a;
+  font-size: 12px;
+  vertical-align: middle;
+}
+
+body[data-role="user"] .nav-tab[data-tab="seasons"],
+body[data-role="user"] .nav-tab[data-tab="weeks"],
+body[data-role="user"] .nav-tab[data-tab="matches"] {
+  display: none !important;
+}
+
+@media (max-width: 720px) {
+  .dashboard-top-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-top-actions .header-sync-btn {
+    width: 100%;
+  }
 }
