@@ -5109,3 +5109,114 @@ body[data-role="user"] .nav-tab[data-tab="matches"] {
     scroll-margin-top: 84px;
   }
 }
+/* LOGO KUTUSU - LOGIN */
+.brand-card-login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 0 14px;
+  padding: 14px;
+  border-radius: 22px;
+
+  /* Arka plan - koyu + cam efekti */
+  background: linear-gradient(160deg, rgba(20, 45, 85, 0.95), rgba(10, 25, 50, 0.9));
+  backdrop-filter: blur(6px);
+
+  /* Kenar çizgi + glow */
+  border: 1px solid rgba(120, 170, 255, 0.25);
+  box-shadow:
+    0 8px 25px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* LOGO İÇ KUTU */
+.brand-logo-login-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 100%;
+  max-width: 200px;
+  aspect-ratio: 1 / 1;
+
+  padding: 12px;
+  border-radius: 18px;
+
+  /* Daha belirgin zemin (logoyu öne çıkarır) */
+  background: radial-gradient(circle at 50% 40%, rgba(25, 60, 110, 0.9), rgba(10, 25, 50, 0.95));
+
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* LOGO */
+.brand-logo-login-wrap .logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.6));
+}
+
+/* PC */
+@media (min-width: 769px) {
+  .brand-logo-login-wrap {
+    max-width: 190px;
+    padding: 10px;
+  }
+}
+
+/* MOBİL */
+@media (max-width: 768px) {
+  .brand-card-login {
+    padding: 10px;
+    border-radius: 18px;
+  }
+
+  .brand-logo-login-wrap {
+    max-width: 140px;
+    padding: 8px;
+  }
+}
+html.login-locked,
+body.login-locked {
+  overflow: hidden !important;
+  height: 100%;
+  touch-action: none;
+}
+
+body.login-locked {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+}
+
+.login-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(3, 10, 24, 0.98);
+  backdrop-filter: blur(10px);
+  z-index: 99999;
+  overscroll-behavior: none;
+}
+
+.login-overlay.hidden {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .login-overlay {
+    padding: 12px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .login-card {
+    max-height: none;
+  }
+}
