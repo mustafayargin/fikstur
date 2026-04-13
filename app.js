@@ -731,10 +731,12 @@ function registerPresenceWindowHooks() {
 
   window.addEventListener("pagehide", () => {
     stopPresenceTracking({ removeSession: true });
+    clearRememberedSession();
   });
 
   window.addEventListener("beforeunload", () => {
     stopPresenceTracking({ removeSession: true });
+    clearRememberedSession();
   });
 
   document.addEventListener("visibilitychange", () => {
@@ -2975,17 +2977,51 @@ function resetLoginForm() {
   if (usernameInput) usernameInput.value = "";
   if (passwordInput) passwordInput.value = "";
 }
+function setLoginScrollLock(isLocked) {
+  const scrollY = window.__loginScrollY || 0;
 
+  if (isLocked) {
+    window.__loginScrollY = window.scrollY || window.pageYOffset || 0;
+    document.documentElement.classList.add("login-locked");
+    document.body.classList.add("login-locked");
+    document.body.style.top = `-${window.__loginScrollY}px`;
+    return;
+  }
+
+  document.documentElement.classList.remove("login-locked");
+  document.body.classList.remove("login-locked");
+  document.body.style.top = "";
+  window.scrollTo(0, window.__loginScrollY || 0);
+}
+
+function clearRememberedSession() {
+  try {
+    state.settings.auth.isAuthenticated = false;
+    state.settings.auth.role = "admin";
+    state.settings.auth.playerId = null;
+    state.settings.auth.user = null;
+    currentSessionUser = null;
+    saveState(true);
+  } catch (error) {
+    console.warn("Oturum temizleme uyarısı:", error);
+  }
+}
 function updateLoginOverlay() {
   const overlay = document.getElementById("loginOverlay");
   if (!overlay) return;
-  overlay.classList.toggle("hidden", isAuthenticated());
-  if (!isAuthenticated()) {
+
+  const auth = isAuthenticated();
+
+  overlay.classList.toggle("hidden", auth);
+  setLoginScrollLock(!auth);
+
+  if (!auth) {
     resetLoginForm();
     clearLoginErrorState();
     setLoginSubmitting(false);
     setLoginFeedback("idle", "Hazır.");
   }
+
   updateSessionCard();
 }
 function closeLoginOverlay() {
@@ -3082,10 +3118,6 @@ async function loginUser() {
     closeLoginOverlay();
     applyRolePermissions();
     startPresenceTracking();
-    saveState(true);
-closeLoginOverlay();
-applyRolePermissions();
-startPresenceTracking();
 
     await runSessionHydrationWithFastOverlay({
       loadingMessage: "Kayıtlı veriler açılıyor, güncel bilgiler yükleniyor...",
