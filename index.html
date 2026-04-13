@@ -12,10 +12,8 @@
       <aside class="sidebar" id="sidebar">
         <div>
           <div class="brand-card">
-            <div class="brand-icon">⚽</div>
-            <div>
-              <h1>Fikstür</h1>
-              <p>Süper Lig Tahmin Paneli</p>
+            <div class="brand-logo-wrap">
+              <img src="favicon.png" alt="Logo" class="logo-img">
             </div>
           </div>
 
@@ -87,6 +85,16 @@
       </aside>
 
       <main class="content">
+        <div class="mobile-top-brand" aria-hidden="true">
+          <div class="mobile-top-brand__logo">
+            <img src="favicon.png" alt="Logo" class="logo-img">
+          </div>
+          <div class="mobile-top-brand__copy">
+            <strong>Fikstür Tahmin</strong>
+            <span>Pro Panel</span>
+          </div>
+        </div>
+
         <section class="tab-panel active" id="tab-dashboard">
           <div class="page-header">
             <div>
@@ -532,6 +540,13 @@
               <input id="shareHideEmptyToggle" type="checkbox" />
               <span>Boşları soluk göster</span>
             </label>
+            <button
+              id="downloadShareImageBtn"
+              type="button"
+              class="secondary share-download-btn"
+            >
+              Görsel İndir
+            </button>
           </div>
 
           <div class="card">
@@ -546,14 +561,7 @@
               id="predictionLockBanner"
               class="prediction-lock-banner is-hidden"
             ></div>
-            <div class="admin-prediction-note admin-only">
-              <strong>Admin hızlı notu</strong>
-              <span
-                >Bu ekranda tüm kullanıcıların tahminlerine müdahale edebilir,
-                kilitli maçlarda bile giriş yapabilir ve gerektiğinde
-                düzeltme/silme işlemi uygulayabilirsin.</span
-              >
-            </div>
+
             <div id="predictionsTable"></div>
           </div>
         </section>
@@ -602,12 +610,14 @@
 
           <div class="stats-grid" id="advancedStatsGrid"></div>
           <div class="dashboard-grid standings-layout">
-            <section class="card">
-              <div class="card-header"><h3>Oyuncu İstatistik Kartları</h3></div>
-              <div id="insightsList"></div>
-            </section>
+            
             <section class="card champion-card" id="championCard"></section>
           </div>
+          <br>
+          <section class="card">
+            <div class="card-header"><h3>Oyuncu İstatistik Kartları</h3></div>
+            <div id="insightsList"></div>
+          </section>
         </section>
 
         <section class="tab-panel" id="tab-backup">
@@ -684,10 +694,34 @@
       <button class="mobile-nav-btn" type="button" data-tab="stats">
         İstatistikler
       </button>
+      <button class="mobile-nav-btn admin-only" type="button" id="mobileAdminMenuBtn">
+        Menü
+      </button>
       <button class="mobile-nav-btn" type="button" id="mobileAccountBtn">
         Hesap
       </button>
     </nav>
+
+    <div class="mobile-admin-menu-sheet" id="mobileAdminMenuSheet" hidden>
+      <div class="mobile-admin-menu-backdrop" id="mobileAdminMenuBackdrop"></div>
+      <div class="mobile-admin-menu-panel">
+        <div class="mobile-admin-menu-header">
+          <h3>Admin Menü</h3>
+          <button class="secondary" type="button" id="mobileAdminMenuCloseBtn">Kapat</button>
+        </div>
+        <div class="mobile-admin-menu-grid">
+          <button class="mobile-admin-menu-item" type="button" data-tab="dashboard">Genel Bakış</button>
+          <button class="mobile-admin-menu-item" type="button" data-tab="seasons">Sezonlar</button>
+          <button class="mobile-admin-menu-item" type="button" data-tab="players">Kişiler</button>
+          <button class="mobile-admin-menu-item" type="button" data-tab="weeks">Haftalar</button>
+          <button class="mobile-admin-menu-item" type="button" data-tab="matches">Maçlar</button>
+          <button class="mobile-admin-menu-item" type="button" data-tab="predictions">Tahminler</button>
+          <button class="mobile-admin-menu-item" type="button" data-tab="standings">Puan Durumu</button>
+          <button class="mobile-admin-menu-item" type="button" data-tab="stats">İstatistikler</button>
+          <button class="mobile-admin-menu-item" type="button" data-tab="backup">Yedekleme</button>
+        </div>
+      </div>
+    </div>
 
     <div class="mobile-account-menu" id="mobileAccountMenu" hidden>
       <div class="account-menu-head">
