@@ -406,6 +406,7 @@ let firebasePresenceCache = {};
 let presenceHeartbeatTimer = null;
 let presenceConnectedRef = null;
 let presenceSessionRef = null;
+let presenceUserRef = null;
 let presenceSessionId = null;
 let forceLogoutUserRef = null;
 let forceLogoutListener = null;
@@ -468,6 +469,20 @@ function getPresenceUserMeta() {
   };
 }
 
+function getPlayerRole(player) {
+  const rawRole = String(
+    player?.role || player?.rol || player?.kullaniciRol || "user",
+  ).toLowerCase();
+  if (rawRole === "admin") return "admin";
+
+  const rawUsername = String(
+    player?.username || player?.kullaniciAdi || "",
+  ).trim().toLowerCase();
+  if (rawUsername === "admin") return "admin";
+
+  return "user";
+}
+
 function getOnlineThresholdMs() {
   return 35000;
 }
@@ -507,12 +522,18 @@ function getPresenceStatusForUser(userId) {
       latestSession?.connectedAt ||
       record.lastSeen ||
       "",
+    name: record.name || latestSession?.name || "",
+    username: record.username || latestSession?.username || "",
+    role: record.role || latestSession?.role || "user",
   };
 }
 
 function stopPresenceTracking(options = {}) {
   clearInterval(presenceHeartbeatTimer);
   presenceHeartbeatTimer = null;
+
+  const stoppedAt = new Date().toISOString();
+  const presenceMeta = getPresenceUserMeta();
 
   if (presenceConnectedRef?.off) {
     try {
@@ -528,13 +549,26 @@ function stopPresenceTracking(options = {}) {
       presenceSessionRef
         .update({
           online: false,
-          lastSeen: new Date().toISOString(),
+          lastSeen: stoppedAt,
         })
         .catch(() => {});
     }
   }
 
+  if (presenceUserRef) {
+    presenceUserRef
+      .update({
+        online: false,
+        lastSeen: stoppedAt,
+        name: presenceMeta.name || "",
+        username: presenceMeta.username || "",
+        role: presenceMeta.role || "user",
+      })
+      .catch(() => {});
+  }
+
   presenceSessionRef = null;
+  presenceUserRef = null;
   presenceSessionId = null;
 
   if (forceLogoutUserRef && forceLogoutListener) {
@@ -622,17 +656,31 @@ function startPresenceTracking() {
     sessionStorage.getItem(`fikstur_presence_${userId}`) || uid("session");
   sessionStorage.setItem(`fikstur_presence_${userId}`, presenceSessionId);
 
+  presenceUserRef = db.ref(`presence/${userId}`);
   presenceSessionRef = db.ref(`presence/${userId}/sessions/${presenceSessionId}`);
   presenceConnectedRef = db.ref(".info/connected");
 
   const heartbeat = () => {
     const meta = getPresenceUserMeta();
+    const now = new Date().toISOString();
     if (!presenceSessionRef) return;
     presenceSessionRef
       .update({
         online: true,
-        lastSeen: new Date().toISOString(),
-        connectedAt: authUser.connectedAt || new Date().toISOString(),
+        lastSeen: now,
+        connectedAt: authUser.connectedAt || now,
+        sessionStartedAt,
+        name: meta.name || "",
+        username: meta.username || "",
+        role: meta.role || "user",
+      })
+      .catch(() => {});
+
+    presenceUserRef
+      ?.update({
+        online: true,
+        lastSeen: now,
+        connectedAt: authUser.connectedAt || now,
         sessionStartedAt,
         name: meta.name || "",
         username: meta.username || "",
@@ -646,14 +694,27 @@ function startPresenceTracking() {
 
     if (snapshot.val() === true) {
       presenceSessionRef.onDisconnect().remove();
+      presenceUserRef
+        ?.onDisconnect()
+        .update({
+          online: false,
+          lastSeen: new Date().toISOString(),
+        });
       heartbeat();
       return;
     }
 
+    const disconnectedAt = new Date().toISOString();
     presenceSessionRef
       .update({
         online: false,
-        lastSeen: new Date().toISOString(),
+        lastSeen: disconnectedAt,
+      })
+      .catch(() => {});
+    presenceUserRef
+      ?.update({
+        online: false,
+        lastSeen: disconnectedAt,
       })
       .catch(() => {});
   });
@@ -678,14 +739,21 @@ function registerPresenceWindowHooks() {
 
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") {
+      const hiddenAt = new Date().toISOString();
       if (presenceSessionRef) {
         presenceSessionRef
           .update({
             online: false,
-            lastSeen: new Date().toISOString(),
+            lastSeen: hiddenAt,
           })
           .catch(() => {});
       }
+      presenceUserRef
+        ?.update({
+          online: false,
+          lastSeen: hiddenAt,
+        })
+        .catch(() => {});
       return;
     }
 
@@ -1127,7 +1195,23 @@ async function refreshSessionData(triggerButton = null) {
 
 function ensureHeaderSyncButtons() {
   document.querySelectorAll(".page-header").forEach((header) => {
+    const panel = header.closest(".tab-panel");
+    const isPredictionsHeader = panel?.id === "tab-predictions";
     let actions = header.querySelector(".header-actions");
+    const existingButtons = header.querySelectorAll('[data-role="global-sync-btn"]');
+
+    existingButtons.forEach((btn, index) => {
+      if (index > 0 || !isPredictionsHeader) btn.remove();
+    });
+
+    if (!isPredictionsHeader) {
+      if (actions?.querySelector("#dashboardSeasonSelect")) {
+        actions.classList.add("dashboard-top-actions");
+      } else {
+        actions?.classList.remove("dashboard-top-actions");
+      }
+      return;
+    }
 
     if (!actions) {
       actions = document.createElement("div");
@@ -1140,22 +1224,15 @@ function ensureHeaderSyncButtons() {
     if (!btn) {
       btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "secondary header-sync-btn";
+      btn.className = "secondary header-sync-btn minimal-sync-btn";
       btn.dataset.role = "global-sync-btn";
+      btn.setAttribute("aria-label", "Verileri yenile");
+      btn.title = "Tahmin verilerini yenile";
       btn.innerHTML =
-        '<span class="sync-btn-icon" aria-hidden="true">↻</span><span>Verileri Çek</span>';
+        '<span class="sync-btn-icon" aria-hidden="true">↻</span><span>Yenile</span>';
     }
 
-    const seasonSelect =
-      actions.querySelector("#dashboardSeasonSelect") ||
-      actions.querySelector('select[id*="Season"]') ||
-      actions.querySelector("select");
-
-    if (seasonSelect) {
-      if (seasonSelect.nextElementSibling !== btn) {
-        seasonSelect.insertAdjacentElement("afterend", btn);
-      }
-    } else if (!actions.contains(btn)) {
+    if (!actions.contains(btn)) {
       actions.appendChild(btn);
     }
 
@@ -1164,6 +1241,64 @@ function ensureHeaderSyncButtons() {
     } else {
       actions.classList.remove("dashboard-top-actions");
     }
+  });
+}
+
+function bindAdminPanelTableScroll() {
+  document.querySelectorAll(".firebase-admin-table-scroll").forEach((shell) => {
+    if (shell._dragScrollBound) return;
+    shell._dragScrollBound = true;
+
+    let pointerId = null;
+    let startX = 0;
+    let startY = 0;
+    let startScrollLeft = 0;
+    let startScrollTop = 0;
+    let dragging = false;
+
+    const stopDrag = () => {
+      if (pointerId !== null) {
+        try {
+          shell.releasePointerCapture(pointerId);
+        } catch (error) {}
+      }
+      pointerId = null;
+      dragging = false;
+      shell.classList.remove("is-dragging");
+    };
+
+    shell.addEventListener("pointerdown", (event) => {
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+      if (event.target.closest("button, input, select, textarea, label, a")) return;
+
+      pointerId = event.pointerId;
+      startX = event.clientX;
+      startY = event.clientY;
+      startScrollLeft = shell.scrollLeft;
+      startScrollTop = shell.scrollTop;
+      dragging = false;
+      try {
+        shell.setPointerCapture(pointerId);
+      } catch (error) {}
+    });
+
+    shell.addEventListener("pointermove", (event) => {
+      if (pointerId !== event.pointerId) return;
+      const deltaX = event.clientX - startX;
+      const deltaY = event.clientY - startY;
+      if (!dragging && (Math.abs(deltaX) > 6 || Math.abs(deltaY) > 6)) {
+        dragging = true;
+        shell.classList.add("is-dragging");
+      }
+      if (!dragging) return;
+      shell.scrollLeft = startScrollLeft - deltaX;
+      shell.scrollTop = startScrollTop - deltaY;
+      event.preventDefault();
+    });
+
+    shell.addEventListener("pointerup", stopDrag);
+    shell.addEventListener("pointercancel", stopDrag);
+    shell.addEventListener("lostpointercapture", stopDrag);
   });
 }
 function getLastSyncLabel() {
@@ -2152,7 +2287,7 @@ function getPredictionOutcomeClass(pred, match) {
 
 function getVisiblePlayersOrdered() {
   const players = [...state.players].filter(
-    (player) => String(player.role || "user").toLowerCase() !== "admin",
+    (player) => getPlayerRole(player) !== "admin",
   );
   const currentPlayerId = getCurrentPlayerId();
   if (getCurrentRole() !== "user" || !currentPlayerId) return players;
@@ -2724,6 +2859,25 @@ function toggleAccountMenu(type = "mobile") {
   btn.classList.toggle("is-open", willOpen);
 }
 
+function closeMobileAdminMenu() {
+  const sheet = document.getElementById("mobileAdminMenuSheet");
+  const trigger = document.getElementById("mobileAdminMenuBtn");
+  if (!sheet) return;
+  sheet.hidden = true;
+  sheet.classList.remove("open");
+  trigger?.classList.remove("is-open");
+}
+
+function toggleMobileAdminMenu(forceOpen = null) {
+  const sheet = document.getElementById("mobileAdminMenuSheet");
+  const trigger = document.getElementById("mobileAdminMenuBtn");
+  if (!sheet || getCurrentRole() !== "admin") return;
+  const willOpen = typeof forceOpen === "boolean" ? forceOpen : sheet.hidden;
+  sheet.hidden = !willOpen;
+  sheet.classList.toggle("open", willOpen);
+  trigger?.classList.toggle("is-open", willOpen);
+}
+
 async function changeOwnPassword() {
   if (!isAuthenticated() || getCurrentRole() === "admin") return;
   const player = getCurrentPlayer();
@@ -2960,6 +3114,11 @@ function updateNavSelection(tabName) {
     .forEach((btn) =>
       btn.classList.toggle("active", btn.dataset.tab === tabName),
     );
+  document
+    .querySelectorAll(".mobile-admin-menu-item[data-tab]")
+    .forEach((btn) =>
+      btn.classList.toggle("active", btn.dataset.tab === tabName),
+    );
 }
 
 function applyRolePermissions() {
@@ -2974,6 +3133,14 @@ function applyRolePermissions() {
   document.querySelectorAll(".admin-only").forEach((el) => {
     el.classList.toggle("hidden-by-role", role !== "admin");
   });
+
+  const mobileAdminMenuBtn = document.getElementById("mobileAdminMenuBtn");
+  const mobileBottomNav = document.getElementById("mobileBottomNav");
+  if (mobileAdminMenuBtn) {
+    mobileAdminMenuBtn.classList.toggle("hidden-by-role", role !== "admin");
+  }
+  mobileBottomNav?.classList.toggle("is-admin", role === "admin");
+  if (role !== "admin") closeMobileAdminMenu();
 
   const currentTab = state.settings.currentTab || "dashboard";
   if (
@@ -3513,12 +3680,144 @@ function getTeamMetaByName(name, seasonId = getActiveSeasonId()) {
   );
 }
 
+const remoteTeamLogoUrlCache = new Map();
+const remoteTeamLogoPromiseCache = new Map();
+
+const TEAM_REMOTE_SEARCH_ALIASES = {
+  "Başakşehir": ["Istanbul Basaksehir", "Basaksehir"],
+  "İstanbul Başakşehir": ["Istanbul Basaksehir", "Basaksehir"],
+  "Beşiktaş": ["Besiktas", "Besiktas JK"],
+  "Çaykur Rizespor": ["Rizespor", "Caykur Rizespor"],
+  "Eyüpspor": ["Eyupspor"],
+  "Fatih Karagümrük": ["Fatih Karagumruk"],
+  "Fatih Karagümrük SK": ["Fatih Karagumruk"],
+  "Fenerbahçe": ["Fenerbahce"],
+  "Galatasaray": ["Galatasaray SK"],
+  "Gaziantep FK": ["Gaziantep", "Gaziantep FK"],
+  "Gençlerbirliği": ["Genclerbirligi"],
+  "Göztepe": ["Goztepe", "Goztepe Izmir"],
+  "İstanbulspor": ["Istanbulspor"],
+  "Kasımpaşa": ["Kasimpasa"],
+  "Kocaelispor": ["Kocaelispor"],
+  "Sivasspor": ["Sivasspor"],
+  "Trabzonspor": ["Trabzonspor"],
+};
+
+function normalizeTeamSearchToken(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, " ")
+    .replace(/\b(sk|jk|fk|as|a s|spor kulubu|spor|kulubu|club|fc)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function getTeamRemoteSearchNames(teamName) {
+  const aliases = TEAM_REMOTE_SEARCH_ALIASES[teamName] || [];
+  return [...new Set([
+    teamName,
+    ...aliases,
+    String(teamName || "").replace(/İ/g, "I").replace(/ı/g, "i"),
+    String(teamName || "").replace(/FK$/i, "").trim(),
+  ].map((item) => String(item || "").trim()).filter(Boolean))];
+}
+
+async function fetchRemoteTeamLogoUrl(teamName) {
+  const cacheKey = normalizeTeamSearchToken(teamName);
+  if (!cacheKey) return "";
+  if (remoteTeamLogoUrlCache.has(cacheKey)) return remoteTeamLogoUrlCache.get(cacheKey) || "";
+  if (remoteTeamLogoPromiseCache.has(cacheKey)) return remoteTeamLogoPromiseCache.get(cacheKey);
+
+  const request = (async () => {
+    const wanted = normalizeTeamSearchToken(teamName);
+    for (const searchName of getTeamRemoteSearchNames(teamName)) {
+      try {
+        const response = await fetch(`https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=${encodeURIComponent(searchName)}`);
+        if (!response.ok) continue;
+        const payload = await response.json();
+        const teams = Array.isArray(payload?.teams) ? payload.teams : [];
+        const matched =
+          teams.find((item) => {
+            const hay = [
+              item?.strTeam,
+              item?.strTeamShort,
+              item?.strAlternate,
+              item?.strLeague,
+            ]
+              .map(normalizeTeamSearchToken)
+              .join(" ");
+            return hay.includes(wanted) || wanted.includes(normalizeTeamSearchToken(item?.strTeam));
+          }) || teams[0];
+        const logoUrl = matched?.strBadge || matched?.strTeamBadge || matched?.strLogo || "";
+        if (logoUrl) {
+          remoteTeamLogoUrlCache.set(cacheKey, logoUrl);
+          return logoUrl;
+        }
+      } catch (error) {
+        console.warn("Uzak logo aranamadı:", teamName, error);
+      }
+    }
+    remoteTeamLogoUrlCache.set(cacheKey, "");
+    return "";
+  })();
+
+  remoteTeamLogoPromiseCache.set(cacheKey, request);
+  try {
+    return await request;
+  } finally {
+    remoteTeamLogoPromiseCache.delete(cacheKey);
+  }
+}
+
+async function hydrateTeamLogoImage(img) {
+  if (!img || img.dataset.remoteLoading === "1" || img.dataset.remoteResolved === "1") return;
+  img.dataset.remoteLoading = "1";
+  const fallback = img.nextElementSibling;
+  try {
+    const remoteUrl = await fetchRemoteTeamLogoUrl(img.dataset.teamName || img.alt || "");
+    if (remoteUrl) {
+      img.src = remoteUrl;
+      img.style.display = "block";
+      img.dataset.remoteResolved = "1";
+      if (fallback) fallback.style.display = "none";
+      return;
+    }
+  } catch (error) {
+    console.warn("Logo yükleme hatası:", error);
+  } finally {
+    img.dataset.remoteLoading = "0";
+  }
+  img.dataset.remoteResolved = "1";
+}
+
+function handleTeamLogoError(img) {
+  if (!img) return;
+  img.style.display = "none";
+  img.dataset.logoFailed = "1";
+  const fallback = img.nextElementSibling;
+  if (fallback) fallback.style.display = "grid";
+  hydrateTeamLogoImage(img);
+}
+
+function hydrateTeamLogosIn(container = document) {
+  container.querySelectorAll?.(".team-logo-img").forEach((img) => {
+    if (img.complete && img.naturalWidth > 0) return;
+    if (img.dataset.logoFailed === "1") {
+      hydrateTeamLogoImage(img);
+    }
+  });
+}
+
 function teamLogoHtml(teamName, seasonId, extraClass = "") {
   const team = getTeamMetaByName(teamName, seasonId);
   const slug = team.slug || slugify(teamName);
+  const localSrc = `logos/${slug}.png`;
+  const explicitRemote = team.logoUrl || team.logo || team.badge || team.image || "";
   return `
     <span class="team-logo-wrap ${extraClass}">
-      <img class="team-logo-img" src="logos/${slug}.png" alt="${escapeHtml(teamName)} logosu" onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';" />
+      <img class="team-logo-img" src="${explicitRemote || localSrc}" data-local-src="${localSrc}" data-team-name="${escapeHtml(teamName)}" alt="${escapeHtml(teamName)} logosu" onerror="window.handleTeamLogoError && window.handleTeamLogoError(this);" />
       <span class="team-logo fallback-logo" style="display:none; ${teamStyle(teamName)}">${teamInitials(teamName)}</span>
     </span>
   `;
@@ -3771,7 +4070,7 @@ function getGeneralStandings(seasonId = getActiveSeasonId()) {
   const matchIds = getMatchesBySeasonId(seasonId).map((m) => m.id);
 
   return state.players
-    .filter((player) => String(player.role || "user").toLowerCase() !== "admin")
+    .filter((player) => getPlayerRole(player) !== "admin")
     .map((player) => {
       const preds = state.predictions.filter(
         (p) => p.playerId === player.id && matchIds.includes(p.matchId),
@@ -3803,7 +4102,7 @@ function getWeeklyStandings(weekId) {
   const matchIds = getMatchesByWeekId(weekId).map((m) => m.id);
 
   return state.players
-    .filter((player) => String(player.role || "user").toLowerCase() !== "admin")
+    .filter((player) => getPlayerRole(player) !== "admin")
     .map((player) => {
       const preds = state.predictions.filter(
         (p) => p.playerId === player.id && matchIds.includes(p.matchId),
@@ -4063,7 +4362,7 @@ function renderFirebaseAdminPanel() {
       const count = state.predictions.filter((p) => p.playerId === player.id && p.homePred !== "" && p.awayPred !== "").length;
       const presence = getPresenceStatusForUser(player.id);
       const statusClass = presence.isOnline ? "online" : "offline";      const statusText = presence.isOnline ? "Online" : "Offline";
-      const canForceLogout = String(player.role || "user").toLowerCase() !== "admin";
+      const canForceLogout = getPlayerRole(player) !== "admin";
       return `
         <tr>
           <td>${escapeHtml(player.name)}</td>
@@ -4125,11 +4424,7 @@ function renderFirebaseAdminPanel() {
         <div class="firebase-admin-stat"><span>Bekleyen sıra</span><strong>${summary.queueCount}</strong></div>
         <div class="firebase-admin-stat"><span>Aktif sezon hafta</span><strong>${summary.weekCount}</strong></div>
       </div>
-      <div class="firebase-admin-capabilities">
-        <div class="firebase-admin-capability"><strong>Admin yetkisi</strong> : <span>Tüm kullanıcı tahminlerini düzenleyebilir ve silebilir.</span></div>
-        <div class="firebase-admin-capability"><strong>Kilit aşımı</strong> : <span>Maç başlasa bile admin tahmin girebilir ve düzeltme yapabilir.</span></div>
-        <div class="firebase-admin-capability"><strong>Canlı senkron</strong> : <span>Kaydettiğin değişiklikler tüm kullanıcılara anında düşer.</span></div>
-      </div>
+
       <div class="status-note firebase-admin-status" id="firebaseAdminPanelStatus">Son tahmin: ${summary.lastPrediction ? formatAdminPanelDateTime(summary.lastPrediction.updatedAt) : "Henüz yok"}</div>
       <div class="firebase-admin-table-grid">
         <div class="firebase-admin-table-wrap">
@@ -4164,6 +4459,7 @@ async function refreshFirebaseAdminPanel(buttonOrEvent) {
   try {
     await hydrateFromFirebaseRealtime("manuel");
     renderFirebaseAdminPanel();
+    bindAdminPanelTableScroll();
     if (status) status.textContent = `${getOnlineSourceLabel()} verileri güncellendi • ${formatAdminPanelDateTime(new Date().toISOString())}`;
     setAsyncButtonState(actionButton, "success", { success: "Hazır" });
   } catch (error) {
@@ -4292,7 +4588,7 @@ function renderPlayers() {
     return (container.innerHTML = createEmptyState("Henüz kişi eklenmedi."));
   container.innerHTML = `<div class="excel-list">${state.players
     .map((player) => {
-      const isAdminUser = String(player.role || "user").toLowerCase() === "admin";
+      const isAdminUser = getPlayerRole(player) === "admin";
       return `
     <div class="excel-list-row player-row player-admin-row ${isAdminUser ? "admin-player-row" : ""}">
       <div class="player-name-cell">${escapeHtml(player.name)}${isAdminUser ? ' <span class="badge admin">Admin</span>' : ""}</div>
@@ -4426,7 +4722,7 @@ window.removePlayer = async function (id, buttonOrEvent) {
   const actionButton = getActionButtonFromArg(buttonOrEvent);
   const player = getPlayerById(id);
   if (!player) return;
-  if (String(player.role || "user").toLowerCase() === "admin") {
+  if (getPlayerRole(player) === "admin") {
     return showAlert("Admin kullanıcısı silinemez.", {
       title: "İşlem kapalı",
       type: "warning",
@@ -4871,7 +5167,7 @@ window.forceLogoutUserSession = async function (playerId) {
 
   const player = getPlayerById(playerId);
   if (!player) return;
-  if (String(player.role || "user").toLowerCase() === "admin") {
+  if (getPlayerRole(player) === "admin") {
     return showAlert("Admin kullanıcısı sistemden çıkarılamaz.", {
       title: "İşlem engellendi",
       type: "warning",
@@ -4976,29 +5272,29 @@ function isPredictionShareFadeEmpty() {
 function togglePredictionShareMode() {
   state.settings.predictionShareMode = !state.settings.predictionShareMode;
   saveState();
-  renderAll();
+  updatePredictionShareModeButton();
 }
 
 function setPredictionShareView(view) {
   state.settings.predictionShareView = view === "post" ? "post" : "pre";
   saveState();
-  renderPredictions();
+  updatePredictionShareModeButton();
 }
 
 function setPredictionShareCompact(enabled) {
   state.settings.predictionShareCompact = !!enabled;
   saveState();
-  renderPredictions();
+  updatePredictionShareModeButton();
 }
 
 function setPredictionShareFadeEmpty(enabled) {
   state.settings.predictionShareFadeEmpty = !!enabled;
   saveState();
-  renderPredictions();
+  updatePredictionShareModeButton();
 }
 
 function canUsePredictionShareMode() {
-  return !(isMobileView() && getCurrentRole() !== "admin");
+  return !isMobileView() || getCurrentRole() === "admin";
 }
 
 function updatePredictionShareModeButton() {
@@ -5010,7 +5306,10 @@ function updatePredictionShareModeButton() {
     saveState();
   }
   const active = allowed && isPredictionShareMode();
-  btn.textContent = `Paylaşım Modu: ${active ? "Açık" : "Kapalı"}`;
+  const mobileAdminTools = isMobileView() && getCurrentRole() === "admin";
+  btn.textContent = mobileAdminTools
+    ? `Paylaşım Araçları: ${active ? "Açık" : "Kapalı"}`
+    : `Paylaşım Modu: ${active ? "Açık" : "Kapalı"}`;
   btn.classList.toggle("is-active", active);
   btn.classList.toggle("hidden", !allowed);
   btn.setAttribute("aria-hidden", allowed ? "false" : "true");
@@ -5039,6 +5338,602 @@ function getPredictionDisplayValue(pred) {
   const hasAway = away !== "" && away !== null && away !== undefined;
   if (!hasHome || !hasAway) return "—";
   return `${home} - ${away}`;
+}
+
+function downloadBlobFile(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+function getTeamPalette(name) {
+  const index = Math.max(0, DEFAULT_TEAM_NAMES.indexOf(name));
+  return TEAM_COLORS[
+    index >= 0 ? index % TEAM_COLORS.length : Math.abs(String(name || "").length) % TEAM_COLORS.length
+  ] || ["#38bdf8", "#22c55e"];
+}
+
+function truncateCanvasText(ctx, text, maxWidth) {
+  const safe = String(text || "");
+  if (!safe) return "";
+  if (ctx.measureText(safe).width <= maxWidth) return safe;
+  let output = safe;
+  while (output.length > 1 && ctx.measureText(`${output}…`).width > maxWidth) {
+    output = output.slice(0, -1);
+  }
+  return `${output}…`;
+}
+
+function fillRoundedRect(ctx, x, y, width, height, radius, fillStyle, strokeStyle = "") {
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + width, y, x + width, y + height, r);
+  ctx.arcTo(x + width, y + height, x, y + height, r);
+  ctx.arcTo(x, y + height, x, y, r);
+  ctx.arcTo(x, y, x + width, y, r);
+  ctx.closePath();
+  if (fillStyle) {
+    ctx.fillStyle = fillStyle;
+    ctx.fill();
+  }
+  if (strokeStyle) {
+    ctx.strokeStyle = strokeStyle;
+    ctx.stroke();
+  }
+}
+
+const shareLogoImageCache = new Map();
+
+function getTeamLogoCandidateSources(teamName, seasonId = getActiveSeasonId()) {
+  const team = getTeamMetaByName(teamName, seasonId);
+  const slug = team?.slug || DEFAULT_TEAM_SLUGS[teamName] || slugify(teamName);
+  const remoteCached = remoteTeamLogoUrlCache.get(normalizeTeamSearchToken(teamName)) || "";
+  return [
+    slug ? `logos/${slug}.png` : "",
+    team?.logoUrl || "",
+    team?.logo || "",
+    team?.badge || "",
+    team?.image || "",
+    remoteCached,
+  ].filter(Boolean);
+}
+
+function loadCanvasImage(src) {
+  return new Promise((resolve) => {
+    if (!src) return resolve(null);
+    const img = new Image();
+    img.decoding = "async";
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+async function getTeamLogoImage(teamName, seasonId = getActiveSeasonId()) {
+  const cacheKey = `${seasonId || "global"}__${teamName || ""}`;
+  if (shareLogoImageCache.has(cacheKey)) {
+    return shareLogoImageCache.get(cacheKey);
+  }
+
+  for (const src of getTeamLogoCandidateSources(teamName, seasonId)) {
+    const img = await loadCanvasImage(src);
+    if (img) {
+      shareLogoImageCache.set(cacheKey, img);
+      return img;
+    }
+  }
+
+  const remoteUrl = await fetchRemoteTeamLogoUrl(teamName);
+  if (remoteUrl) {
+    const remoteImg = await loadCanvasImage(remoteUrl);
+    if (remoteImg) {
+      shareLogoImageCache.set(cacheKey, remoteImg);
+      return remoteImg;
+    }
+  }
+
+  shareLogoImageCache.set(cacheKey, null);
+  return null;
+}
+
+async function drawTeamBadgeOnCanvas(ctx, teamName, x, y, size, seasonId = getActiveSeasonId()) {
+  const logoImg = await getTeamLogoImage(teamName, seasonId);
+  if (logoImg) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(255,255,255,0.98)";
+    ctx.fill();
+    ctx.clip();
+    const inset = Math.max(3, Math.round(size * 0.08));
+    ctx.drawImage(logoImg, x + inset, y + inset, size - inset * 2, size - inset * 2);
+    ctx.restore();
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,255,255,0.22)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(x + size / 2, y + size / 2, size / 2 - 0.75, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
+  const [colorA, colorB] = getTeamPalette(teamName);
+  const gradient = ctx.createLinearGradient(x, y, x + size, y + size);
+  gradient.addColorStop(0, colorA);
+  gradient.addColorStop(1, colorB);
+  fillRoundedRect(ctx, x, y, size, size, size / 2, gradient, "rgba(255,255,255,0.18)");
+  ctx.fillStyle = "#f8fafc";
+  ctx.font = `800 ${Math.max(14, Math.round(size * 0.32))}px Inter, Arial, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(teamInitials(teamName), x + size / 2, y + size / 2 + 1);
+  ctx.textAlign = "left";
+}
+
+function drawPredictionShareHeader(ctx, x, y, width, title, subtitle, pageText) {
+  const headGradient = ctx.createLinearGradient(x, y, x + width, y + 80);
+  headGradient.addColorStop(0, "rgba(15,23,42,0.96)");
+  headGradient.addColorStop(1, "rgba(12,36,74,0.96)");
+  fillRoundedRect(ctx, x, y, width, 88, 24, headGradient, "rgba(148,163,184,0.16)");
+  ctx.fillStyle = "#38bdf8";
+  ctx.font = "800 22px Inter, Arial, sans-serif";
+  ctx.fillText("PAYLAŞIM EKRANI", x + 24, y + 28);
+  ctx.fillStyle = "#f8fafc";
+  ctx.font = "900 42px Inter, Arial, sans-serif";
+  ctx.fillText(title, x + 24, y + 62);
+  ctx.fillStyle = "#94a3b8";
+  ctx.font = "600 18px Inter, Arial, sans-serif";
+  ctx.fillText(subtitle, x + 360, y + 62);
+  fillRoundedRect(ctx, x + width - 150, y + 22, 126, 40, 20, "rgba(15,23,42,0.88)", "rgba(255,255,255,0.16)");
+  ctx.fillStyle = "#e2e8f0";
+  ctx.font = "800 18px Inter, Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(pageText, x + width - 87, y + 47);
+  ctx.textAlign = "left";
+}
+
+function getShareCellPalette(pred, match, shareView) {
+  const hasPrediction = pred && pred.homePred !== "" && pred.awayPred !== "";
+  if (!hasPrediction) {
+    return {
+      bg: "rgba(15,23,42,0.72)",
+      border: "rgba(148,163,184,0.12)",
+      accent: "#94a3b8",
+      label: shareView === "pre" ? "—" : "Boş",
+    };
+  }
+  if (!match.played || shareView === "pre") {
+    return {
+      bg: "rgba(15,23,42,0.82)",
+      border: "rgba(56,189,248,0.22)",
+      accent: "#e2e8f0",
+      label: "Tahmin",
+    };
+  }
+  const pts = Number(pred.points || 0);
+  if (pts >= 3) {
+    return {
+      bg: "rgba(16,185,129,0.18)",
+      border: "rgba(16,185,129,0.34)",
+      accent: "#dcfce7",
+      label: "Tam skor",
+    };
+  }
+  if (pts >= 1) {
+    return {
+      bg: "rgba(245,158,11,0.18)",
+      border: "rgba(245,158,11,0.34)",
+      accent: "#fef3c7",
+      label: "Yakın",
+    };
+  }
+  return {
+    bg: "rgba(239,68,68,0.16)",
+    border: "rgba(239,68,68,0.32)",
+    accent: "#fee2e2",
+    label: "0 puan",
+  };
+}
+
+async function createPredictionShareExportCanvas(matches, players, options = {}) {
+  const shareView = options.shareView === "post" ? "post" : "pre";
+  const seasonName = getSeasonById(getActiveSeasonId())?.name || "Sezon";
+  const weekNumber = getWeekNumberById(state.settings.activeWeekId) || "?";
+  const pageIndex = Number(options.pageIndex || 0);
+  const totalPages = Number(options.totalPages || 1);
+  const weeklyStandings = shareView === "post" ? getWeeklyStandings(state.settings.activeWeekId) : [];
+  const summaryRows = shareView === "post"
+    ? players.map((player) => {
+        const row = weeklyStandings.find((item) => item.id === player.id) || {
+          id: player.id,
+          total: 0,
+          exact: 0,
+          resultOnly: 0,
+        };
+        return { ...row, id: player.id, name: player.name };
+      })
+    : [];
+
+  const rankingMap = new Map(
+    [...summaryRows]
+      .sort(
+        (a, b) =>
+          Number(b.total || 0) - Number(a.total || 0) ||
+          Number(b.exact || 0) - Number(a.exact || 0) ||
+          Number(b.resultOnly || 0) - Number(a.resultOnly || 0),
+      )
+      .map((row, index) => [row.id, index + 1]),
+  );
+
+  const margin = 28;
+  const headerH = 106;
+  const tableHeadH = 54;
+  const rowH = shareView === "post" ? 88 : 78;
+  const footerH = 18;
+  const matchColW = shareView === "post" ? 560 : 540;
+  const playerColW = shareView === "post" ? 152 : 140;
+  const summaryW = shareView === "post" ? 340 : 0;
+  const width = margin * 2 + matchColW + players.length * playerColW + summaryW;
+  const height = margin * 2 + headerH + tableHeadH + matches.length * rowH + footerH;
+
+  const canvas = document.createElement("canvas");
+  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  canvas.width = Math.round(width * dpr);
+  canvas.height = Math.round(height * dpr);
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+
+  const bgGradient = ctx.createLinearGradient(0, 0, width, height);
+  bgGradient.addColorStop(0, "#031124");
+  bgGradient.addColorStop(0.55, "#071833");
+  bgGradient.addColorStop(1, "#04101e");
+  ctx.fillStyle = bgGradient;
+  ctx.fillRect(0, 0, width, height);
+
+  drawPredictionShareHeader(
+    ctx,
+    margin,
+    margin,
+    width - margin * 2,
+    `${weekNumber}. Hafta`,
+    seasonName,
+    `${pageIndex + 1}/${totalPages}`,
+  );
+
+  const tableX = margin;
+  const tableY = margin + headerH;
+  const tableW = matchColW + players.length * playerColW;
+  const panelH = tableHeadH + matches.length * rowH;
+
+  fillRoundedRect(
+    ctx,
+    tableX,
+    tableY,
+    tableW,
+    panelH,
+    22,
+    "rgba(15,23,42,0.86)",
+    "rgba(148,163,184,0.16)",
+  );
+  fillRoundedRect(ctx, tableX, tableY, tableW, tableHeadH, 22, "rgba(17,24,39,0.94)", "");
+  ctx.fillStyle = "#e2e8f0";
+  ctx.font = "800 22px Inter, Arial, sans-serif";
+  ctx.fillText("MAÇ", tableX + 18, tableY + 34);
+
+  players.forEach((player, index) => {
+    const cellX = tableX + matchColW + index * playerColW;
+    fillRoundedRect(
+      ctx,
+      cellX + 12,
+      tableY + 10,
+      playerColW - 24,
+      34,
+      17,
+      "rgba(30,41,59,0.96)",
+      "rgba(148,163,184,0.18)",
+    );
+    ctx.fillStyle = "#f8fafc";
+    ctx.font = "900 18px Inter, Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(String(player.name || "").toUpperCase(), cellX + playerColW / 2, tableY + 32);
+    ctx.textAlign = "left";
+  });
+
+  for (const [rowIndex, match] of matches.entries()) {
+    const rowY = tableY + tableHeadH + rowIndex * rowH;
+    const isOdd = rowIndex % 2 === 1;
+    fillRoundedRect(
+      ctx,
+      tableX,
+      rowY,
+      matchColW,
+      rowH,
+      0,
+      isOdd ? "rgba(15,23,42,0.68)" : "rgba(12,18,34,0.76)",
+      "rgba(148,163,184,0.08)",
+    );
+
+    const leftX = tableX + 18;
+    const badgeSize = 40;
+    const centerScoreW = 92;
+    const leftTeamMaxW = 150;
+    const rightTeamMaxW = 150;
+    const centerX = tableX + matchColW / 2;
+
+    await drawTeamBadgeOnCanvas(ctx, match.homeTeam, leftX, rowY + 20, badgeSize);
+    ctx.fillStyle = "#f8fafc";
+    ctx.font = "800 18px Inter, Arial, sans-serif";
+    ctx.fillText(
+      truncateCanvasText(ctx, match.homeTeam, leftTeamMaxW),
+      leftX + badgeSize + 12,
+      rowY + 42,
+    );
+
+    const rightBadgeX = tableX + matchColW - 18 - badgeSize;
+    await drawTeamBadgeOnCanvas(ctx, match.awayTeam, rightBadgeX, rowY + 20, badgeSize);
+    const awayText = truncateCanvasText(ctx, match.awayTeam, rightTeamMaxW);
+    const awayWidth = ctx.measureText(awayText).width;
+    ctx.fillText(awayText, rightBadgeX - 12 - awayWidth, rowY + 42);
+
+    const scoreValue = match.played
+      ? `${match.homeScore ?? 0} - ${match.awayScore ?? 0}`
+      : shareView === "pre"
+        ? formatDate(match.date).replace(",", "")
+        : "- -";
+
+    fillRoundedRect(
+      ctx,
+      centerX - centerScoreW / 2,
+      rowY + 10,
+      centerScoreW,
+      40,
+      16,
+      "rgba(37, 51, 79, 0.94)",
+      "rgba(148,163,184,0.18)",
+    );
+    ctx.fillStyle = "#ffffff";
+    ctx.font = match.played
+      ? "900 24px Inter, Arial, sans-serif"
+      : "700 14px Inter, Arial, sans-serif";
+    ctx.textAlign = "center";
+    if (match.played) {
+      ctx.fillText(scoreValue, centerX, rowY + 36);
+    } else {
+      const [datePart, timePart] = scoreValue.split(" ");
+      ctx.fillText(datePart || "", centerX, rowY + 28);
+      ctx.font = "700 13px Inter, Arial, sans-serif";
+      ctx.fillStyle = "#cbd5e1";
+      ctx.fillText(timePart || "", centerX, rowY + 44);
+    }
+    ctx.textAlign = "left";
+
+    if (shareView === "post") {
+      fillRoundedRect(
+        ctx,
+        centerX - 46,
+        rowY + 56,
+        92,
+        20,
+        10,
+        "rgba(15,23,42,0.92)",
+        "rgba(148,163,184,0.12)",
+      );
+      ctx.fillStyle = match.played ? "#bfdbfe" : "#94a3b8";
+      ctx.font = "700 11px Inter, Arial, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(match.played ? "Fikstür skoru" : "Bekleniyor", centerX, rowY + 70);
+      ctx.textAlign = "left";
+    }
+
+    players.forEach((player, colIndex) => {
+      const cellX = tableX + matchColW + colIndex * playerColW;
+      const pred = ensurePrediction(match.id, player.id);
+      const palette = getShareCellPalette(pred, match, shareView);
+      fillRoundedRect(
+        ctx,
+        cellX,
+        rowY,
+        playerColW,
+        rowH,
+        0,
+        palette.bg,
+        "rgba(148,163,184,0.08)",
+      );
+      fillRoundedRect(
+        ctx,
+        cellX + 10,
+        rowY + 10,
+        playerColW - 20,
+        rowH - 20,
+        16,
+        "rgba(2,6,23,0.12)",
+        palette.border,
+      );
+      ctx.fillStyle = palette.accent;
+      ctx.font = "900 28px Inter, Arial, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(getPredictionDisplayValue(pred), cellX + playerColW / 2, rowY + 38);
+      ctx.font = "800 13px Inter, Arial, sans-serif";
+      ctx.fillStyle = shareView === "post" ? palette.accent : "#bfdbfe";
+      const status =
+        shareView === "post"
+          ? palette.label
+          : pred.homePred !== "" && pred.awayPred !== ""
+            ? "Tahmin var"
+            : "Tahmin yok";
+      ctx.fillText(status, cellX + playerColW / 2, rowY + 58);
+      if (shareView === "post") {
+        ctx.font = "900 13px Inter, Arial, sans-serif";
+        ctx.fillStyle = Number(pred.points || 0) > 0 ? "#ffffff" : "#cbd5e1";
+        ctx.fillText(
+          `${pred.homePred !== "" && pred.awayPred !== "" ? Number(pred.points || 0) : 0}P`,
+          cellX + playerColW / 2,
+          rowY + 74,
+        );
+      }
+      ctx.textAlign = "left";
+    });
+  }
+
+  if (shareView === "post") {
+    const sumX = margin + tableW + 18;
+    const sumWidth = summaryW - 18;
+    const summaryCardH = 78;
+    const summaryGap = 10;
+    const sumHeight = Math.min(panelH, 84 + summaryRows.length * (summaryCardH + summaryGap));
+    fillRoundedRect(
+      ctx,
+      sumX,
+      tableY,
+      sumWidth,
+      sumHeight,
+      22,
+      "rgba(248,250,252,0.96)",
+      "rgba(148,163,184,0.22)",
+    );
+    ctx.fillStyle = "#0f172a";
+    ctx.font = "900 24px Inter, Arial, sans-serif";
+    ctx.fillText("Puan Özeti", sumX + 16, tableY + 32);
+    ctx.fillStyle = "#475569";
+    ctx.font = "700 13px Inter, Arial, sans-serif";
+    ctx.fillText("Bu sayfadaki kullanıcılar", sumX + 16, tableY + 52);
+
+    summaryRows.forEach((row, index) => {
+      const rank = rankingMap.get(row.id) || index + 1;
+      const cardY = tableY + 68 + index * (summaryCardH + summaryGap);
+      const cardX = sumX + 12;
+      const cardW = sumWidth - 24;
+      const rankFill =
+        rank === 1
+          ? "rgba(16,185,129,0.20)"
+          : rank === 2
+            ? "rgba(245,158,11,0.18)"
+            : rank === 3
+              ? "rgba(59,130,246,0.18)"
+              : "rgba(15,23,42,0.06)";
+      const rankStroke =
+        rank === 1
+          ? "rgba(16,185,129,0.34)"
+          : rank === 2
+            ? "rgba(245,158,11,0.32)"
+            : rank === 3
+              ? "rgba(59,130,246,0.30)"
+              : "rgba(148,163,184,0.18)";
+
+      fillRoundedRect(ctx, cardX, cardY, cardW, summaryCardH, 16, rankFill, rankStroke);
+      fillRoundedRect(
+        ctx,
+        cardX + 12,
+        cardY + 12,
+        28,
+        28,
+        14,
+        rank === 1 ? "#10b981" : rank === 2 ? "#f59e0b" : rank === 3 ? "#3b82f6" : "#334155",
+        "",
+      );
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "900 14px Inter, Arial, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(String(rank), cardX + 26, cardY + 31);
+      ctx.textAlign = "left";
+
+      ctx.fillStyle = "#0f172a";
+      ctx.font = "900 16px Inter, Arial, sans-serif";
+      const summaryName = truncateCanvasText(ctx, String(row.name || "").toUpperCase(), cardW - 68);
+      ctx.fillText(summaryName, cardX + 50, cardY + 24);
+
+      const chips = [
+        { label: `Hafta ${row.total || 0}P`, x: cardX + 50, y: cardY + 40, w: 84, fill: "rgba(16,185,129,0.14)", stroke: "rgba(16,185,129,0.26)", text: "#047857" },
+        { label: `Tam ${row.exact || 0}`, x: cardX + 142, y: cardY + 40, w: 68, fill: "rgba(56,189,248,0.14)", stroke: "rgba(56,189,248,0.24)", text: "#0369a1" },
+        { label: `Yakın ${row.resultOnly || 0}`, x: cardX + 218, y: cardY + 40, w: 78, fill: "rgba(245,158,11,0.14)", stroke: "rgba(245,158,11,0.24)", text: "#b45309" },
+      ];
+
+      chips.forEach((chip) => {
+        fillRoundedRect(ctx, chip.x, chip.y, chip.w, 24, 12, chip.fill, chip.stroke);
+        ctx.fillStyle = chip.text;
+        ctx.font = "800 11px Inter, Arial, sans-serif";
+        ctx.fillText(chip.label, chip.x + 9, chip.y + 16);
+      });
+    });
+  }
+
+  ctx.fillStyle = "rgba(148,163,184,0.72)";
+  ctx.font = "700 12px Inter, Arial, sans-serif";
+  ctx.textAlign = "right";
+  ctx.fillText(`Oluşturuldu: ${formatDate(new Date())}`, width - margin, height - 8);
+  ctx.textAlign = "left";
+
+  return canvas;
+}
+
+async function exportPredictionShareImage() {
+  const button = document.getElementById("downloadShareImageBtn");
+  if (button) {
+    button.classList.add("is-busy");
+    button.textContent = "Hazırlanıyor...";
+  }
+  try {
+    const weekId = state.settings.activeWeekId;
+    if (!weekId) {
+      await showAlert("Önce bir hafta seçmelisin.", { title: "Hafta gerekli", type: "warning" });
+      return;
+    }
+    const matches = getMatchesByWeekId(weekId);
+    const players = getVisiblePlayersOrdered();
+    if (!matches.length || !players.length) {
+      await showAlert("Görsel oluşturmak için maç ve kullanıcı verisi gerekli.", { title: "Veri eksik", type: "warning" });
+      return;
+    }
+
+    const shareView = getPredictionShareView();
+    const playersPerPage = shareView === "post" ? 6 : 7;
+    const totalPages = Math.max(1, Math.ceil(players.length / playersPerPage));
+    const weekLabel = `${getWeekNumberById(weekId) || "hafta"}`;
+    const downloaded = [];
+
+    for (let pageIndex = 0; pageIndex < totalPages; pageIndex += 1) {
+      const chunk = players.slice(pageIndex * playersPerPage, pageIndex * playersPerPage + playersPerPage);
+      const canvas = await createPredictionShareExportCanvas(matches, chunk, {
+        shareView,
+        pageIndex,
+        totalPages,
+      });
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (!blob) throw new Error("PNG dosyası oluşturulamadı.");
+      const suffix = totalPages > 1 ? `-sayfa-${pageIndex + 1}` : "";
+      const fileName = `tahmin-paylasim-${shareView === "post" ? "mac-sonrasi" : "mac-oncesi"}-hafta-${weekLabel}${suffix}.png`;
+      downloadBlobFile(blob, fileName);
+      downloaded.push(fileName);
+      await new Promise((resolve) => setTimeout(resolve, 120));
+    }
+
+    await showAlert(
+      totalPages > 1
+        ? `${downloaded.length} görsel indirildi. Dosya adlarında sayfa numarası var.`
+        : "Paylaşım görseli indirildi.",
+      { title: "Hazır", type: "success" },
+    );
+  } catch (error) {
+    console.error("Paylaşım görseli oluşturulamadı:", error);
+    await showAlert(error?.message || "Görsel oluşturulurken bir hata oluştu.", {
+      title: "İndirme başarısız",
+      type: "error",
+    });
+  } finally {
+    if (button) {
+      button.classList.remove("is-busy");
+      button.textContent = "Görsel İndir";
+    }
+  }
 }
 
 function renderPredictionShareTable(container, matches, players) {
@@ -5099,6 +5994,7 @@ function renderPredictionShareTable(container, matches, players) {
     .join("");
 
   container.innerHTML = `<div class="excel-predictions share-mode-table ${compactMode ? "share-mode-compact" : ""} share-view-${shareView}" style="--player-count:${players.length};"><div class="prediction-grid-head share-grid-head"><div>Maç</div>${headerPlayers}</div><div class="prediction-grid-body">${rows}</div></div>`;
+  hydrateTeamLogosIn(container);
 }
 
 function renderPredictions() {
@@ -5125,19 +6021,13 @@ function renderPredictions() {
 
   if (isMobileView()) {
     renderMobilePredictions(container, matches);
+    hydrateTeamLogosIn(container);
     updatePredictionShareModeButton();
     bindPredictionActionElements(container);
     saveState(true);
     return;
   }
 
-  if (isPredictionShareMode()) {
-    renderPredictionShareTable(container, matches, players);
-    updatePredictionShareModeButton();
-    bindPredictionActionElements(container);
-    saveState(true);
-    return;
-  }
 
   const currentPlayerId = getCurrentPlayerId();
 
@@ -5888,7 +6778,7 @@ function renderMissingPredictions() {
   const rows = [];
   getMatchesByWeekId(weekId).forEach((match) => {
     state.players
-      .filter((player) => String(player.role || "user").toLowerCase() !== "admin")
+      .filter((player) => getPlayerRole(player) !== "admin")
       .forEach((player) => {
         const pred = getPrediction(match.id, player.id);
         if (!pred || pred.homePred === "" || pred.awayPred === "")
@@ -5918,7 +6808,7 @@ function getPlayerSeasonStats(seasonId = getActiveSeasonId()) {
   const seasonMatches = getSortedSeasonMatches(seasonId);
   const matchIdSet = new Set(seasonMatches.map((match) => String(match.id)));
   const players = state.players.filter(
-    (player) => String(player.role || "user").toLowerCase() !== "admin",
+    (player) => getPlayerRole(player) !== "admin",
   );
 
   return players
@@ -6000,12 +6890,7 @@ function renderAdvancedStats() {
         ? `${info.bestResult.name} (${info.bestResult.resultOnly})`
         : "-",
     ],
-    [
-      "En Çok Tahmin",
-      info.mostPredictions
-        ? `${info.mostPredictions.name} (${info.mostPredictions.predictionCount})`
-        : "-",
-    ],
+    
   ]
     .map(
       ([label, value]) =>
@@ -6105,19 +6990,53 @@ function showLeaderToast(message) {
   );
 }
 
-function createConfettiBurst() {
+let statsCelebrationTimer = null;
+let lastStatsCelebrationAt = 0;
+
+function createConfettiBurst(options = {}) {
   const layer = document.getElementById("confettiLayer");
+  if (!layer) return;
+
+  const count = Number(options.count || 120);
+  const clearAfter = Number(options.clearAfter || 4500);
+  const minDuration = Number(options.minDuration || 2);
+  const maxDuration = Number(options.maxDuration || 4);
+  const maxDelay = Number(options.maxDelay || 0.5);
+
   layer.innerHTML = "";
-  for (let i = 0; i < 120; i += 1) {
+  for (let i = 0; i < count; i += 1) {
     const piece = document.createElement("span");
     piece.className = "confetti-piece";
     piece.style.left = `${Math.random() * 100}%`;
-    piece.style.animationDelay = `${Math.random() * 0.5}s`;
-    piece.style.animationDuration = `${2 + Math.random() * 2}s`;
+    piece.style.animationDelay = `${Math.random() * maxDelay}s`;
+    piece.style.animationDuration = `${minDuration + Math.random() * Math.max(0.2, maxDuration - minDuration)}s`;
     piece.style.transform = `translateY(-20px) rotate(${Math.random() * 360}deg)`;
     layer.appendChild(piece);
   }
-  setTimeout(() => (layer.innerHTML = ""), 4500);
+
+  clearTimeout(createConfettiBurst.timer);
+  createConfettiBurst.timer = setTimeout(() => {
+    if (layer) layer.innerHTML = "";
+  }, clearAfter);
+}
+
+function triggerStatsCelebration(force = false) {
+  if ((state.settings.currentTab || "dashboard") !== "stats") return;
+
+  const now = Date.now();
+  if (!force && now - lastStatsCelebrationAt < 1200) return;
+  lastStatsCelebrationAt = now;
+
+  clearTimeout(statsCelebrationTimer);
+  statsCelebrationTimer = setTimeout(() => {
+    createConfettiBurst({
+      count: window.innerWidth <= 720 ? 72 : 110,
+      clearAfter: 3400,
+      minDuration: 1.8,
+      maxDuration: 3.1,
+      maxDelay: 0.35,
+    });
+  }, 180);
 }
 
 window.celebrateChampion = function (seasonId, manual = false) {
@@ -6142,6 +7061,7 @@ function renderAll() {
   renderStats();
   renderDashboardSyncCard();
   renderFirebaseAdminPanel();
+  bindAdminPanelTableScroll();
   updateAdminSyncPanel();
   renderSeasons();
   renderPlayers();
@@ -6460,15 +7380,23 @@ function addMatch() {
 }
 
 function switchTab(tabName) {
-  if (getCurrentRole() !== "admin" && ["players", "backup"].includes(tabName))
+  if (
+    getCurrentRole() !== "admin" &&
+    ["players", "backup", "seasons", "weeks", "matches"].includes(tabName)
+  )
     tabName = "dashboard";
   state.settings.currentTab = tabName;
+  closeMobileAdminMenu();
   updateNavSelection(tabName);
+  ensureHeaderSyncButtons();
   document
     .querySelectorAll(".tab-panel")
     .forEach((panel) =>
       panel.classList.toggle("active", panel.id === `tab-${tabName}`),
     );
+  if (tabName === "stats") {
+    triggerStatsCelebration();
+  }
   closeLandscapeSidebar();
   saveState(true);
 }
@@ -6555,7 +7483,7 @@ function buildWeekCsv(weekId) {
   const matches = getMatchesByWeekId(weekId);
 
   const orderedPlayers = [...state.players]
-    .filter((player) => String(player.role || "user").toLowerCase() !== "admin")
+    .filter((player) => getPlayerRole(player) !== "admin")
     .sort((a, b) =>
       String(a.name || "").localeCompare(String(b.name || ""), "tr"),
     );
@@ -6641,7 +7569,7 @@ async function syncBackupStateToFirebase(stateObj) {
       kullaniciAdi: normalizeLoginName(player.username || player.name || id),
       sifre: String(player.password || "1234"),
       adSoyad: String(player.name || player.username || id).trim().toUpperCase(),
-      rol: String(player.role || "user").toLowerCase() === "admin" ? "admin" : "user",
+      rol: getPlayerRole(player) === "admin" ? "admin" : "user",
       aktif: true,
       importedAt: stamp,
     };
@@ -6962,7 +7890,7 @@ async function handleDangerousReset() {
   }
 
   const adminPlayers = (state.players || []).filter(
-    (player) => String(player.role || 'user').toLowerCase() === 'admin',
+    (player) => getPlayerRole(player) === "admin",
   );
   const preservedAuth = state.settings?.auth ? { ...state.settings.auth } : null;
 
@@ -7658,6 +8586,7 @@ function bindEvents() {
   on("shareHideEmptyToggle", "change", (event) =>
     setPredictionShareFadeEmpty(event.target.checked),
   );
+  on("downloadShareImageBtn", "click", exportPredictionShareImage);
   on("closeChampionModalBtn", "click", () =>
     document.getElementById("championModal")?.classList.add("hidden"),
   );
@@ -7682,6 +8611,12 @@ function bindEvents() {
   on("mobileLogoutBtn", "click", logoutUser);
   on("desktopAccountBtn", "click", () => toggleAccountMenu("desktop"));
   on("mobileAccountBtn", "click", () => toggleAccountMenu("mobile"));
+  on("mobileAdminMenuBtn", "click", () => toggleMobileAdminMenu());
+  on("mobileAdminMenuCloseBtn", "click", closeMobileAdminMenu);
+  on("mobileAdminMenuBackdrop", "click", closeMobileAdminMenu);
+  document
+    .querySelectorAll(".mobile-admin-menu-item[data-tab]")
+    .forEach((btn) => btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
   on("desktopChangePasswordBtn", "click", changeOwnPassword);
   on("mobileChangePasswordBtn", "click", changeOwnPassword);
   on("loginBtn", "click", loginUser);
@@ -7785,3 +8720,4 @@ window.testFirebaseAdminConnection = testFirebaseAdminConnection;
 window.toggleFirebaseAdminCard = toggleFirebaseAdminCard;
 window.toggleDashboardSyncCard = toggleDashboardSyncCard;
 window.toggleAdminSyncOverview = toggleAdminSyncOverview;
+window.handleTeamLogoError = handleTeamLogoError;
