@@ -1,5 +1,6 @@
 window.__ALLOW_MATCH_WRITE__ = false;
 const STORAGE_KEY = "fikstur_tahmin_paneli_v4";
+const APP_VERSION = "2026-04-16-v3";
 const DB_NAME = "fiksturLocalDb";
 const DB_STORE = "handles";
 const HANDLE_KEY = "backupHandle";
