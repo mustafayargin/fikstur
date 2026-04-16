@@ -1,6 +1,7 @@
 window.__ALLOW_MATCH_WRITE__ = false;
 const STORAGE_KEY = "fikstur_tahmin_paneli_v4";
 const APP_VERSION = "2026-04-16-v3";
+console.log("APP VERSION:", APP_VERSION);
 const DB_NAME = "fiksturLocalDb";
 const DB_STORE = "handles";
 const HANDLE_KEY = "backupHandle";
@@ -9774,4 +9775,16 @@ window.togglePlayerSeasonCheckbox = async function (el) {
   }
 
   renderAll();
+  showAppVersion();
 };
+function showAppVersion() {
+  const el = document.createElement("div");
+  el.textContent = "v: " + APP_VERSION;
+  el.style.position = "fixed";
+  el.style.bottom = "5px";
+  el.style.right = "10px";
+  el.style.fontSize = "10px";
+  el.style.opacity = "0.5";
+  el.style.zIndex = "9999";
+  document.body.appendChild(el);
+}
