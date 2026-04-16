@@ -988,11 +988,14 @@ async function hydrateFromFirebaseRealtime(source = "manual") {
     try {
       await ensureFirebaseDefaults();
       await syncUsersFromSheet({ silent: true });
-      await syncOnlineMatchesFromSheet({
-        silent: true,
-        seasonLabel: "",
-        replaceRemoteScope: true,
-      });
+            await syncOnlineMatchesFromSheet({
+              silent: true,
+              seasonId: null,
+              weekId: null,
+              seasonLabel: "",
+              weekNumber: "",
+              replaceRemoteScope: false,
+            });
       await syncOnlinePredictions({
         silent: true,
         seasonId: null,
@@ -1006,6 +1009,7 @@ async function hydrateFromFirebaseRealtime(source = "manual") {
         lastAction: `Canlı ${getOnlineSourceLabel()} verisi alındı (${source}).`,
         success: true,
       });
+      saveState(true);
       debounceFirebaseRealtimeRender();
       return true;
     } catch (error) {
@@ -2094,6 +2098,12 @@ function removeMatchesFromLocalState(matchIds = []) {
 }
 
 function pruneLocalMatchesAgainstRemote(rows = [], requestedSeasonLabel = "") {
+    if (!Array.isArray(rows)) {
+      console.warn(
+        "pruneLocalMatchesAgainstRemote: rows dizi değil, işlem iptal edildi.",
+      );
+      return;
+    }
   const remoteRows = Array.isArray(rows) ? rows : [];
   const affectedSeasonLabels = new Set(
     remoteRows
@@ -2106,13 +2116,14 @@ function pruneLocalMatchesAgainstRemote(rows = [], requestedSeasonLabel = "") {
     affectedSeasonLabels.add(normalizeText(requestedSeasonLabel));
   }
 
-  if (!affectedSeasonLabels.size && !requestedSeasonLabel && !remoteRows.length) {
-    state.matches = [];
-    state.predictions = [];
-    state.weeks = [];
-    state.teams = [];
-    state.seasons = [];
-    ensureActiveSelections();
+  if (
+    !affectedSeasonLabels.size &&
+    !requestedSeasonLabel &&
+    !remoteRows.length
+  ) {
+    console.warn(
+      "pruneLocalMatchesAgainstRemote atlandı: boş remote veri geldiği için local state temizlenmedi.",
+    );
     return;
   }
 
@@ -2176,15 +2187,17 @@ async function syncOnlineMatchesFromSheet(options = {}) {
       rows = normalizeOnlineMatchRows(response);
     }
 
-    if (options.replaceRemoteScope !== false) {
-      pruneLocalMatchesAgainstRemote(rows, requestedSeasonLabel || "");
-    }
-
     if (!rows.length) {
+      console.warn(
+        "syncOnlineMatchesFromSheet: remote boş döndü, local veriler korunuyor.",
+      );
       recalculateAllPoints();
-      saveState(true);
       if (!options.silent) renderAll();
       return false;
+    }
+
+    if (options.replaceRemoteScope !== false) {
+      pruneLocalMatchesAgainstRemote(rows, requestedSeasonLabel || "");
     }
 
     const touchedWeekIds = new Set();
@@ -2819,11 +2832,19 @@ async function syncOnlinePredictions(options = {}) {
       ? getUnsyncedPredictionDraftsForScope(seasonId, weekId || null)
       : [];
 
-    if (seasonId) {
-      clearOnlinePredictionsForScope(seasonId, weekId || null);
-    } else {
-      state.predictions = [];
-    }
+        if (!rows.length) {
+          console.warn(
+            "syncOnlinePredictions: remote boş döndü, local tahminler korunuyor.",
+          );
+          if (!options.silent) renderAll();
+          return false;
+        }
+
+        if (seasonId) {
+          clearOnlinePredictionsForScope(seasonId, weekId || null);
+        } else {
+          state.predictions = [];
+        }
 
     rows.forEach((row) => {
       const matchId = resolveMatchIdFromOnlineRow(row);
@@ -2943,14 +2964,32 @@ async function hydrateOnlineStateForSession(options = {}) {
       throw matchSyncResult.reason;
     }
 
-    if (!matchSyncResult.value) {
-      await syncOnlineMatchesFromSheet({
-        ...normalizedOptions,
-        seasonLabel: "",
-      });
-    }
+       if (!matchSyncResult.value) {
+         await syncOnlineMatchesFromSheet({
+           silent: true,
+           seasonId: null,
+           weekId: null,
+           seasonLabel: "",
+           weekNumber: "",
+           replaceRemoteScope: false,
+         });
+       }
 
     await hydrateStructureFromFirebase();
+        ensureActiveSelections();
+
+        if (!state.settings.activeSeasonId && state.seasons.length) {
+          state.settings.activeSeasonId = state.seasons[0].id;
+        }
+
+        if (!state.settings.activeWeekId) {
+          const activeSeasonWeeks = getWeeksBySeasonId(
+            state.settings.activeSeasonId,
+          );
+          if (activeSeasonWeeks.length) {
+            state.settings.activeWeekId = activeSeasonWeeks[0].id;
+          }
+        }
 
     if (updateLoadingUi) {
       setAppLoadingCheck("matches", "done", "Maç verileri hazır");
@@ -2983,6 +3022,7 @@ async function hydrateOnlineStateForSession(options = {}) {
       success: true,
     });
 
+    saveState(true);
     renderAll();
 
     if (updateLoadingUi) {
@@ -4027,18 +4067,27 @@ function getPrediction(matchId, playerId) {
 
 function ensureActiveSelections() {
   const currentSeasonId = getActiveSeasonId();
-  if (!state.settings.activeSeasonId && currentSeasonId) {
-    state.settings.activeSeasonId = currentSeasonId;
+
+  if (!state.settings.activeSeasonId) {
+    if (currentSeasonId) {
+      state.settings.activeSeasonId = currentSeasonId;
+    } else if (state.seasons.length) {
+      state.settings.activeSeasonId = state.seasons[0].id;
+    }
   }
 
   const seasonWeeks = getWeeksBySeasonId(getActiveSeasonId());
   if (!seasonWeeks.length) {
     state.settings.activeWeekId = null;
   } else {
-    const exists = seasonWeeks.some((w) => w.id === state.settings.activeWeekId);
+    const exists = seasonWeeks.some(
+      (w) => w.id === state.settings.activeWeekId,
+    );
     if (!exists) {
       const publicWeekId = getPublicActiveWeekId();
-      const matchingPublicWeek = seasonWeeks.find((w) => String(w.id) === String(publicWeekId));
+      const matchingPublicWeek = seasonWeeks.find(
+        (w) => String(w.id) === String(publicWeekId),
+      );
       state.settings.activeWeekId = matchingPublicWeek?.id || seasonWeeks[0].id;
     }
   }
@@ -4052,8 +4101,11 @@ function ensureActiveSelections() {
   if (!publicSeasonWeeks.length) {
     state.settings.publicActiveWeekId = null;
   } else {
-    const publicExists = publicSeasonWeeks.some((w) => w.id === state.settings.publicActiveWeekId);
-    if (!publicExists) state.settings.publicActiveWeekId = publicSeasonWeeks[0].id;
+    const publicExists = publicSeasonWeeks.some(
+      (w) => w.id === state.settings.publicActiveWeekId,
+    );
+    if (!publicExists)
+      state.settings.publicActiveWeekId = publicSeasonWeeks[0].id;
   }
 }
 
