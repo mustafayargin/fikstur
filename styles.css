@@ -609,17 +609,13 @@ option {
   border: 1px solid var(--line);
 }
 
-.player-row {
-  grid-template-columns: minmax(0, 1.3fr) auto auto;
-}
 
 .week-row {
   grid-template-columns: minmax(0, 1fr) auto auto;
 }
 
-.player-name-cell {
-  font-weight: 700;
-}
+
+
 
 .excel-table {
   border: 1px solid var(--line);
@@ -1431,7 +1427,7 @@ option {
     padding: 14px;
   }
 
-  .player-row,
+  
   .week-row {
     grid-template-columns: 1fr;
   }
@@ -2188,9 +2184,6 @@ input[type="number"] {
   grid-column: 1 / -1;
 }
 
-.player-admin-row {
-  grid-template-columns: minmax(140px, 1fr) minmax(160px, 1.2fr) auto;
-}
 
 .wrap-actions {
   flex-wrap: wrap;
@@ -5218,5 +5211,617 @@ body.login-locked {
 
   .login-card {
     max-height: none;
+  }
+}
+
+
+.player-season-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.season-member-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+}
+
+.season-member-chip.is-active {
+  border-color: rgba(60, 200, 120, 0.35);
+}
+
+.season-member-chip.is-passive {
+  opacity: 0.75;
+}
+
+.season-member-chip input {
+  width: 16px;
+  height: 16px;
+}
+
+.season-team-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.season-team-card {
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+}
+
+.season-team-card-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.season-team-card-logo .team-logo,
+.season-team-card-logo img {
+  width: 36px;
+  height: 36px;
+}
+
+.season-team-card-name {
+  font-weight: 700;
+}
+
+.inline-field span {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+/* === Sezonlar & Takımlar premium düzenleme === */
+.seasons-page {
+  position: relative;
+}
+
+.seasons-header {
+  margin-bottom: 18px;
+}
+
+.seasons-page .page-header h2 {
+  letter-spacing: -0.02em;
+}
+
+.seasons-top-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(380px, 0.95fr);
+  gap: 16px;
+  margin-bottom: 16px;
+  align-items: stretch;
+}
+
+.season-content-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.season-create-card,
+.season-api-card,
+.season-showcase-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid rgba(120, 160, 255, 0.16);
+  background:
+    radial-gradient(circle at top right, rgba(63, 205, 145, 0.12), transparent 34%),
+    radial-gradient(circle at left center, rgba(77, 124, 255, 0.14), transparent 42%),
+    linear-gradient(180deg, rgba(18, 28, 48, 0.96), rgba(9, 16, 29, 0.96));
+  box-shadow:
+    0 20px 40px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.season-create-card::before,
+.season-api-card::before,
+.season-showcase-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.07), transparent 70%);
+  pointer-events: none;
+}
+
+.season-create-card .card-header,
+.season-api-card .card-header,
+.season-showcase-card .card-header {
+  margin-bottom: 14px;
+}
+
+.season-create-card .card-header h3,
+.season-api-card .card-header h3,
+.season-showcase-card .card-header h3 {
+  font-size: 18px;
+  letter-spacing: -0.01em;
+}
+
+.season-form-grid {
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) 170px;
+}
+
+.season-api-stack {
+  gap: 14px;
+}
+
+.season-api-card .field label,
+.season-create-card .field label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(191, 205, 255, 0.84);
+}
+
+.season-api-card .small-meta {
+  line-height: 1.5;
+  color: rgba(215, 224, 255, 0.78);
+}
+
+.season-api-actions {
+  flex-wrap: wrap;
+}
+
+.season-api-actions button {
+  min-width: 150px;
+}
+
+.season-showcase-card {
+  padding: 18px;
+}
+
+#seasonTeamsList .stack-actions {
+  gap: 16px;
+}
+
+#seasonTeamsList .card-subtitle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #f3f7ff;
+}
+
+#seasonTeamsList .card-subtitle::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #48d597, #7aa2ff);
+  box-shadow: 0 0 14px rgba(72, 213, 151, 0.45);
+}
+
+.season-list-scroll {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 14px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+.season-list-scroll .excel-list-row.week-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "info badge"
+    "actions actions";
+  gap: 14px 12px;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
+    linear-gradient(135deg, rgba(73, 116, 255, 0.13), rgba(26, 40, 70, 0.1));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.season-list-scroll .excel-list-row.week-row > div:first-child {
+  grid-area: info;
+  min-width: 0;
+}
+
+.season-list-scroll .excel-list-row.week-row > div:first-child strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.season-list-scroll .excel-list-row.week-row .badge {
+  grid-area: badge;
+  align-self: start;
+  justify-self: end;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.season-list-scroll .excel-list-row.week-row .inline-actions {
+  grid-area: actions;
+  justify-content: flex-start;
+}
+
+.season-list-scroll .excel-list-row.week-row::after {
+  content: "";
+  position: absolute;
+  inset: auto 16px 0 16px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(122, 162, 255, 0), rgba(122, 162, 255, 0.35), rgba(72, 213, 151, 0));
+}
+
+.season-team-card-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.season-team-card {
+  position: relative;
+  overflow: hidden;
+  padding: 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top right, rgba(72, 213, 151, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  box-shadow:
+    0 16px 28px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.season-team-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(122, 162, 255, 0.24);
+  box-shadow:
+    0 18px 34px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(122, 162, 255, 0.08);
+}
+
+.season-team-card-top {
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.season-team-card-logo {
+  flex: 0 0 auto;
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.season-team-card-logo .team-logo,
+.season-team-card-logo img {
+  width: 40px;
+  height: 40px;
+}
+
+.season-team-card-name {
+  font-size: 20px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.season-team-card .small-meta {
+  color: rgba(191, 205, 255, 0.76);
+}
+
+.season-team-card .inline-field span {
+  margin-bottom: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(191, 205, 255, 0.84);
+}
+
+.season-team-card .inline-actions.compact.wrap-actions {
+  margin-top: 12px;
+  gap: 8px;
+}
+
+.season-team-card .inline-actions.compact.wrap-actions .small {
+  min-height: 34px;
+}
+
+@media (max-width: 1280px) {
+  .seasons-top-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .season-api-card {
+    order: 2;
+  }
+}
+
+@media (max-width: 900px) {
+  .season-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .season-list-scroll {
+    grid-template-columns: 1fr;
+  }
+}
+/* =========================
+   Kişiler sayfası premium kart tasarımı
+   ========================= */
+
+.players-premium-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 18px;
+}
+
+.player-premium-card {
+  position: relative;
+  overflow: hidden;
+  padding: 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(98, 133, 197, 0.22);
+  background:
+    radial-gradient(circle at top right, rgba(62, 116, 255, 0.14), transparent 34%),
+    linear-gradient(145deg, rgba(27, 41, 74, 0.96), rgba(13, 19, 35, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 14px 32px rgba(0, 0, 0, 0.24);
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.player-premium-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(106, 168, 255, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 18px 40px rgba(0, 0, 0, 0.28);
+}
+
+.player-premium-card.is-admin {
+  border-color: rgba(52, 211, 153, 0.28);
+  background:
+    radial-gradient(circle at top right, rgba(16, 185, 129, 0.16), transparent 34%),
+    linear-gradient(145deg, rgba(24, 48, 54, 0.96), rgba(11, 20, 26, 0.98));
+}
+
+.player-card-glow {
+  position: absolute;
+  right: -35px;
+  top: -35px;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(88, 144, 255, 0.2), transparent 68%);
+  pointer-events: none;
+}
+
+.player-premium-card.is-admin .player-card-glow {
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.2), transparent 68%);
+}
+
+.player-card-top,
+.player-card-seasons,
+.player-card-actions {
+  position: relative;
+  z-index: 2;
+}
+
+.player-card-top {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.player-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.player-card-name {
+  font-size: 24px;
+  line-height: 1.05;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: #f8fbff;
+  text-transform: uppercase;
+  text-shadow: 0 3px 12px rgba(0, 0, 0, 0.26);
+}
+
+.player-role-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #d1fae5;
+  background: rgba(16, 185, 129, 0.16);
+  border: 1px solid rgba(16, 185, 129, 0.24);
+}
+
+.player-card-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.player-stat-pill {
+  min-width: 120px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.player-stat-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(190, 210, 255, 0.65);
+}
+
+.player-stat-pill strong {
+  font-size: 15px;
+  color: #ffffff;
+}
+
+.player-card-seasons {
+  margin-bottom: 16px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.player-card-section-title {
+  margin-bottom: 12px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(190, 210, 255, 0.72);
+}
+
+.player-season-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.player-admin-note,
+.player-empty-seasons {
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(221, 231, 255, 0.78);
+}
+
+.player-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.player-card-actions .small {
+  min-height: 36px;
+  border-radius: 12px;
+  font-weight: 700;
+}
+
+.season-member-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(10, 17, 31, 0.72);
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    background 0.16s ease;
+}
+
+.season-member-chip:hover {
+  transform: translateY(-1px);
+}
+
+.season-member-chip input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #1d9bf0;
+  cursor: pointer;
+}
+
+.season-member-chip span {
+  font-size: 14px;
+  font-weight: 700;
+  color: #eef4ff;
+}
+
+.season-member-chip.is-active {
+  border-color: rgba(52, 211, 153, 0.34);
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.season-member-chip.is-passive {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: rgba(71, 85, 105, 0.12);
+  opacity: 0.86;
+}
+
+@media (max-width: 768px) {
+  .players-premium-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .player-premium-card {
+    padding: 15px;
+    border-radius: 20px;
+  }
+
+  .player-card-name {
+    font-size: 20px;
+  }
+
+  .player-card-seasons {
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .player-stat-pill {
+    min-width: 0;
+    flex: 1 1 120px;
+  }
+
+  .player-card-actions {
+    flex-direction: row;
+  }
+
+  .player-card-actions .small {
+    flex: 1 1 auto;
+  }
+
+  .season-member-chip {
+    min-height: 38px;
+    padding: 0 12px;
+  }
+
+  .season-member-chip span {
+    font-size: 13px;
   }
 }

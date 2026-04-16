@@ -143,6 +143,11 @@ async function ensureFirebaseDefaults() {
       source: "firebase",
       createdAt: new Date().toISOString(),
       defaultUsersSeeded: true,
+      seasonsMeta: [],
+    });
+  } else if (!Array.isArray(settings.seasonsMeta)) {
+    await firebaseUpdate("settings", {
+      seasonsMeta: [],
     });
   }
 
@@ -279,6 +284,12 @@ async function firebaseApiPost(action, payload = {}) {
                   : "user",
             }
           : {}),
+        ...(Object.prototype.hasOwnProperty.call(payload, "aktif")
+          ? { aktif: payload.aktif !== false }
+          : {}),
+        ...(payload.seasonStates ? { seasonStates: payload.seasonStates } : {}),
+        ...(payload.seasonMemberships ? { seasonMemberships: payload.seasonMemberships } : {}),
+        ...(payload.activeSeasons ? { activeSeasons: payload.activeSeasons } : {}),
         updatedAt: new Date().toISOString(),
       };
       await firebaseWrite(`users/${id}`, next);
@@ -782,6 +793,7 @@ async function hydrateFromFirebaseRealtime(source = "manual") {
   firebaseRealtimeHydrationPromise = (async () => {
     try {
       await ensureFirebaseDefaults();
+      await syncSeasonRegistryFromFirebase();
       await syncUsersFromSheet({ silent: true });
       await syncOnlineMatchesFromSheet({
         silent: true,
@@ -1806,23 +1818,15 @@ function ensureSeasonFromOnlineLabel(seasonLabel, fallbackLeagueName = "") {
   const normalizedLabel = String(seasonLabel || "").trim();
   if (!normalizedLabel) return getSeasonById(getActiveSeasonId()) || null;
 
-  let season = state.seasons.find(
+  const season = state.seasons.find(
     (item) => normalizeText(item.name) === normalizeText(normalizedLabel),
   );
 
-  if (!season) {
-    season = {
-      id: uid("season"),
-      name: normalizedLabel,
-      leagueName: fallbackLeagueName || "",
-    };
-    state.seasons.push(season);
-  } else if (fallbackLeagueName && !season.leagueName) {
+  if (season && fallbackLeagueName && !season.leagueName) {
     season.leagueName = fallbackLeagueName;
   }
 
-  if (!state.settings.activeSeasonId) state.settings.activeSeasonId = season.id;
-  return season;
+  return season || null;
 }
 function removeMatchesFromLocalState(matchIds = []) {
   const normalizedIds = new Set(matchIds.map((id) => String(id)));
@@ -2124,6 +2128,63 @@ async function deleteOnlineUser(payload) {
   return await apiPost("deleteUser", payload);
 }
 
+function normalizeSeasonRegistryItem(item) {
+  if (!item) return null;
+  const id = String(item.id || "").trim();
+  const name = String(item.name || "").trim();
+  const leagueName = String(item.leagueName || "").trim();
+  if (!id || !name) return null;
+  return { id, name, leagueName };
+}
+
+async function syncSeasonRegistryFromFirebase() {
+  if (!isFirebaseReady()) return [];
+  const settings = (await firebaseRead("settings")) || {};
+  const rawList = Array.isArray(settings.seasonsMeta) ? settings.seasonsMeta : [];
+  const seasonList = rawList.map(normalizeSeasonRegistryItem).filter(Boolean);
+  const remoteIds = new Set(seasonList.map((item) => String(item.id)));
+
+  state.seasons = seasonList.map((item) => ({ ...item }));
+  state.teams = state.teams.filter((team) => remoteIds.has(String(team.seasonId)));
+  state.weeks = state.weeks.filter((week) => remoteIds.has(String(week.seasonId)));
+  const validWeekIds = new Set(state.weeks.map((week) => String(week.id)));
+  state.matches = state.matches.filter(
+    (match) =>
+      remoteIds.has(String(match.seasonId)) &&
+      validWeekIds.has(String(match.weekId)),
+  );
+  const validMatchIds = new Set(state.matches.map((match) => String(match.id)));
+  state.predictions = state.predictions.filter((pred) =>
+    validMatchIds.has(String(pred.matchId)),
+  );
+
+  if (
+    state.settings.activeSeasonId &&
+    !remoteIds.has(String(state.settings.activeSeasonId))
+  ) {
+    state.settings.activeSeasonId = seasonList[0]?.id || null;
+  }
+  if (!state.settings.activeSeasonId && seasonList.length) {
+    state.settings.activeSeasonId = seasonList[0].id;
+  }
+  return seasonList;
+}
+
+async function persistSeasonRegistryToFirebase() {
+  if (!isFirebaseReady()) return false;
+  const seasonsMeta = state.seasons.map((season) => ({
+    id: String(season.id || "").trim(),
+    name: String(season.name || "").trim(),
+    leagueName: String(season.leagueName || "").trim(),
+  })).filter((season) => season.id && season.name);
+
+  await firebaseUpdate("settings", {
+    seasonsMeta,
+    updatedAt: new Date().toISOString(),
+  });
+  return true;
+}
+
 async function syncUsersFromSheet(options = {}) {
   if (!useOnlineMode) return [];
   const result = await fetchOnlineUsers();
@@ -2136,6 +2197,8 @@ async function syncUsersFromSheet(options = {}) {
     password: user.sifre || "1234",
     username: user.kullaniciAdi || "",
     role: String(user.rol || "user").toLowerCase() === "admin" ? "admin" : "user",
+    aktif: user.aktif !== false,
+    seasonStates: user.seasonStates || user.seasonMemberships || user.activeSeasons || {},
   }));
   state.players = users;
   const authUser = getAuthUser();
@@ -2288,8 +2351,10 @@ function getPredictionOutcomeClass(pred, match) {
 }
 
 function getVisiblePlayersOrdered() {
+  const activeSeasonId = getActiveSeasonId();
   const players = [...state.players].filter(
-    (player) => getPlayerRole(player) !== "admin",
+    (player) =>
+      getPlayerRole(player) !== "admin" && isPlayerActiveForSeason(player, activeSeasonId),
   );
   const currentPlayerId = getCurrentPlayerId();
   if (getCurrentRole() !== "user" || !currentPlayerId) return players;
@@ -2298,6 +2363,43 @@ function getVisiblePlayersOrdered() {
     if (b.id === currentPlayerId) return 1;
     return a.name.localeCompare(b.name, "tr");
   });
+}
+
+function normalizeSeasonStateMap(value = {}) {
+  const output = {};
+  if (!value || typeof value !== "object") return output;
+  Object.entries(value).forEach(([seasonId, isActive]) => {
+    const normalizedSeasonId = String(seasonId || "").trim();
+    if (!normalizedSeasonId) return;
+    output[normalizedSeasonId] = isActive !== false;
+  });
+  return output;
+}
+
+function getPlayerSeasonStateMap(player) {
+  return normalizeSeasonStateMap(
+    player?.seasonStates || player?.seasonMemberships || player?.activeSeasons || {},
+  );
+}
+
+function isPlayerActiveForSeason(player, seasonId = getActiveSeasonId()) {
+  if (!player) return false;
+  if (getPlayerRole(player) === "admin") return false;
+  const normalizedSeasonId = String(seasonId || "").trim();
+  if (!normalizedSeasonId) return true;
+  const seasonStates = getPlayerSeasonStateMap(player);
+  if (!Object.keys(seasonStates).length) return true;
+  return seasonStates[normalizedSeasonId] !== false;
+}
+
+function createDefaultSeasonStateMap(defaultValue = true) {
+  const output = {};
+  state.seasons.forEach((season) => {
+    const seasonId = String(season.id || "").trim();
+    if (!seasonId) return;
+    output[seasonId] = defaultValue;
+  });
+  return output;
 }
 
 function normalizeLoginName(value) {
@@ -3153,6 +3255,160 @@ function updateNavSelection(tabName) {
     );
 }
 
+
+let predictionViewportRestoreToken = 0;
+
+function isPredictionsTabActive() {
+  return (state.settings.currentTab || "dashboard") === "predictions";
+}
+
+function getWindowScrollPosition() {
+  return {
+    x: window.pageXOffset || window.scrollX || 0,
+    y: window.pageYOffset || window.scrollY || 0,
+  };
+}
+
+function getPredictionViewportShell() {
+  return (
+    document.querySelector("#predictionsTable .predictions-scroll-shell") ||
+    document.querySelector("#predictionsTable .mobile-prediction-list") ||
+    document.querySelector("#predictionsTable")
+  );
+}
+
+function capturePredictionViewport(options = {}) {
+  if (!isPredictionsTabActive()) return null;
+
+  const activeElement = document.activeElement;
+  const shell = getPredictionViewportShell();
+  const scrollPos = getWindowScrollPosition();
+  const activeInput =
+    activeElement && activeElement.matches?.('input[data-pred-role="input"]')
+      ? activeElement
+      : null;
+
+  const focusId = Object.prototype.hasOwnProperty.call(options, "focusId")
+    ? options.focusId
+    : activeInput?.id || `pred_home_${options.matchId || ""}_${options.playerId || ""}`;
+
+  return {
+    windowX: scrollPos.x,
+    windowY: scrollPos.y,
+    shellLeft: shell?.scrollLeft ?? 0,
+    shellTop: shell?.scrollTop ?? 0,
+    focusId,
+    matchId: options.matchId || activeInput?.dataset?.matchId || "",
+    playerId: options.playerId || activeInput?.dataset?.playerId || "",
+    selectionStart:
+      typeof activeInput?.selectionStart === "number"
+        ? activeInput.selectionStart
+        : null,
+    selectionEnd:
+      typeof activeInput?.selectionEnd === "number"
+        ? activeInput.selectionEnd
+        : null,
+  };
+}
+
+function restorePredictionViewport(snapshot) {
+  if (!snapshot || !isPredictionsTabActive()) return;
+
+  const shell = getPredictionViewportShell();
+  window.scrollTo(snapshot.windowX || 0, snapshot.windowY || 0);
+
+  if (shell) {
+    if (typeof snapshot.shellLeft === "number") shell.scrollLeft = snapshot.shellLeft;
+    if (typeof snapshot.shellTop === "number") shell.scrollTop = snapshot.shellTop;
+  }
+
+  let focusTarget = null;
+
+  if (snapshot.focusId) {
+    focusTarget = document.getElementById(snapshot.focusId);
+  }
+
+  if (focusTarget && !focusTarget.disabled) {
+    try {
+      focusTarget.focus({ preventScroll: true });
+    } catch (error) {
+      focusTarget.focus();
+    }
+
+    if (
+      typeof snapshot.selectionStart === "number" &&
+      typeof snapshot.selectionEnd === "number" &&
+      typeof focusTarget.setSelectionRange === "function"
+    ) {
+      try {
+        focusTarget.setSelectionRange(
+          snapshot.selectionStart,
+          snapshot.selectionEnd,
+        );
+      } catch (error) {}
+    }
+  }
+}
+
+function schedulePredictionViewportRestore(snapshot) {
+  if (!snapshot || !isPredictionsTabActive()) return;
+
+  predictionViewportRestoreToken += 1;
+  const token = predictionViewportRestoreToken;
+  let frameCount = 0;
+
+  const restoreStep = () => {
+    if (token !== predictionViewportRestoreToken) return;
+    restorePredictionViewport(snapshot);
+    frameCount += 1;
+    if (frameCount < 4) {
+      requestAnimationFrame(restoreStep);
+    }
+  };
+
+  requestAnimationFrame(restoreStep);
+}
+function simulateOutsideTapAfterPredictionSave() {
+  let sink = document.getElementById("prediction-focus-sink");
+
+  if (!sink) {
+    sink = document.createElement("button");
+    sink.id = "prediction-focus-sink";
+    sink.type = "button";
+    sink.tabIndex = -1;
+    sink.setAttribute("aria-hidden", "true");
+    sink.style.position = "fixed";
+    sink.style.left = "0";
+    sink.style.top = "0";
+    sink.style.width = "1px";
+    sink.style.height = "1px";
+    sink.style.opacity = "0";
+    sink.style.pointerEvents = "none";
+    sink.style.padding = "0";
+    sink.style.border = "0";
+    document.body.appendChild(sink);
+  }
+
+  const active = document.activeElement;
+  if (active && typeof active.blur === "function") {
+    active.blur();
+  }
+
+  requestAnimationFrame(() => {
+    try {
+      sink.focus({ preventScroll: true });
+    } catch (error) {
+      sink.focus();
+    }
+
+    if (
+      document.activeElement &&
+      typeof document.activeElement.blur === "function"
+    ) {
+      document.activeElement.blur();
+    }
+  });
+}
 function applyRolePermissions() {
   const role = getCurrentRole();
   const authReady = isAuthenticated();
@@ -3258,7 +3514,20 @@ function bindPredictionActionElements(root = document) {
       const target = e.currentTarget;
       const { matchId, playerId } = target.dataset || {};
       if (!matchId || !playerId) return;
-      window.queuePredictionSave(matchId, playerId);
+
+      const isAwayInput = target.id === `pred_away_${matchId}_${playerId}`;
+
+      const viewportSnapshot = capturePredictionViewport({
+        matchId,
+        playerId,
+        focusId: isAwayInput ? null : target.id,
+      });
+
+      window.queuePredictionSave(matchId, playerId, false, viewportSnapshot);
+
+      if (!isAwayInput) {
+        schedulePredictionViewportRestore(viewportSnapshot);
+      }
     };
   });
 
@@ -4590,7 +4859,7 @@ function renderStats() {
   const leader = getGeneralStandings(activeSeasonId)[0];
   const cards = [
     { label: "Aktif Sezon", value: escapeHtml(season?.name || "-") },
-    { label: "Kişi Sayısı", value: String(state.players.length) },
+    { label: "Kişi Sayısı", value: String(getVisiblePlayersOrdered().length) },
     { label: "Haftadaki Maç", value: String(matches.length) },
     { label: "Oynanmış Maç", value: String(matches.filter((m) => m.played).length) },
     { label: "Eksik Tahmin", value: String(activeWeekId ? countMissingPredictions(activeWeekId) : 0) },
@@ -4616,24 +4885,139 @@ function renderStats() {
 
 function renderPlayers() {
   const container = document.getElementById("playersList");
-  if (!state.players.length)
-    return (container.innerHTML = createEmptyState("Henüz kişi eklenmedi."));
-  container.innerHTML = `<div class="excel-list">${state.players
-    .map((player) => {
-      const isAdminUser = getPlayerRole(player) === "admin";
-      return `
-    <div class="excel-list-row player-row player-admin-row ${isAdminUser ? "admin-player-row" : ""}">
-      <div class="player-name-cell">${escapeHtml(player.name)}${isAdminUser ? ' <span class="badge admin">Admin</span>' : ""}</div>
-      <div class="small-meta">Şifre: <strong>${escapeHtml(player.password || "1234")}</strong> · ${state.predictions.filter((p) => p.playerId === player.id && p.homePred !== "" && p.awayPred !== "").length} kayıtlı tahmin</div>
-      <div class="inline-actions compact wrap-actions">
-        <button class="small secondary" onclick="renamePlayer('${player.id}', this)">Adı Düzenle</button>
-        <button class="small secondary" onclick="changePlayerPassword('${player.id}', this)">Şifre Değiştir</button>
-        ${isAdminUser ? "" : `<button class="small danger" onclick="removePlayer('${player.id}', this)">Sil</button>`}
-      </div>
-    </div>`;
-    })
-    .join("")}</div>`;
+  if (!state.players.length) {
+    container.innerHTML = createEmptyState("Henüz kişi eklenmedi.");
+    return;
+  }
+
+  const seasonCards = [...state.seasons].sort((a, b) =>
+    b.name.localeCompare(a.name, "tr"),
+  );
+
+  container.innerHTML = `
+    <div class="players-premium-grid">
+      ${state.players
+        .map((player) => {
+          const isAdminUser = getPlayerRole(player) === "admin";
+          const seasonStates = getPlayerSeasonStateMap(player);
+          const predictionCount = state.predictions.filter(
+            (p) =>
+              p.playerId === player.id &&
+              p.homePred !== "" &&
+              p.awayPred !== "",
+          ).length;
+
+          const seasonMembershipMarkup = isAdminUser
+            ? `
+              <div class="player-admin-note">
+                Admin tüm sezon yönetim ekranlarını görür, tahmin tablosunda oyuncu olarak listelenmez.
+              </div>
+            `
+            : seasonCards.length
+              ? `
+                <div class="player-season-chip-grid">
+                  ${seasonCards
+                    .map((season) => {
+                      const checked = seasonStates[season.id] !== false;
+                      return `
+                        <label class="season-member-chip ${checked ? "is-active" : "is-passive"}">
+                          <input type="checkbox" ${checked ? "checked" : ""} onchange="togglePlayerSeasonState('${player.id}', '${season.id}', this.checked)" />
+                          <span>${escapeHtml(season.name)}</span>
+                        </label>
+                      `;
+                    })
+                    .join("")}
+                </div>
+              `
+              : `<div class="player-empty-seasons">Önce sezon ekle. Sezonlar oluştukça burada kutular çıkacak.</div>`;
+
+          return `
+            <div class="player-premium-card ${isAdminUser ? "is-admin" : ""}">
+              <div class="player-card-glow"></div>
+
+              <div class="player-card-top">
+                <div class="player-card-title-row">
+                  <div class="player-card-name">${escapeHtml(player.name)}</div>
+                  ${isAdminUser ? '<span class="player-role-badge">Admin</span>' : ""}
+                </div>
+
+                <div class="player-card-stats">
+                  <div class="player-stat-pill">
+                    <span class="player-stat-label">Şifre</span>
+                    <strong>${escapeHtml(player.password || "1234")}</strong>
+                  </div>
+                  <div class="player-stat-pill">
+                    <span class="player-stat-label">Tahmin</span>
+                    <strong>${predictionCount}</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div class="player-card-seasons">
+                <div class="player-card-section-title">Sezon katılımı</div>
+                ${seasonMembershipMarkup}
+              </div>
+
+              <div class="player-card-actions">
+                <button class="small secondary" onclick="renamePlayer('${player.id}', this)">Adı Düzenle</button>
+                <button class="small secondary" onclick="changePlayerPassword('${player.id}', this)">Şifre Değiştir</button>
+                ${isAdminUser ? "" : `<button class="small danger" onclick="removePlayer('${player.id}', this)">Sil</button>`}
+              </div>
+            </div>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
 }
+
+window.togglePlayerSeasonState = async function (playerId, seasonId, isActive) {
+  if (isReadOnlyMode()) {
+    return showAlert("Kullanıcı görünümünde sezon katılımı değiştirilemez.", {
+      title: "Yetki yok",
+      type: "warning",
+    });
+  }
+  const player = getPlayerById(playerId);
+  const season = getSeasonById(seasonId);
+  if (!player || !season) return;
+  if (getPlayerRole(player) === "admin") {
+    renderPlayers();
+    return showAlert("Admin kullanıcı sezon kutuları ile yönetilmez.", {
+      title: "Bilgi",
+      type: "warning",
+    });
+  }
+
+  const nextSeasonStates = {
+    ...createDefaultSeasonStateMap(true),
+    ...getPlayerSeasonStateMap(player),
+    [seasonId]: isActive !== false,
+  };
+
+  player.seasonStates = nextSeasonStates;
+
+  if (useOnlineMode) {
+    try {
+      const result = await updateOnlineUser({
+        id: player.id,
+        seasonStates: nextSeasonStates,
+      });
+      if (!result?.success) {
+        throw new Error(result?.message || "Sezon katılımı kaydedilemedi.");
+      }
+      await syncUsersFromSheet({ silent: true });
+    } catch (error) {
+      showAlert(error?.message || "Sezon katılımı Firebase'e yazılamadı.", {
+        title: "Kayıt Hatası",
+        type: "warning",
+      });
+    }
+  }
+
+  saveState(true);
+  renderAll();
+};
 
 window.renamePlayer = async function (id, buttonOrEvent) {
   if (isReadOnlyMode())
@@ -4816,10 +5200,12 @@ function renderSeasons() {
   const teams = getTeamsBySeasonId(seasonId);
   const season = getSeasonById(seasonId);
   if (!season) {
-    container.innerHTML = createEmptyState("Önce bir sezon oluştur.");
+    container.innerHTML = createEmptyState("Önce lig adıyla birlikte bir sezon oluştur.");
     return;
   }
-  const seasonRows = state.seasons
+
+  const seasonRows = [...state.seasons]
+    .sort((a, b) => b.name.localeCompare(a.name, "tr"))
     .map(
       (item) => `
     <div class="excel-list-row week-row">
@@ -4836,31 +5222,72 @@ function renderSeasons() {
   `,
     )
     .join("");
+
   const teamRows = teams.length
-    ? teams
+    ? `<div class="season-team-card-grid">${teams
         .map(
           (team) => `
-    <div class="excel-list-row player-row">
-      <div class="player-name-cell team-row-cell">${teamLogoHtml(team.name, seasonId)} <span>${escapeHtml(team.name)}</span></div>
-      <div class="small-meta">logo: ${escapeHtml(team.slug || "-")}</div>
-      <div class="inline-actions compact">
-        <button class="small secondary" onclick="renameSeasonTeam('${team.id}')">Düzenle</button>
-        <button class="small danger" onclick="removeSeasonTeam('${team.id}')">Sil</button>
+      <div class="season-team-card">
+        <div class="season-team-card-top">
+          <div class="season-team-card-logo">${teamLogoHtml(team.name, seasonId)}</div>
+          <div>
+            <div class="season-team-card-name">${escapeHtml(team.name)}</div>
+            <div class="small-meta">Sezon: ${escapeHtml(season.name)}</div>
+          </div>
+        </div>
+        <label class="field inline-field">
+          <span>Logo dosya adı</span>
+          <input type="text" value="${escapeHtml(team.slug || "")}" oninput="markSeasonTeamSlugDraft('${team.id}', this.value)" placeholder="örn: galatasaray" />
+        </label>
+        <div class="inline-actions compact wrap-actions">
+          <button class="small secondary" onclick="saveSeasonTeamSlug('${team.id}', this)">Logo adını kaydet</button>
+          <button class="small secondary" onclick="renameSeasonTeam('${team.id}')">Adı düzenle</button>
+          <button class="small danger" onclick="removeSeasonTeam('${team.id}')">Sil</button>
+        </div>
       </div>
-    </div>
-  `,
+    `,
         )
-        .join("")
+        .join("")}</div>`
     : createEmptyState("Bu sezonda henüz takım yok.");
 
   container.innerHTML = `
     <div class="stack-actions">
       <div class="excel-list season-list-scroll">${seasonRows}</div>
       <div class="card-subtitle">${escapeHtml(season.name)} takımları</div>
-      <div class="excel-list team-list-scroll">${teamRows}</div>
+      ${teamRows}
     </div>
   `;
 }
+
+window.markSeasonTeamSlugDraft = function (teamId, value) {
+  const team = getTeamById(teamId);
+  if (!team) return;
+  team._draftSlug = String(value || "").trim();
+};
+
+window.saveSeasonTeamSlug = async function (teamId, buttonOrEvent) {
+  if (isReadOnlyMode()) {
+    return showAlert("Kullanıcı görünümünde takım logosu düzenlenemez.", {
+      title: "Yetki yok",
+      type: "warning",
+    });
+  }
+  const actionButton = getActionButtonFromArg(buttonOrEvent);
+  const team = getTeamById(teamId);
+  if (!team) return;
+  const nextSlug = String(team._draftSlug || team.slug || slugify(team.name) || "").trim();
+  if (!nextSlug) {
+    return showAlert("Logo dosya adı boş olamaz.", {
+      title: "Eksik bilgi",
+      type: "warning",
+    });
+  }
+  team.slug = nextSlug;
+  delete team._draftSlug;
+  saveState(true);
+  renderAll();
+  setAsyncButtonState(actionButton, "success", { success: "Kaydedildi" });
+};
 
 window.removeSeason = async function (id) {
   if (isReadOnlyMode())
@@ -4876,22 +5303,97 @@ window.removeSeason = async function (id) {
       `${season.name} sezonunu ve içindeki tüm hafta, maç, takım verilerini silmek istiyor musun?`,
       { title: "Sezon silinsin mi?", type: "danger", confirmText: "Sil" },
     ))
-  )
+  ) {
     return;
-  const weekIds = getWeeksBySeasonId(id).map((w) => w.id);
-  const matchIds = getMatchesBySeasonId(id).map((m) => m.id);
+  }
+
+  const matchIds = getMatchesBySeasonId(id).map((m) => String(m.id));
+
+  if (useOnlineMode && isFirebaseReady()) {
+    try {
+      const matchesMap = (await firebaseRead("matches")) || {};
+      const predictionsMap = (await firebaseRead("predictions")) || {};
+      const usersMap = (await firebaseRead("users")) || {};
+      const remoteMatches = firebaseSnapshotToArray(matchesMap);
+      const remotePredictions = firebaseSnapshotToArray(predictionsMap);
+      const remoteUsers = firebaseSnapshotToArray(usersMap);
+
+      const remoteMatchesToDelete = remoteMatches.filter((item) => {
+        const sameSeasonName =
+          normalizeText(item.season || item.sezon || "") ===
+          normalizeText(season.name || "");
+        return sameSeasonName;
+      });
+
+      const remoteMatchIdsToDelete = new Set(
+        remoteMatchesToDelete.map((item) =>
+          String(item.id || item.sheetMatchId || item.macId || "").trim(),
+        ),
+      );
+
+      const remotePredictionsToDelete = remotePredictions.filter((pred) =>
+        remoteMatchIdsToDelete.has(String(pred.matchId || "").trim()),
+      );
+
+      for (const match of remoteMatchesToDelete) {
+        const matchKey = sanitizeFirebaseKey(
+          match.id || match.sheetMatchId || match.macId || "",
+        );
+        if (matchKey) await firebaseRemove(`matches/${matchKey}`);
+      }
+
+      for (const pred of remotePredictionsToDelete) {
+        const predKey = sanitizeFirebaseKey(
+          pred.id || makePredictionRecordId(pred.matchId, pred.playerId),
+        );
+        if (predKey) await firebaseRemove(`predictions/${predKey}`);
+      }
+
+      for (const user of remoteUsers) {
+        const seasonStates = normalizeSeasonStateMap(
+          user.seasonStates || user.seasonMemberships || user.activeSeasons || {},
+        );
+        if (!Object.prototype.hasOwnProperty.call(seasonStates, id)) continue;
+        delete seasonStates[id];
+        const userKey = sanitizeFirebaseKey(user.id || "");
+        if (userKey) {
+          await firebaseUpdate(`users/${userKey}`, {
+            seasonStates,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      }
+    } catch (error) {
+      console.warn("Sezonun Firebase temizliği tamamlanamadı:", error);
+    }
+  }
+
   state.seasons = state.seasons.filter((s) => s.id !== id);
   state.teams = state.teams.filter((t) => t.seasonId !== id);
   state.weeks = state.weeks.filter((w) => w.seasonId !== id);
   state.matches = state.matches.filter((m) => m.seasonId !== id);
-  state.predictions = state.predictions.filter(
-    (p) => !matchIds.includes(p.matchId),
-  );
+  state.predictions = state.predictions.filter((p) => !matchIds.includes(String(p.matchId)));
+  state.players = state.players.map((player) => {
+    const seasonStates = getPlayerSeasonStateMap(player);
+    if (!Object.prototype.hasOwnProperty.call(seasonStates, id)) return player;
+    const nextStates = { ...seasonStates };
+    delete nextStates[id];
+    return { ...player, seasonStates: nextStates };
+  });
+
   delete state.settings.celebratedChampions[id];
   state.settings.activeSeasonId = state.seasons[0]?.id || null;
   state.settings.activeWeekId =
     getWeeksBySeasonId(state.settings.activeSeasonId)[0]?.id || null;
-  saveState();
+  saveState(true);
+  if (useOnlineMode && isFirebaseReady()) {
+    try {
+      await persistSeasonRegistryToFirebase();
+      await hydrateFromFirebaseRealtime("season-delete");
+    } catch (error) {
+      console.warn("Sezon listesi Firebase'de güncellenemedi:", error);
+    }
+  }
   renderAll();
 };
 
@@ -6030,6 +6532,7 @@ function renderPredictionShareTable(container, matches, players) {
 }
 
 function renderPredictions() {
+  const viewportSnapshot = capturePredictionViewport();
   const container = document.getElementById("predictionsTable");
   if (!container) return;
   const weekId = state.settings.activeWeekId;
@@ -6038,6 +6541,7 @@ function renderPredictions() {
 
   if (!weekId) {
     container.innerHTML = createEmptyState("Önce bir hafta seç.");
+    schedulePredictionViewportRestore(viewportSnapshot);
     return;
   }
 
@@ -6048,6 +6552,7 @@ function renderPredictions() {
     container.innerHTML = createEmptyState(
       "Tahmin girmek için en az bir hafta, bir maç ve bir kişi olmalı.",
     );
+    schedulePredictionViewportRestore(viewportSnapshot);
     return;
   }
 
@@ -6057,6 +6562,7 @@ function renderPredictions() {
     updatePredictionShareModeButton();
     bindPredictionActionElements(container);
     saveState(true);
+    schedulePredictionViewportRestore(viewportSnapshot);
     return;
   }
 
@@ -6201,6 +6707,7 @@ function renderPredictions() {
   bindPredictionActionElements(container);
   bindPredictionTableDesktopScroll();
   saveState(true);
+  schedulePredictionViewportRestore(viewportSnapshot);
 }
 
 const predictionTimers = {};
@@ -6414,7 +6921,47 @@ function focusPredictionSiblingInput(target) {
     if (typeof sibling.select === "function") sibling.select();
   });
 }
+function blurPredictionInputAndCloseKeyboard(input) {
+  if (!input) return;
 
+  let sink = document.getElementById("mobile-keyboard-dismiss-sink");
+  if (!sink) {
+    sink = document.createElement("button");
+    sink.id = "mobile-keyboard-dismiss-sink";
+    sink.type = "button";
+    sink.setAttribute("aria-hidden", "true");
+    sink.tabIndex = -1;
+    sink.style.position = "fixed";
+    sink.style.opacity = "0";
+    sink.style.pointerEvents = "none";
+    sink.style.width = "1px";
+    sink.style.height = "1px";
+    sink.style.left = "0";
+    sink.style.top = "0";
+    sink.style.padding = "0";
+    sink.style.border = "0";
+    document.body.appendChild(sink);
+  }
+
+  input.blur();
+
+  requestAnimationFrame(() => {
+    try {
+      sink.focus({ preventScroll: true });
+    } catch (_) {
+      sink.focus();
+    }
+
+    input.blur();
+
+    requestAnimationFrame(() => {
+      if (document.activeElement === sink || document.activeElement === input) {
+        document.body.focus?.();
+        input.blur();
+      }
+    });
+  });
+}
 function setPredictionUiState(matchId, playerId, uiState) {
   const key = getPredictionUiKey(matchId, playerId);
   predictionUiState[key] = uiState;
@@ -6515,20 +7062,31 @@ function setPredictionUiState(matchId, playerId, uiState) {
     }, 4200);
   }
 }
-window.queuePredictionSave = function (matchId, playerId, immediate = false) {
+window.queuePredictionSave = function (
+  matchId,
+  playerId,
+  immediate = false,
+  viewportSnapshot = null,
+) {
   const key = getPredictionUiKey(matchId, playerId);
   clearTimeout(predictionTimers[key]);
 
+  const snapshot =
+    viewportSnapshot || capturePredictionViewport({ matchId, playerId });
+
   if (immediate) {
-    window.savePrediction(matchId, playerId);
+    window.savePrediction(matchId, playerId, { viewportSnapshot: snapshot });
+    schedulePredictionViewportRestore(snapshot);
     return;
   }
 
   setPredictionUiState(matchId, playerId, "dirty");
   updatePredictionDeleteButton(matchId, playerId, true);
+  schedulePredictionViewportRestore(snapshot);
 };
 
 window.deletePredictionEntry = async function (matchId, playerId) {
+  const viewportSnapshot = capturePredictionViewport({ matchId, playerId });
   const btn = document.getElementById(`pred_delete_${matchId}_${playerId}`);
   if (!btn) return;
 
@@ -6576,10 +7134,14 @@ window.deletePredictionEntry = async function (matchId, playerId) {
 
     btn.innerText = "Sil";
     btn.disabled = false;
+  } finally {
+    schedulePredictionViewportRestore(viewportSnapshot);
   }
 };
 
-window.savePrediction = async function (matchId, playerId) {
+window.savePrediction = async function (matchId, playerId, options = {}) {
+  const viewportSnapshot =
+    options.viewportSnapshot || capturePredictionViewport({ matchId, playerId });
   const match = state.matches.find((m) => m.id === matchId);
 
   if (
@@ -6625,15 +7187,18 @@ window.savePrediction = async function (matchId, playerId) {
   renderMissingPredictions();
   renderStats();
   renderAdvancedStats();
+  schedulePredictionViewportRestore(viewportSnapshot);
 
   if (homePred === "" || awayPred === "") {
     setPredictionUiState(matchId, playerId, "dirty");
+    schedulePredictionViewportRestore(viewportSnapshot);
     return;
   }
 
   if (!useOnlineMode || !isAuthenticated()) {
     setPredictionUiState(matchId, playerId, "saved");
     updatePredictionDeleteButton(matchId, playerId, true);
+    schedulePredictionViewportRestore(viewportSnapshot);
     return;
   }
 
@@ -6689,6 +7254,7 @@ window.savePrediction = async function (matchId, playerId) {
         title: "Kayıt Hatası",
         type: "warning",
       });
+      schedulePredictionViewportRestore(viewportSnapshot);
       return;
     }
 
@@ -6712,6 +7278,7 @@ window.savePrediction = async function (matchId, playerId) {
     dequeuePredictionRetry(payload);
     saveState(true);
     setPredictionUiState(matchId, playerId, "saved");
+    schedulePredictionViewportRestore(viewportSnapshot);
   } catch (error) {
     clearTimeout(predictionTimers[key]);
     console.error("Online tahmin kaydı hatası:", error);
@@ -6741,6 +7308,7 @@ window.savePrediction = async function (matchId, playerId) {
           type: "info",
         },
       );
+      schedulePredictionViewportRestore(viewportSnapshot);
       return;
     }
 
@@ -6757,6 +7325,7 @@ window.savePrediction = async function (matchId, playerId) {
         type: "warning",
       },
     );
+    schedulePredictionViewportRestore(viewportSnapshot);
   }
 };
 
@@ -7086,6 +7655,7 @@ window.celebrateChampion = function (seasonId, manual = false) {
 };
 
 function renderAll() {
+  const viewportSnapshot = capturePredictionViewport();
   ensureActiveSelections();
   recalculateAllPoints();
   saveState(true);
@@ -7114,9 +7684,10 @@ function renderAll() {
   applyRolePermissions();
   ensureHeaderSyncButtons();
   updateNavSelection(state.settings.currentTab || "dashboard");
+  schedulePredictionViewportRestore(viewportSnapshot);
 }
 
-function addSeason() {
+async function addSeason() {
   if (isReadOnlyMode())
     return showAlert("Kullanıcı görünümünde bu alan sadece görüntülenir.", {
       title: "Yetki yok",
@@ -7129,17 +7700,64 @@ function addSeason() {
       title: "Eksik bilgi",
       type: "warning",
     });
-  if (state.seasons.some((s) => s.name === name))
+  if (!leagueName)
+    return showAlert("Lig adı boş olamaz.", {
+      title: "Eksik bilgi",
+      type: "warning",
+    });
+
+  const seasonExists = state.seasons.some(
+    (s) => normalizeText(s.name) === normalizeText(name),
+  );
+  if (seasonExists)
     return showAlert("Bu sezon zaten var.", {
       title: "Tekrarlayan kayıt",
       type: "warning",
     });
+
   const seasonId = uid("season");
-  state.seasons.push({ id: seasonId, name, leagueName });
+  const newSeason = { id: seasonId, name, leagueName };
+
+  state.seasons.push(newSeason);
+  state.players = state.players.map((player) => {
+    if (getPlayerRole(player) === "admin") return player;
+    const seasonStates = {
+      ...createDefaultSeasonStateMap(true),
+      ...getPlayerSeasonStateMap(player),
+      [seasonId]: true,
+    };
+    return { ...player, seasonStates };
+  });
   state.settings.activeSeasonId = seasonId;
   state.settings.activeWeekId = null;
+
+  if (useOnlineMode && isFirebaseReady()) {
+    try {
+      await persistSeasonRegistryToFirebase();
+      for (const player of state.players) {
+        if (getPlayerRole(player) === "admin") continue;
+        await updateOnlineUser({
+          id: player.id,
+          seasonStates: getPlayerSeasonStateMap(player),
+        });
+      }
+      await hydrateFromFirebaseRealtime("season-add");
+    } catch (error) {
+      state.seasons = state.seasons.filter((item) => item.id !== seasonId);
+      state.players = state.players.map((player) => {
+        const nextStates = { ...getPlayerSeasonStateMap(player) };
+        delete nextStates[seasonId];
+        return { ...player, seasonStates: nextStates };
+      });
+      return showAlert(error?.message || "Sezon Firebase'e kaydedilemedi.", {
+        title: "Kayıt Hatası",
+        type: "warning",
+      });
+    }
+  }
+
   document.getElementById("seasonName").value = "";
-  saveState();
+  saveState(true);
   renderAll();
 }
 
@@ -7264,6 +7882,7 @@ function addPlayer(buttonOrEvent) {
       id: `player-${slugify(name) || "oyuncu"}`,
       name: name.toUpperCase(),
       password,
+      seasonStates: createDefaultSeasonStateMap(true),
     };
 
   if (useOnlineMode) {
@@ -7289,6 +7908,7 @@ async function addUserOnline(player, actionButton = null) {
       kullaniciAdi: normalizeLoginName(player.name),
       sifre: player.password || "1234",
       adSoyad: player.name,
+      seasonStates: player.seasonStates || createDefaultSeasonStateMap(true),
     });
 
     if (!result?.success) {
@@ -7417,6 +8037,7 @@ function switchTab(tabName) {
     ["players", "backup", "seasons", "weeks", "matches"].includes(tabName)
   )
     tabName = "dashboard";
+  const shouldScrollTop = tabName !== "predictions";
   state.settings.currentTab = tabName;
   closeMobileAdminMenu();
   updateNavSelection(tabName);
@@ -7431,6 +8052,13 @@ function switchTab(tabName) {
   }
   closeLandscapeSidebar();
   saveState(true);
+  if (shouldScrollTop) {
+    requestAnimationFrame(() => {
+      window.scrollTo(0, 0);
+      const content = document.querySelector(`#tab-${tabName}`);
+      content?.scrollTo?.(0, 0);
+    });
+  }
 }
 
 function getBackupSelectedWeekId() {
@@ -7659,6 +8287,11 @@ async function syncBackupStateToFirebase(stateObj) {
       source: "firebase",
       lastImportAt: stamp,
       backupVersion: 1,
+      seasonsMeta: (safeState.seasons || []).map((season) => ({
+        id: String(season.id || "").trim(),
+        name: String(season.name || "").trim(),
+        leagueName: String(season.leagueName || "").trim(),
+      })).filter((season) => season.id && season.name),
     }),
   ]);
 
@@ -8238,9 +8871,9 @@ async function importFixturesFromApi(updateResultsOnly = false) {
     if (!events.length) throw new Error("Bu sezon için etkinlik bulunamadı.");
     const teamNames = [
       ...new Set(events.flatMap((e) => [e.homeTeam, e.awayTeam])),
-    ];
+    ].filter(Boolean);
     teamNames.forEach((name) => {
-      if (!getTeamsBySeasonId(seasonId).some((t) => t.name === name)) {
+      if (!getTeamsBySeasonId(seasonId).some((t) => normalizeText(t.name) === normalizeText(name))) {
         state.teams.push({
           id: uid("team"),
           seasonId,
@@ -8249,6 +8882,17 @@ async function importFixturesFromApi(updateResultsOnly = false) {
         });
       }
     });
+
+    if (!updateResultsOnly) {
+      saveState(true);
+      renderAll();
+      status.textContent = `API'den ${teamNames.length} takım kontrol edildi. Yeni sezona yalnızca takım listesi işlendi; otomatik sezon/hafta eklenmedi.`;
+      recordAdminSyncActivity({
+        lastAction: "Sezon ekranından yalnızca takım listesi API üzerinden güncellendi.",
+        success: true,
+      });
+      return true;
+    }
 
     const touchedWeekIds = new Set();
     let movedCount = 0;
@@ -8314,7 +8958,7 @@ async function importFixturesFromApi(updateResultsOnly = false) {
     }
     status.textContent = updateResultsOnly
       ? `Sezondaki tarih/saat ve skor verileri güncellendi${movedCount ? `, ${movedCount} ertelenen maç taşındı` : ""}${sheetSyncResult?.success ? `, Sheets senkronu tamamlandı` : ", Sheets yanıtı gecikti ama yerel güncelleme tamamlandı"}.`
-      : `Sezonun tüm haftaları ve maçları API üzerinden içeri aktarıldı${movedCount ? `, ${movedCount} ertelenen maç doğru haftaya taşındı` : ""}${sheetSyncResult?.success ? `, Sheets senkronu tamamlandı` : ", Sheets yanıtı gecikti ama yerel güncelleme tamamlandı"}.`;
+      : `API'den yalnızca takım listesi işlendi.`;
     recordAdminSyncActivity({
       lastAction: updateResultsOnly
         ? "Sezon skor ve saat verileri güncellendi."
@@ -8469,17 +9113,33 @@ function bindEvents() {
 
       const isHomeInput = target.id === `pred_home_${matchId}_${playerId}`;
       if (isHomeInput) {
+        if (typeof e.stopImmediatePropagation === "function") {
+          e.stopImmediatePropagation();
+        }
+        e.stopPropagation();
         focusPredictionSiblingInput(target);
         return;
       }
 
-      requestAnimationFrame(() => {
-        target.blur();
-      });
+      blurPredictionInputAndCloseKeyboard(target);
+      simulateOutsideTapAfterPredictionSave();
 
       if (shouldAutoSavePrediction(matchId, playerId)) {
         setTimeout(() => {
-          window.queuePredictionSave?.(matchId, playerId, true);
+          const viewportSnapshot = capturePredictionViewport({
+            matchId,
+            playerId,
+            focusId: null,
+          });
+
+          window.queuePredictionSave?.(
+            matchId,
+            playerId,
+            true,
+            viewportSnapshot,
+          );
+
+          simulateOutsideTapAfterPredictionSave();
         }, 40);
       }
     },
@@ -8503,9 +9163,19 @@ function bindEvents() {
           return;
         }
 
-        target.blur();
+        blurPredictionInputAndCloseKeyboard(target);
         if (shouldAutoSavePrediction(matchId, playerId)) {
-          window.queuePredictionSave?.(matchId, playerId, true);
+          const saveViewportSnapshot = capturePredictionViewport({
+            matchId,
+            playerId,
+            focusId: null,
+          });
+          window.queuePredictionSave?.(
+            matchId,
+            playerId,
+            true,
+            saveViewportSnapshot,
+          );
         }
       }
     },
