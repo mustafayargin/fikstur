@@ -143,6 +143,14 @@ async function ensureFirebaseDefaults() {
       source: "firebase",
       createdAt: new Date().toISOString(),
       defaultUsersSeeded: true,
+      structure: {
+        seasons: [],
+        weeks: [],
+        teams: [],
+        activeSeasonId: null,
+        activeWeekId: null,
+        updatedAt: new Date().toISOString(),
+      },
     });
   }
 
@@ -790,6 +798,8 @@ async function hydrateFromFirebaseRealtime(source = "manual") {
   firebaseRealtimeHydrationPromise = (async () => {
     try {
       await ensureFirebaseDefaults();
+      const remoteSettings = (await firebaseRead("settings")) || {};
+      applyStructureMetadataFromSettings(remoteSettings);
       await syncUsersFromSheet({ silent: true });
       await syncOnlineMatchesFromSheet({
         silent: true,
@@ -803,6 +813,7 @@ async function hydrateFromFirebaseRealtime(source = "manual") {
         seasonLabel: "",
         weekNumber: "",
       });
+      applyStructureMetadataFromSettings(remoteSettings);
       if (isAuthenticated()) startPresenceTracking();
       recordAdminSyncActivity({
         lastAction: `Canlı ${getOnlineSourceLabel()} verisi alındı (${source}).`,
@@ -3531,6 +3542,119 @@ function createInitialState() {
   };
 }
 
+function buildStructureMetadataFromState() {
+  return {
+    seasons: (state.seasons || []).map((season) => ({
+      id: String(season.id || ""),
+      name: String(season.name || "").trim(),
+      leagueName: String(season.leagueName || "").trim(),
+    })).filter((season) => season.id && season.name),
+    weeks: (state.weeks || []).map((week) => ({
+      id: String(week.id || ""),
+      seasonId: String(week.seasonId || ""),
+      number: Number(week.number || 0),
+      status: String(week.status || "hazirlaniyor"),
+    })).filter((week) => week.id && week.seasonId && week.number),
+    teams: (state.teams || []).map((team) => ({
+      id: String(team.id || ""),
+      seasonId: String(team.seasonId || ""),
+      name: String(team.name || "").trim(),
+      slug: String(team.slug || "").trim(),
+    })).filter((team) => team.id && team.seasonId && team.name),
+    activeSeasonId: state.settings?.activeSeasonId || null,
+    activeWeekId: state.settings?.activeWeekId || null,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function applyStructureMetadataFromSettings(settingsValue) {
+  const structure = settingsValue?.structure || settingsValue?.structureMeta || null;
+  if (!structure || typeof structure !== "object") return false;
+
+  const seasonMap = new Map((state.seasons || []).map((item) => [String(item.id), item]));
+  const nextSeasons = [];
+  (Array.isArray(structure.seasons) ? structure.seasons : []).forEach((season) => {
+    const id = String(season?.id || "").trim();
+    const name = String(season?.name || "").trim();
+    if (!id || !name) return;
+    const existing = seasonMap.get(id) || {};
+    nextSeasons.push({
+      ...existing,
+      id,
+      name,
+      leagueName: String(season?.leagueName || existing.leagueName || "").trim(),
+    });
+  });
+  if (nextSeasons.length) {
+    const seen = new Set(nextSeasons.map((item) => String(item.id)));
+    state.seasons = [...nextSeasons, ...(state.seasons || []).filter((item) => !seen.has(String(item.id)))];
+  }
+
+  const weekMap = new Map((state.weeks || []).map((item) => [String(item.id), item]));
+  const nextWeeks = [];
+  (Array.isArray(structure.weeks) ? structure.weeks : []).forEach((week) => {
+    const id = String(week?.id || "").trim();
+    const seasonId = String(week?.seasonId || "").trim();
+    const number = Number(week?.number || 0);
+    if (!id || !seasonId || !number) return;
+    const existing = weekMap.get(id) || {};
+    nextWeeks.push({
+      ...existing,
+      id,
+      seasonId,
+      number,
+      status: String(week?.status || existing.status || "hazirlaniyor"),
+    });
+  });
+  if (nextWeeks.length) {
+    const seen = new Set(nextWeeks.map((item) => String(item.id)));
+    state.weeks = [...nextWeeks, ...(state.weeks || []).filter((item) => !seen.has(String(item.id)))];
+  }
+
+  const teamMap = new Map((state.teams || []).map((item) => [String(item.id), item]));
+  const nextTeams = [];
+  (Array.isArray(structure.teams) ? structure.teams : []).forEach((team) => {
+    const id = String(team?.id || "").trim();
+    const seasonId = String(team?.seasonId || "").trim();
+    const name = String(team?.name || "").trim();
+    if (!id || !seasonId || !name) return;
+    const existing = teamMap.get(id) || {};
+    nextTeams.push({
+      ...existing,
+      id,
+      seasonId,
+      name,
+      slug: String(team?.slug || existing.slug || slugify(name)),
+    });
+  });
+  if (nextTeams.length) {
+    const seen = new Set(nextTeams.map((item) => String(item.id)));
+    state.teams = [...nextTeams, ...(state.teams || []).filter((item) => !seen.has(String(item.id)))];
+  }
+
+  const remoteActiveSeasonId = structure.activeSeasonId ? String(structure.activeSeasonId) : "";
+  const remoteActiveWeekId = structure.activeWeekId ? String(structure.activeWeekId) : "";
+  if (remoteActiveSeasonId && state.seasons.some((item) => String(item.id) === remoteActiveSeasonId)) {
+    state.settings.activeSeasonId = remoteActiveSeasonId;
+  }
+  if (remoteActiveWeekId && state.weeks.some((item) => String(item.id) === remoteActiveWeekId)) {
+    state.settings.activeWeekId = remoteActiveWeekId;
+  }
+
+  ensureActiveSelections();
+  return true;
+}
+
+async function syncStructureMetadataToFirebase() {
+  if (!useOnlineMode || !isFirebaseReady()) return false;
+  await firebaseUpdate("settings", {
+    structure: buildStructureMetadataFromState(),
+    source: "firebase",
+    lastStructureSyncAt: new Date().toISOString(),
+  });
+  return true;
+}
+
 function ensureDefaultSeason(stateObj) {
   if (!stateObj.settings) stateObj.settings = {};
   if (!Array.isArray(stateObj.seasons)) stateObj.seasons = [];
@@ -3819,6 +3943,11 @@ async function setActiveSeason(seasonId) {
   const firstWeek = getWeeksBySeasonId(seasonId)[0];
   state.settings.activeWeekId = firstWeek?.id || null;
   saveState();
+  if (useOnlineMode) {
+    syncStructureMetadataToFirebase().catch((error) => {
+      console.warn("Takım metadatası Firebase'e yazılamadı:", error);
+    });
+  }
   renderAll();
   await syncOnlinePredictions({
     seasonId,
@@ -3831,6 +3960,11 @@ async function setActiveWeek(weekId) {
   const week = getWeekById(weekId);
   if (week?.seasonId) state.settings.activeSeasonId = week.seasonId;
   saveState();
+  if (useOnlineMode) {
+    syncStructureMetadataToFirebase().catch((error) => {
+      console.warn("Hafta metadatası Firebase'e yazılamadı:", error);
+    });
+  }
   renderAll();
   await syncOnlinePredictions({
     seasonId: state.settings.activeSeasonId,
@@ -4985,6 +5119,11 @@ window.renamePlayer = async function (id, buttonOrEvent) {
 
   player.name = name.trim().toUpperCase();
   saveState();
+  if (useOnlineMode) {
+    syncStructureMetadataToFirebase().catch((error) => {
+      console.warn("Sezon silme metadatası Firebase'e yazılamadı:", error);
+    });
+  }
   renderAll();
   setAsyncButtonState(actionButton, "success", { success: "Kaydedildi" });
 };
@@ -5205,6 +5344,11 @@ window.saveSeasonTeamSlug = function (teamId) {
   const nextSlug = String(input?.value || "").trim() || slugify(team.name);
   team.slug = nextSlug;
   saveState();
+  if (useOnlineMode) {
+    syncStructureMetadataToFirebase().catch((error) => {
+      console.warn("Takım logo metadatası Firebase'e yazılamadı:", error);
+    });
+  }
   renderSeasons();
   hydrateTeamLogosIn(document.getElementById("seasonTeamsList"));
   showAlert(`${team.name} logosu güncellendi.`, {
@@ -5243,6 +5387,11 @@ window.removeSeason = async function (id) {
   state.settings.activeWeekId =
     getWeeksBySeasonId(state.settings.activeSeasonId)[0]?.id || null;
   saveState();
+  if (useOnlineMode) {
+    syncStructureMetadataToFirebase().catch((error) => {
+      console.warn("Sezon silme metadatası Firebase'e yazılamadı:", error);
+    });
+  }
   renderAll();
 };
 
@@ -5266,6 +5415,11 @@ window.renameSeasonTeam = async function (teamId) {
   team.name = name.trim();
   team.slug = (slug || slugify(name)).trim();
   saveState();
+  if (useOnlineMode) {
+    syncStructureMetadataToFirebase().catch((error) => {
+      console.warn("Takım düzenleme metadatası Firebase'e yazılamadı:", error);
+    });
+  }
   renderAll();
 };
 
@@ -5290,6 +5444,11 @@ window.removeSeasonTeam = async function (teamId) {
     return;
   state.teams = state.teams.filter((t) => t.id !== teamId);
   saveState();
+  if (useOnlineMode) {
+    syncStructureMetadataToFirebase().catch((error) => {
+      console.warn("Takım silme metadatası Firebase'e yazılamadı:", error);
+    });
+  }
   renderAll();
 };
 
@@ -5348,6 +5507,11 @@ window.changeWeekStatus = async function (id) {
     });
   week.status = status;
   saveState();
+  if (useOnlineMode) {
+    syncStructureMetadataToFirebase().catch((error) => {
+      console.warn("Hafta durumu Firebase'e yazılamadı:", error);
+    });
+  }
   renderAll();
 };
 window.removeWeek = async function (id) {
@@ -5435,6 +5599,9 @@ window.removeWeek = async function (id) {
     }
 
     saveState();
+    if (useOnlineMode) {
+      await syncStructureMetadataToFirebase();
+    }
     renderAll();
 
     showAlert(`${week.number}. hafta ve bağlı maç/tahminler silindi.`, {
@@ -7618,6 +7785,10 @@ function addSeason() {
   document.getElementById("seasonName").value = "";
   saveState();
   if (useOnlineMode) {
+    syncStructureMetadataToFirebase().catch((error) => {
+      console.warn("Sezon metadatası Firebase'e yazılamadı:", error);
+    });
+
     Promise.allSettled(
       state.players
         .filter((player) => getPlayerRole(player) !== "admin")
@@ -7669,6 +7840,11 @@ function addSeasonTeam() {
   document.getElementById("seasonTeamName").value = "";
   document.getElementById("seasonTeamSlug").value = "";
   saveState();
+  if (useOnlineMode) {
+    syncStructureMetadataToFirebase().catch((error) => {
+      console.warn("Takım metadatası Firebase'e yazılamadı:", error);
+    });
+  }
   renderAll();
 }
 
@@ -7843,6 +8019,11 @@ function addWeek() {
   state.settings.activeWeekId = week.id;
   document.getElementById("weekNumber").value = "";
   saveState();
+  if (useOnlineMode) {
+    syncStructureMetadataToFirebase().catch((error) => {
+      console.warn("Hafta metadatası Firebase'e yazılamadı:", error);
+    });
+  }
   renderAll();
 }
 
@@ -8173,6 +8354,28 @@ async function syncBackupStateToFirebase(stateObj) {
       source: "firebase",
       lastImportAt: stamp,
       backupVersion: 1,
+      structure: {
+        seasons: (safeState.seasons || []).map((season) => ({
+          id: String(season.id || ""),
+          name: String(season.name || "").trim(),
+          leagueName: String(season.leagueName || "").trim(),
+        })).filter((season) => season.id && season.name),
+        weeks: (safeState.weeks || []).map((week) => ({
+          id: String(week.id || ""),
+          seasonId: String(week.seasonId || ""),
+          number: Number(week.number || 0),
+          status: String(week.status || "hazirlaniyor"),
+        })).filter((week) => week.id && week.seasonId && week.number),
+        teams: (safeState.teams || []).map((team) => ({
+          id: String(team.id || ""),
+          seasonId: String(team.seasonId || ""),
+          name: String(team.name || "").trim(),
+          slug: String(team.slug || "").trim(),
+        })).filter((team) => team.id && team.seasonId && team.name),
+        activeSeasonId: safeState.settings?.activeSeasonId || null,
+        activeWeekId: safeState.settings?.activeWeekId || null,
+        updatedAt: stamp,
+      },
     }),
   ]);
 
