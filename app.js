@@ -253,6 +253,7 @@ async function firebaseApiPost(action, payload = {}) {
             : "user",
         aktif: true,
         createdAt: new Date().toISOString(),
+        seasonMemberships: normalizeSeasonMemberships(payload.seasonMemberships),
       };
 
       await firebaseWrite(`users/${id}`, record);
@@ -277,6 +278,13 @@ async function firebaseApiPost(action, payload = {}) {
                 String(payload.rol).toLowerCase() === "admin"
                   ? "admin"
                   : "user",
+            }
+          : {}),
+        ...(Object.prototype.hasOwnProperty.call(payload || {}, "seasonMemberships")
+          ? {
+              seasonMemberships: normalizeSeasonMemberships(
+                payload.seasonMemberships,
+              ),
             }
           : {}),
         updatedAt: new Date().toISOString(),
@@ -884,22 +892,53 @@ const DEFAULT_TEAM_SLUGS = {
   "Adana Demirspor": "adana-demirspor",
   Alanyaspor: "alanyaspor",
   Antalyaspor: "antalyaspor",
+
   Başakşehir: "basaksehir",
+  "İstanbul Başakşehir": "basaksehir",
+  "Medipol Başakşehir": "basaksehir",
+  "RAMS Başakşehir": "basaksehir",
+
   Beşiktaş: "besiktas",
+
   "Bodrum FK": "bodrum-fk",
-  "Çaykur Rizespor": "caykur-rizespor",
+  "Sipay Bodrum FK": "bodrum-fk",
+  "BB Bodrumspor": "bodrum-fk",
+
+  "Çaykur Rizespor": "rizespor",
+  Rizespor: "rizespor",
+
   Eyüpspor: "eyupspor",
   Fenerbahçe: "fenerbahce",
   Galatasaray: "galatasaray",
-  "Gaziantep FK": "gaziantep-fk",
+
+  "Gaziantep FK": "gaziantep",
+  Gaziantep: "gaziantep",
+
   Göztepe: "goztepe",
   Hatayspor: "hatayspor",
+
+  "Fatih Karagümrük": "fatih-karagumruk",
+  "Fatih Karagümrük SK": "fatih-karagumruk",
+  Karagümrük: "fatih-karagumruk",
+
   Kasımpaşa: "kasimpasa",
   Kayserispor: "kayserispor",
+  Kocaelispor: "kocaelispor",
   Konyaspor: "konyaspor",
   Samsunspor: "samsunspor",
   Sivasspor: "sivasspor",
   Trabzonspor: "trabzonspor",
+
+  Gençlerbirliği: "genclerbirligi",
+  Genclerbirligi: "genclerbirligi",
+
+  Ankaragücü: "ankaragucu",
+  "MKE Ankaragücü": "ankaragucu",
+
+  İstanbulspor: "istanbulspor",
+  Ümraniyespor: "umraniyespor",
+  Pendikspor: "pendikspor",
+  Giresunspor: "giresunspor",
 };
 
 let previousLeaderName = null;
@@ -2136,6 +2175,7 @@ async function syncUsersFromSheet(options = {}) {
     password: user.sifre || "1234",
     username: user.kullaniciAdi || "",
     role: String(user.rol || "user").toLowerCase() === "admin" ? "admin" : "user",
+    seasonMemberships: normalizeSeasonMemberships(user.seasonMemberships),
   }));
   state.players = users;
   const authUser = getAuthUser();
@@ -2288,9 +2328,7 @@ function getPredictionOutcomeClass(pred, match) {
 }
 
 function getVisiblePlayersOrdered() {
-  const players = [...state.players].filter(
-    (player) => getPlayerRole(player) !== "admin",
-  );
+  const players = [...getSeasonPlayers(getActiveSeasonId())];
   const currentPlayerId = getCurrentPlayerId();
   if (getCurrentRole() !== "user" || !currentPlayerId) return players;
   return players.sort((a, b) => {
@@ -3584,6 +3622,124 @@ function getWeekById(id) {
 function getPlayerById(id) {
   return state.players.find((p) => String(p.id) === String(id));
 }
+
+function normalizeSeasonMemberships(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([seasonId, enabled]) => [String(seasonId), enabled !== false])
+      .filter(([seasonId]) => seasonId),
+  );
+}
+
+function getPlayerSeasonMemberships(player) {
+  return normalizeSeasonMemberships(player?.seasonMemberships || player?.seasonParticipants || {});
+}
+
+function playerHasAnySeasonMembership(player) {
+  return Object.keys(getPlayerSeasonMemberships(player)).length > 0;
+}
+
+function isPlayerActiveInSeason(player, seasonId = getActiveSeasonId()) {
+  if (!player || !seasonId) return false;
+  if (getPlayerRole(player) === "admin") return false;
+  const memberships = getPlayerSeasonMemberships(player);
+  if (Object.prototype.hasOwnProperty.call(memberships, String(seasonId))) {
+    return memberships[String(seasonId)] !== false;
+  }
+  if (Object.keys(memberships).length > 0) return false;
+  return true;
+}
+
+function getSeasonPlayers(seasonId = getActiveSeasonId(), options = {}) {
+  const includeAdmin = !!options.includeAdmin;
+  const participantsOnly = options.participantsOnly !== false;
+  return (state.players || []).filter((player) => {
+    if (getPlayerRole(player) === "admin") return includeAdmin;
+    if (!participantsOnly) return true;
+    return isPlayerActiveInSeason(player, seasonId);
+  });
+}
+
+function getSeasonParticipantCount(seasonId = getActiveSeasonId()) {
+  return getSeasonPlayers(seasonId).length;
+}
+
+function buildSeasonMembershipsFromSourceSeason(sourceSeasonId, targetSeasonId) {
+  const nextByPlayer = {};
+  (state.players || []).forEach((player) => {
+    if (getPlayerRole(player) === "admin") return;
+    const memberships = getPlayerSeasonMemberships(player);
+    const shouldEnable = sourceSeasonId
+      ? isPlayerActiveInSeason(player, sourceSeasonId)
+      : true;
+    nextByPlayer[String(player.id)] = {
+      ...memberships,
+      [String(targetSeasonId)]: shouldEnable,
+    };
+  });
+  return nextByPlayer;
+}
+
+async function persistPlayerSeasonMembership(playerId, seasonMemberships) {
+  const player = getPlayerById(playerId);
+  if (!player) return { success: false, message: "Kullanıcı bulunamadı." };
+  const normalized = normalizeSeasonMemberships(seasonMemberships);
+  player.seasonMemberships = normalized;
+  saveState(true);
+
+  if (useOnlineMode) {
+    const result = await updateOnlineUser({
+      id: player.id,
+      seasonMemberships: normalized,
+    });
+    if (!result?.success) {
+      return {
+        success: false,
+        message: result?.message || "Sezon katılımı kaydedilemedi.",
+      };
+    }
+    await syncUsersFromSheet({ silent: true });
+  }
+
+  return { success: true, seasonMemberships: normalized };
+}
+
+async function togglePlayerSeasonParticipation(playerId, seasonId, buttonOrEvent) {
+  const player = getPlayerById(playerId);
+  if (!player || !seasonId) return;
+  const actionButton = getActionButtonFromArg(buttonOrEvent);
+  const memberships = getPlayerSeasonMemberships(player);
+  const nextEnabled = !isPlayerActiveInSeason(player, seasonId);
+  const nextMemberships = {
+    ...memberships,
+    [String(seasonId)]: nextEnabled,
+  };
+
+  if (actionButton) {
+    setAsyncButtonState(actionButton, "loading", {
+      loading: nextEnabled ? "Aktifleştiriliyor..." : "Pasifleştiriliyor...",
+      success: nextEnabled ? "Aktif" : "Pasif",
+    });
+  }
+
+  const result = await persistPlayerSeasonMembership(playerId, nextMemberships);
+  if (!result?.success) {
+    showAlert(result?.message || "Sezon katılımı güncellenemedi.", {
+      title: "Kayıt Hatası",
+      type: "warning",
+    });
+    setAsyncButtonState(actionButton, "error", { error: "Hata" });
+    return;
+  }
+
+  renderAll();
+  setAsyncButtonState(actionButton, "success", {
+    success: nextEnabled ? "Aktif" : "Pasif",
+  });
+}
+
+window.togglePlayerSeasonParticipation = togglePlayerSeasonParticipation;
 function getTeamById(id) {
   return state.teams.find((t) => t.id === id);
 }
@@ -3714,6 +3870,27 @@ function getTeamMetaByName(name, seasonId = getActiveSeasonId()) {
 
 const remoteTeamLogoUrlCache = new Map();
 const remoteTeamLogoPromiseCache = new Map();
+const LOCAL_LOGO_MISSING_STORAGE_KEY = "localMissingTeamLogos";
+const localMissingTeamLogoCache = new Set();
+
+try {
+  const savedMissingLogos = JSON.parse(localStorage.getItem(LOCAL_LOGO_MISSING_STORAGE_KEY) || "[]");
+  if (Array.isArray(savedMissingLogos)) {
+    savedMissingLogos.forEach((item) => item && localMissingTeamLogoCache.add(String(item)));
+  }
+} catch {}
+
+function rememberMissingLocalLogo(src) {
+  const normalized = String(src || "").trim();
+  if (!normalized || localMissingTeamLogoCache.has(normalized)) return;
+  localMissingTeamLogoCache.add(normalized);
+  try {
+    localStorage.setItem(
+      LOCAL_LOGO_MISSING_STORAGE_KEY,
+      JSON.stringify(Array.from(localMissingTeamLogoCache)),
+    );
+  } catch {}
+}
 
 const TEAM_REMOTE_SEARCH_ALIASES = {
   "Başakşehir": ["Istanbul Basaksehir", "Basaksehir"],
@@ -3804,33 +3981,35 @@ async function fetchRemoteTeamLogoUrl(teamName) {
 }
 
 async function hydrateTeamLogoImage(img) {
-  if (!img || img.dataset.remoteLoading === "1" || img.dataset.remoteResolved === "1") return;
-  img.dataset.remoteLoading = "1";
-  const fallback = img.nextElementSibling;
-  try {
-    const remoteUrl = await fetchRemoteTeamLogoUrl(img.dataset.teamName || img.alt || "");
-    if (remoteUrl) {
-      img.src = remoteUrl;
-      img.style.display = "block";
-      img.dataset.remoteResolved = "1";
-      if (fallback) fallback.style.display = "none";
-      return;
-    }
-  } catch (error) {
-    console.warn("Logo yükleme hatası:", error);
-  } finally {
-    img.dataset.remoteLoading = "0";
-  }
+  if (!img) return;
   img.dataset.remoteResolved = "1";
+  if (!img.src || img.getAttribute("src") === "favicon.png") {
+    img.src = "favicon.png";
+    img.style.display = "block";
+    const fallback = img.nextElementSibling;
+    if (fallback) fallback.style.display = "none";
+  }
 }
 
 function handleTeamLogoError(img) {
   if (!img) return;
+  const localSrc = String(img.dataset.localSrc || "").trim();
+  const currentSrc = img.getAttribute("src") || "";
+  if (currentSrc && currentSrc !== "favicon.png") {
+    if (localSrc && currentSrc === localSrc) rememberMissingLocalLogo(localSrc);
+    img.setAttribute("src", "favicon.png");
+    img.src = "favicon.png";
+    img.style.display = "block";
+    img.dataset.logoFailed = "1";
+    img.dataset.remoteResolved = "1";
+    const fallback = img.nextElementSibling;
+    if (fallback) fallback.style.display = "none";
+    return;
+  }
   img.style.display = "none";
   img.dataset.logoFailed = "1";
   const fallback = img.nextElementSibling;
   if (fallback) fallback.style.display = "grid";
-  hydrateTeamLogoImage(img);
 }
 
 function hydrateTeamLogosIn(container = document) {
@@ -3842,14 +4021,42 @@ function hydrateTeamLogosIn(container = document) {
   });
 }
 
+function resolveTeamLogoSlug(teamName, team = null) {
+  const name = String(teamName || "").trim();
+  const rawSlug = String(team?.slug || "").trim();
+
+  if (rawSlug) {
+    if (rawSlug === "gaziantep-fk") return "gaziantep";
+    if (rawSlug === "caykur-rizespor") return "rizespor";
+    if (rawSlug === "istanbul-basaksehir") return "basaksehir";
+    if (rawSlug === "karagumruk") return "fatih-karagumruk";
+    if (rawSlug === "bb-bodrumspor") return "bodrum-fk";
+    return rawSlug;
+  }
+
+  return DEFAULT_TEAM_SLUGS[name] || slugify(name);
+}
+
 function teamLogoHtml(teamName, seasonId, extraClass = "") {
   const team = getTeamMetaByName(teamName, seasonId);
-  const slug = team.slug || slugify(teamName);
-  const localSrc = `logos/${slug}.png`;
-  const explicitRemote = team.logoUrl || team.logo || team.badge || team.image || "";
+  const resolvedSlug = resolveTeamLogoSlug(teamName, team);
+  const localSrc = `logos/${resolvedSlug}.png`;
+  const explicitRemote =
+    team.logoUrl || team.logo || team.badge || team.image || "";
+  const preferredSrc =
+    explicitRemote ||
+    (localMissingTeamLogoCache.has(localSrc) ? "favicon.png" : localSrc);
+
   return `
     <span class="team-logo-wrap ${extraClass}">
-      <img class="team-logo-img" src="${explicitRemote || localSrc}" data-local-src="${localSrc}" data-team-name="${escapeHtml(teamName)}" alt="${escapeHtml(teamName)} logosu" onerror="window.handleTeamLogoError && window.handleTeamLogoError(this);" />
+      <img
+        class="team-logo-img"
+        src="${preferredSrc}"
+        data-local-src="${localSrc}"
+        data-team-name="${escapeHtml(teamName)}"
+        alt="${escapeHtml(teamName)} logosu"
+        onerror="window.handleTeamLogoError && window.handleTeamLogoError(this);"
+      />
       <span class="team-logo fallback-logo" style="display:none; ${teamStyle(teamName)}">${teamInitials(teamName)}</span>
     </span>
   `;
@@ -4101,8 +4308,7 @@ function recalculateAllPoints() {
 function getGeneralStandings(seasonId = getActiveSeasonId()) {
   const matchIds = getMatchesBySeasonId(seasonId).map((m) => m.id);
 
-  return state.players
-    .filter((player) => getPlayerRole(player) !== "admin")
+  return getSeasonPlayers(seasonId)
     .map((player) => {
       const preds = state.predictions.filter(
         (p) => p.playerId === player.id && matchIds.includes(p.matchId),
@@ -4133,8 +4339,9 @@ function getGeneralStandings(seasonId = getActiveSeasonId()) {
 function getWeeklyStandings(weekId) {
   const matchIds = getMatchesByWeekId(weekId).map((m) => m.id);
 
-  return state.players
-    .filter((player) => getPlayerRole(player) !== "admin")
+  const seasonId = getWeekById(weekId)?.seasonId || getActiveSeasonId();
+
+  return getSeasonPlayers(seasonId)
     .map((player) => {
       const preds = state.predictions.filter(
         (p) => p.playerId === player.id && matchIds.includes(p.matchId),
@@ -4165,8 +4372,9 @@ function getWeeklyStandings(weekId) {
 
 function countMissingPredictions(weekId) {
   let count = 0;
+  const seasonId = getWeekById(weekId)?.seasonId || getActiveSeasonId();
   getMatchesByWeekId(weekId).forEach((match) => {
-    state.players.forEach((player) => {
+    getSeasonPlayers(seasonId).forEach((player) => {
       const pred = getPrediction(match.id, player.id);
       if (!pred || pred.homePred === "" || pred.awayPred === "") count += 1;
     });
@@ -4359,7 +4567,7 @@ function buildFirebaseAdminSummary() {
 
   return {
     source: getOnlineSourceLabel(),
-    playerCount: state.players.length,
+    playerCount: getSeasonParticipantCount(getActiveSeasonId()),
     seasonCount: state.seasons.length,
     weekCount: activeSeasonId ? getWeeksBySeasonId(activeSeasonId).length : 0,
     matchCount: state.matches.length,
@@ -4590,7 +4798,7 @@ function renderStats() {
   const leader = getGeneralStandings(activeSeasonId)[0];
   const cards = [
     { label: "Aktif Sezon", value: escapeHtml(season?.name || "-") },
-    { label: "Kişi Sayısı", value: String(state.players.length) },
+    { label: "Kişi Sayısı", value: String(getSeasonParticipantCount(getActiveSeasonId())) },
     { label: "Haftadaki Maç", value: String(matches.length) },
     { label: "Oynanmış Maç", value: String(matches.filter((m) => m.played).length) },
     { label: "Eksik Tahmin", value: String(activeWeekId ? countMissingPredictions(activeWeekId) : 0) },
@@ -4614,26 +4822,118 @@ function renderStats() {
   previousLeaderName = leader?.name || null;
 }
 
+
 function renderPlayers() {
   const container = document.getElementById("playersList");
-  if (!state.players.length)
-    return (container.innerHTML = createEmptyState("Henüz kişi eklenmedi."));
-  container.innerHTML = `<div class="excel-list">${state.players
-    .map((player) => {
-      const isAdminUser = getPlayerRole(player) === "admin";
-      return `
-    <div class="excel-list-row player-row player-admin-row ${isAdminUser ? "admin-player-row" : ""}">
-      <div class="player-name-cell">${escapeHtml(player.name)}${isAdminUser ? ' <span class="badge admin">Admin</span>' : ""}</div>
-      <div class="small-meta">Şifre: <strong>${escapeHtml(player.password || "1234")}</strong> · ${state.predictions.filter((p) => p.playerId === player.id && p.homePred !== "" && p.awayPred !== "").length} kayıtlı tahmin</div>
-      <div class="inline-actions compact wrap-actions">
-        <button class="small secondary" onclick="renamePlayer('${player.id}', this)">Adı Düzenle</button>
-        <button class="small secondary" onclick="changePlayerPassword('${player.id}', this)">Şifre Değiştir</button>
-        ${isAdminUser ? "" : `<button class="small danger" onclick="removePlayer('${player.id}', this)">Sil</button>`}
-      </div>
-    </div>`;
-    })
-    .join("")}</div>`;
+  if (!container) return;
+
+  const activeSeasonId = getActiveSeasonId();
+  const activeSeasonName =
+    getSeasonById(activeSeasonId)?.name || "Sezon seçilmedi";
+
+  if (!state.players.length) {
+    container.innerHTML = createEmptyState("Henüz kişi eklenmedi.");
+    return;
+  }
+
+  const participantCount = getSeasonParticipantCount(activeSeasonId);
+  const totalUserCount = (state.players || []).filter(
+    (player) => getPlayerRole(player) !== "admin",
+  ).length;
+
+  container.innerHTML = `
+    <div class="players-season-summary">
+      <strong>${escapeHtml(activeSeasonName)}</strong> sezonunda
+      <strong>${participantCount}</strong> aktif katılımcı var.
+      <span class="small-meta">Toplam kayıtlı kullanıcı: ${totalUserCount}</span>
+    </div>
+    <div class="excel-list">${state.players
+      .map((player) => {
+        const isAdminUser = getPlayerRole(player) === "admin";
+        const isSeasonActive = isAdminUser
+          ? false
+          : isPlayerActiveInSeason(player, activeSeasonId);
+
+        const membershipClass = isSeasonActive ? "is-active" : "is-passive";
+        const membershipText = isAdminUser
+          ? "Yarışmacı değil"
+          : isSeasonActive
+            ? "Bu sezonda aktif"
+            : "Bu sezonda pasif";
+
+        const predictionCount = state.predictions.filter(
+          (p) =>
+            p.playerId === player.id &&
+            p.homePred !== "" &&
+            p.homePred !== null &&
+            p.homePred !== undefined &&
+            p.awayPred !== "" &&
+            p.awayPred !== null &&
+            p.awayPred !== undefined,
+        ).length;
+
+        return `
+          <div class="excel-list-row player-row player-admin-row ${isAdminUser ? "admin-player-row" : ""}">
+            <div class="player-name-cell">
+              ${escapeHtml(player.name)}
+              ${isAdminUser ? ' <span class="badge admin">Admin</span>' : ""}
+              <span class="season-player-badge ${membershipClass}">${membershipText}</span>
+            </div>
+
+            ${
+              isAdminUser
+                ? ""
+                : `
+              <div class="player-season-memberships">
+                <div class="player-season-memberships-title">Sezon Katılımı</div>
+                <div class="player-season-memberships-list">
+                  ${state.seasons
+                    .map((season) => {
+                      const checked = isPlayerActiveInSeason(player, season.id);
+                      return `
+                        <label class="player-season-checkbox">
+                          <input
+                            type="checkbox"
+                            data-player-id="${player.id}"
+                            data-season-id="${season.id}"
+                            ${checked ? "checked" : ""}
+                            onchange="window.togglePlayerSeasonCheckbox(this)"
+                          />
+                          <span>${escapeHtml(season.name || season.id)}</span>
+                        </label>
+                      `;
+                    })
+                    .join("")}
+                </div>
+              </div>
+            `
+            }
+
+            <div class="small-meta">
+              Şifre: <strong>${escapeHtml(player.password || "1234")}</strong>
+              · ${predictionCount} kayıtlı tahmin
+            </div>
+
+            <div class="inline-actions compact wrap-actions">
+              ${
+                isAdminUser
+                  ? ""
+                  : `<button class="small secondary" onclick="togglePlayerSeasonParticipation('${player.id}', '${activeSeasonId}', this)">${isSeasonActive ? "Bu Sezonda Pasif Yap" : "Bu Sezonda Aktif Yap"}</button>`
+              }
+              <button class="small secondary" onclick="renamePlayer('${player.id}', this)">Adı Düzenle</button>
+              <button class="small secondary" onclick="changePlayerPassword('${player.id}', this)">Şifre Değiştir</button>
+              ${
+                isAdminUser
+                  ? ""
+                  : `<button class="small danger" onclick="removePlayer('${player.id}', this)">Sil</button>`
+              }
+            </div>
+          </div>
+        `;
+      })
+      .join("")}</div>`;
 }
+
 
 window.renamePlayer = async function (id, buttonOrEvent) {
   if (isReadOnlyMode())
@@ -4815,52 +5115,103 @@ function renderSeasons() {
   const container = document.getElementById("seasonTeamsList");
   const teams = getTeamsBySeasonId(seasonId);
   const season = getSeasonById(seasonId);
+  if (!container) return;
   if (!season) {
     container.innerHTML = createEmptyState("Önce bir sezon oluştur.");
     return;
   }
+
   const seasonRows = state.seasons
-    .map(
-      (item) => `
-    <div class="excel-list-row week-row">
-      <div>
-        <strong>${escapeHtml(item.name)}</strong>
-        <div class="small-meta">${escapeHtml(item.leagueName || "Lig belirtilmedi")}</div>
-      </div>
-      <span class="badge gray">${getTeamsBySeasonId(item.id).length} takım</span>
-      <div class="inline-actions compact">
-        <button class="small secondary" onclick="setActiveSeason('${item.id}')">Seç</button>
-        <button class="small danger" onclick="removeSeason('${item.id}')">Sil</button>
-      </div>
-    </div>
-  `,
-    )
+    .map((item) => {
+      const isActive = String(item.id) === String(seasonId);
+      return `
+        <div class="season-chip-card ${isActive ? "active" : ""}">
+          <div class="season-chip-main">
+            <div>
+              <strong>${escapeHtml(item.name)}</strong>
+              <div class="small-meta">${escapeHtml(item.leagueName || "Lig belirtilmedi")}${item.totalWeeks ? ` • ${item.totalWeeks} hafta` : ""}</div>
+            </div>
+            <span class="badge gray">${getTeamsBySeasonId(item.id).length} takım</span>
+          </div>
+          <div class="inline-actions compact season-chip-actions">
+            <button class="small ${isActive ? "" : "secondary"}" onclick="setActiveSeason('${item.id}')">${isActive ? "Seçili" : "Seç"}</button>
+            <button class="small danger" onclick="removeSeason('${item.id}')">Sil</button>
+          </div>
+        </div>
+      `;
+    })
     .join("");
+
   const teamRows = teams.length
     ? teams
-        .map(
-          (team) => `
-    <div class="excel-list-row player-row">
-      <div class="player-name-cell team-row-cell">${teamLogoHtml(team.name, seasonId)} <span>${escapeHtml(team.name)}</span></div>
-      <div class="small-meta">logo: ${escapeHtml(team.slug || "-")}</div>
-      <div class="inline-actions compact">
-        <button class="small secondary" onclick="renameSeasonTeam('${team.id}')">Düzenle</button>
-        <button class="small danger" onclick="removeSeasonTeam('${team.id}')">Sil</button>
-      </div>
-    </div>
-  `,
-        )
+        .map((team) => {
+          const logoValue = escapeHtml(team.slug || slugify(team.name));
+          return `
+            <article class="team-logo-card">
+              <div class="team-logo-card__top">
+                <div class="team-logo-card__identity">
+                  ${teamLogoHtml(team.name, seasonId, "team-logo-card__badge")}
+                  <div>
+                    <div class="team-logo-card__name">${escapeHtml(team.name)}</div>
+                    <div class="small-meta">Logo yolu: logos/${logoValue}.png</div>
+                  </div>
+                </div>
+              </div>
+              <div class="team-logo-card__editor">
+                <label class="field team-logo-card__field">
+                  <span>Logo dosya adı</span>
+                  <input
+                    type="text"
+                    id="teamSlugInput-${team.id}"
+                    value="${logoValue}"
+                    placeholder="örn: galatasaray"
+                    autocapitalize="off"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                </label>
+                <button class="small" onclick="saveSeasonTeamSlug('${team.id}')">Kaydet</button>
+              </div>
+            </article>
+          `;
+        })
         .join("")
-    : createEmptyState("Bu sezonda henüz takım yok.");
+    : createEmptyState("Bu sezonda henüz takım yok. Fikstürü çekince takımlar otomatik oluşur.");
 
   container.innerHTML = `
-    <div class="stack-actions">
-      <div class="excel-list season-list-scroll">${seasonRows}</div>
-      <div class="card-subtitle">${escapeHtml(season.name)} takımları</div>
-      <div class="excel-list team-list-scroll">${teamRows}</div>
+    <div class="seasons-overview-stack">
+      <div class="season-chip-grid">${seasonRows}</div>
+      <div class="season-teams-header-row">
+        <div>
+          <div class="card-subtitle">${escapeHtml(season.name)} takımları</div>
+          <div class="small-meta">Takım listesi API ile oluşur. Burada sadece logo dosya adını düzenlersin.</div>
+        </div>
+        <span class="badge gray">${teams.length} takım</span>
+      </div>
+      <div class="team-logo-grid">${teamRows}</div>
     </div>
   `;
 }
+
+window.saveSeasonTeamSlug = function (teamId) {
+  if (isReadOnlyMode())
+    return showAlert("Kullanıcı görünümünde takım düzenlenemez.", {
+      title: "Yetki yok",
+      type: "warning",
+    });
+  const team = getTeamById(teamId);
+  if (!team) return;
+  const input = document.getElementById(`teamSlugInput-${teamId}`);
+  const nextSlug = String(input?.value || "").trim() || slugify(team.name);
+  team.slug = nextSlug;
+  saveState();
+  renderSeasons();
+  hydrateTeamLogosIn(document.getElementById("seasonTeamsList"));
+  showAlert(`${team.name} logosu güncellendi.`, {
+    title: "Kayıt tamam",
+    type: "success",
+  });
+};
 
 window.removeSeason = async function (id) {
   if (isReadOnlyMode())
@@ -4948,19 +5299,29 @@ function renderWeeks() {
   const weeks = getWeeksBySeasonId(seasonId);
   if (!weeks.length)
     return (container.innerHTML = createEmptyState("Henüz hafta eklenmedi."));
+
   container.innerHTML = `<div class="excel-list week-list-scroll">${weeks
-    .map(
-      (week) => `
+    .map((week) => {
+      const status = inferWeekStatusFromMatches(week.id);
+      week.status = status;
+      const isActiveWeek = String(state.settings.activeWeekId) === String(week.id);
+      const statusBadge =
+        status === "tamamlandi"
+          ? `<span class="badge">✓</span>`
+          : isActiveWeek
+            ? `<span class="badge gray">Aktif Hafta</span>`
+            : `<span class="badge warn">Bekliyor</span>`;
+      return `
     <div class="excel-list-row week-row">
       <div><strong>${week.number}. Hafta</strong><div class="small-meta">${getMatchesByWeekId(week.id).length} maç</div></div>
-      <span class="badge ${week.status === "tamamlandi" ? "" : week.status === "hazirlaniyor" ? "warn" : "gray"}">${escapeHtml(week.status)}</span>
+      ${statusBadge}
       <div class="inline-actions compact">
         <button class="small secondary" onclick="setActiveWeek('${week.id}')">Aktif Yap</button>
         <button class="small secondary" onclick="changeWeekStatus('${week.id}')">Durum</button>
         <button class="small danger" onclick="removeWeek('${week.id}')">Sil</button>
       </div>
-    </div>`,
-    )
+    </div>`;
+    })
     .join("")}</div>`;
 }
 
@@ -5422,10 +5783,11 @@ const shareLogoImageCache = new Map();
 
 function getTeamLogoCandidateSources(teamName, seasonId = getActiveSeasonId()) {
   const team = getTeamMetaByName(teamName, seasonId);
-  const slug = team?.slug || DEFAULT_TEAM_SLUGS[teamName] || slugify(teamName);
-  const remoteCached = remoteTeamLogoUrlCache.get(normalizeTeamSearchToken(teamName)) || "";
+  const resolvedSlug = resolveTeamLogoSlug(teamName, team);
+  const remoteCached =
+    remoteTeamLogoUrlCache.get(normalizeTeamSearchToken(teamName)) || "";
   return [
-    slug ? `logos/${slug}.png` : "",
+    resolvedSlug ? `logos/${resolvedSlug}.png` : "",
     team?.logoUrl || "",
     team?.logo || "",
     team?.badge || "",
@@ -6043,6 +6405,19 @@ function renderPredictions() {
 
   const matches = getMatchesByWeekId(weekId);
   const players = getVisiblePlayersOrdered();
+  const currentPlayer = getCurrentPlayer();
+
+  if (
+    getCurrentRole() === "user" &&
+    currentPlayer &&
+    !isPlayerActiveInSeason(currentPlayer, getActiveSeasonId())
+  ) {
+    container.innerHTML = createEmptyState(
+      "Bu kullanıcı seçili sezonda pasif. Kişiler ekranından bu sezon için tekrar aktif edebilirsin.",
+    );
+    updatePredictionShareModeButton();
+    return;
+  }
 
   if (!matches.length || !players.length) {
     container.innerHTML = createEmptyState(
@@ -6808,10 +7183,9 @@ function renderMissingPredictions() {
   if (!weekId)
     return (container.innerHTML = createEmptyState("Önce aktif hafta seç."));
   const rows = [];
+  const seasonId = getWeekById(weekId)?.seasonId || getActiveSeasonId();
   getMatchesByWeekId(weekId).forEach((match) => {
-    state.players
-      .filter((player) => getPlayerRole(player) !== "admin")
-      .forEach((player) => {
+    getSeasonPlayers(seasonId).forEach((player) => {
         const pred = getPrediction(match.id, player.id);
         if (!pred || pred.homePred === "" || pred.awayPred === "")
           rows.push({
@@ -6839,9 +7213,7 @@ function getSortedSeasonMatches(seasonId = getActiveSeasonId()) {
 function getPlayerSeasonStats(seasonId = getActiveSeasonId()) {
   const seasonMatches = getSortedSeasonMatches(seasonId);
   const matchIdSet = new Set(seasonMatches.map((match) => String(match.id)));
-  const players = state.players.filter(
-    (player) => getPlayerRole(player) !== "admin",
-  );
+  const players = getSeasonPlayers(seasonId);
 
   return players
     .map((player) => {
@@ -7085,7 +7457,94 @@ window.celebrateChampion = function (seasonId, manual = false) {
   if (manual) showLeaderToast("Şampiyon kutlaması açıldı!");
 };
 
+
+function captureUiRestoreState() {
+  const active = document.activeElement;
+  const isPredictionInput = !!(
+    active &&
+    active.matches &&
+    active.matches('input[data-pred-role="input"]')
+  );
+  const predictionsContainer = document.getElementById("predictionsTable");
+  const predictionShell = predictionsContainer?.querySelector(
+    ".predictions-scroll-shell",
+  );
+  const state = {
+    windowScrollX: window.scrollX || window.pageXOffset || 0,
+    windowScrollY: window.scrollY || window.pageYOffset || 0,
+    activeId: active?.id || "",
+    activeValue: active?.value ?? "",
+    activeSelectionStart:
+      typeof active?.selectionStart === "number" ? active.selectionStart : null,
+    activeSelectionEnd:
+      typeof active?.selectionEnd === "number" ? active.selectionEnd : null,
+    predictionShellScrollLeft: predictionShell?.scrollLeft || 0,
+    predictionShellScrollTop: predictionShell?.scrollTop || 0,
+    isPredictionInput,
+  };
+
+  return state;
+}
+
+function restoreUiAfterRender(snapshot) {
+  if (!snapshot) return;
+
+  const applyRestore = () => {
+    window.scrollTo(snapshot.windowScrollX || 0, snapshot.windowScrollY || 0);
+
+    const predictionsContainer = document.getElementById("predictionsTable");
+    const predictionShell = predictionsContainer?.querySelector(
+      ".predictions-scroll-shell",
+    );
+
+    if (predictionShell) {
+      predictionShell.scrollLeft = snapshot.predictionShellScrollLeft || 0;
+      predictionShell.scrollTop = snapshot.predictionShellScrollTop || 0;
+    }
+
+    if (!snapshot.activeId) return;
+    const active = document.getElementById(snapshot.activeId);
+    if (!active) return;
+
+    if (
+      snapshot.isPredictionInput &&
+      active.matches &&
+      active.matches('input[data-pred-role="input"]') &&
+      document.activeElement !== active
+    ) {
+      try {
+        active.focus({ preventScroll: true });
+      } catch (error) {
+        active.focus();
+      }
+    }
+
+    if (typeof snapshot.activeValue !== "undefined" && active.value !== snapshot.activeValue) {
+      active.value = snapshot.activeValue;
+    }
+
+    if (
+      typeof snapshot.activeSelectionStart === "number" &&
+      typeof active.setSelectionRange === "function"
+    ) {
+      try {
+        active.setSelectionRange(
+          snapshot.activeSelectionStart,
+          snapshot.activeSelectionEnd ?? snapshot.activeSelectionStart,
+        );
+      } catch (error) {}
+    }
+  };
+
+  requestAnimationFrame(() => {
+    applyRestore();
+    requestAnimationFrame(applyRestore);
+  });
+}
+
 function renderAll() {
+  const uiSnapshot = captureUiRestoreState();
+
   ensureActiveSelections();
   recalculateAllPoints();
   saveState(true);
@@ -7114,6 +7573,8 @@ function renderAll() {
   applyRolePermissions();
   ensureHeaderSyncButtons();
   updateNavSelection(state.settings.currentTab || "dashboard");
+
+  restoreUiAfterRender(uiSnapshot);
 }
 
 function addSeason() {
@@ -7129,17 +7590,49 @@ function addSeason() {
       title: "Eksik bilgi",
       type: "warning",
     });
-  if (state.seasons.some((s) => s.name === name))
+  const normalizedSeasonName = normalizeText(name);
+  if (state.seasons.some((s) => normalizeText(s.name) === normalizedSeasonName))
     return showAlert("Bu sezon zaten var.", {
       title: "Tekrarlayan kayıt",
       type: "warning",
     });
+  const previousSeasonId = getActiveSeasonId();
   const seasonId = uid("season");
   state.seasons.push({ id: seasonId, name, leagueName });
+  const nextMembershipsByPlayer = buildSeasonMembershipsFromSourceSeason(
+    previousSeasonId,
+    seasonId,
+  );
+  state.players = state.players.map((player) => {
+    if (getPlayerRole(player) === "admin") return player;
+    const mergedMemberships =
+      nextMembershipsByPlayer[String(player.id)] ||
+      getPlayerSeasonMemberships(player);
+    return {
+      ...player,
+      seasonMemberships: mergedMemberships,
+    };
+  });
   state.settings.activeSeasonId = seasonId;
   state.settings.activeWeekId = null;
   document.getElementById("seasonName").value = "";
   saveState();
+  if (useOnlineMode) {
+    Promise.allSettled(
+      state.players
+        .filter((player) => getPlayerRole(player) !== "admin")
+        .map((player) =>
+          updateOnlineUser({
+            id: player.id,
+            seasonMemberships: normalizeSeasonMemberships(
+              player.seasonMemberships,
+            ),
+          }),
+        ),
+    ).catch((error) => {
+      console.warn("Sezon katılım kopyalama uyarısı:", error);
+    });
+  }
   renderAll();
 }
 
@@ -7264,6 +7757,7 @@ function addPlayer(buttonOrEvent) {
       id: `player-${slugify(name) || "oyuncu"}`,
       name: name.toUpperCase(),
       password,
+      seasonMemberships: getActiveSeasonId() ? { [String(getActiveSeasonId())]: true } : {},
     };
 
   if (useOnlineMode) {
@@ -7289,6 +7783,7 @@ async function addUserOnline(player, actionButton = null) {
       kullaniciAdi: normalizeLoginName(player.name),
       sifre: player.password || "1234",
       adSoyad: player.name,
+      seasonMemberships: normalizeSeasonMemberships(player.seasonMemberships),
     });
 
     if (!result?.success) {
@@ -7417,19 +7912,38 @@ function switchTab(tabName) {
     ["players", "backup", "seasons", "weeks", "matches"].includes(tabName)
   )
     tabName = "dashboard";
+
   state.settings.currentTab = tabName;
   closeMobileAdminMenu();
   updateNavSelection(tabName);
   ensureHeaderSyncButtons();
+
   document
     .querySelectorAll(".tab-panel")
     .forEach((panel) =>
       panel.classList.toggle("active", panel.id === `tab-${tabName}`),
     );
+
   if (tabName === "stats") {
     triggerStatsCelebration();
   }
+
   closeLandscapeSidebar();
+
+  // Tahminler sayfası hariç, sekme değişince sayfayı en üste al
+  if (tabName !== "predictions") {
+    requestAnimationFrame(() => {
+      window.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: "auto",
+      });
+
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    });
+  }
+
   saveState(true);
 }
 
@@ -7514,8 +8028,7 @@ function buildWeekCsv(weekId) {
   const season = getSeasonById(week.seasonId);
   const matches = getMatchesByWeekId(weekId);
 
-  const orderedPlayers = [...state.players]
-    .filter((player) => getPlayerRole(player) !== "admin")
+  const orderedPlayers = [...getSeasonPlayers(week.seasonId)]
     .sort((a, b) =>
       String(a.name || "").localeCompare(String(b.name || ""), "tr"),
     );
@@ -7603,6 +8116,7 @@ async function syncBackupStateToFirebase(stateObj) {
       adSoyad: String(player.name || player.username || id).trim().toUpperCase(),
       rol: getPlayerRole(player) === "admin" ? "admin" : "user",
       aktif: true,
+      seasonMemberships: normalizeSeasonMemberships(player.seasonMemberships),
       importedAt: stamp,
     };
   });
@@ -8015,11 +8529,19 @@ async function fetchRoundEvents(seasonLabel, weekNumber) {
   return (data.events || []).map(parseApiEvent).filter(Boolean);
 }
 
+function isMatchDatePast(match) {
+  if (!match?.date) return false;
+  const matchTime = new Date(match.date).getTime();
+  return Number.isFinite(matchTime) && matchTime <= Date.now();
+}
+
 function inferWeekStatusFromMatches(weekId) {
   const matches = getMatchesByWeekId(weekId);
   if (!matches.length) return "hazirlaniyor";
-  if (matches.every((match) => match.played)) return "tamamlandi";
-  return "aktif";
+  const allFinished = matches.every((match) => match.played || isMatchDatePast(match));
+  if (allFinished) return "tamamlandi";
+  if (String(state.settings.activeWeekId) === String(weekId)) return "aktif";
+  return "hazirlaniyor";
 }
 
 function syncWeekStatus(weekId) {
@@ -8231,11 +8753,29 @@ async function importFixturesFromApi(updateResultsOnly = false) {
       title: "Eksik bilgi",
       type: "warning",
     });
-  const status = document.getElementById("apiStatus");
+  const status =
+    document.getElementById("weekApiStatus") ||
+    document.getElementById("apiStatus") ||
+    { textContent: "" };
   status.textContent = "API verisi çekiliyor...";
   try {
     const events = await fetchSeasonEvents(seasonLabel);
     if (!events.length) throw new Error("Bu sezon için etkinlik bulunamadı.");
+    const detectedWeekNumbers = events
+      .map((event) => Number(event.weekNumber || 0))
+      .filter((value) => value > 0);
+    const maxWeekNumber = detectedWeekNumbers.length
+      ? Math.max(...detectedWeekNumbers)
+      : 0;
+    const season = getSeasonById(seasonId);
+    if (season && maxWeekNumber) season.totalWeeks = maxWeekNumber;
+
+    const touchedWeekIds = new Set();
+    for (let weekNumber = 1; weekNumber <= maxWeekNumber; weekNumber += 1) {
+      const ensuredWeek = ensureWeekForSeason(seasonId, weekNumber);
+      if (ensuredWeek?.id) touchedWeekIds.add(ensuredWeek.id);
+    }
+
     const teamNames = [
       ...new Set(events.flatMap((e) => [e.homeTeam, e.awayTeam])),
     ];
@@ -8250,7 +8790,6 @@ async function importFixturesFromApi(updateResultsOnly = false) {
       }
     });
 
-    const touchedWeekIds = new Set();
     let movedCount = 0;
 
     events.forEach((event) => {
@@ -8314,7 +8853,7 @@ async function importFixturesFromApi(updateResultsOnly = false) {
     }
     status.textContent = updateResultsOnly
       ? `Sezondaki tarih/saat ve skor verileri güncellendi${movedCount ? `, ${movedCount} ertelenen maç taşındı` : ""}${sheetSyncResult?.success ? `, Sheets senkronu tamamlandı` : ", Sheets yanıtı gecikti ama yerel güncelleme tamamlandı"}.`
-      : `Sezonun tüm haftaları ve maçları API üzerinden içeri aktarıldı${movedCount ? `, ${movedCount} ertelenen maç doğru haftaya taşındı` : ""}${sheetSyncResult?.success ? `, Sheets senkronu tamamlandı` : ", Sheets yanıtı gecikti ama yerel güncelleme tamamlandı"}.`;
+      : `Sezonun tüm haftaları, maçları ve skorları API üzerinden içeri aktarıldı${movedCount ? `, ${movedCount} ertelenen maç doğru haftaya taşındı` : ""}${sheetSyncResult?.success ? `, Sheets senkronu tamamlandı` : ", Sheets yanıtı gecikti ama yerel güncelleme tamamlandı"}.`;
     recordAdminSyncActivity({
       lastAction: updateResultsOnly
         ? "Sezon skor ve saat verileri güncellendi."
@@ -8597,6 +9136,7 @@ function bindEvents() {
   on("exportFullBackupBtn", "click", exportFullBackup);
   on("apiImportFixturesBtn", "click", () => importFixturesFromApi(false));
   on("apiUpdateResultsBtn", "click", () => importFixturesFromApi(true));
+  on("apiImportSeasonWeeksBtn", "click", () => importFixturesFromApi(false));
   on("apiSyncWeekBtn", "click", syncSelectedWeekFromApi);
   on("dashboardSyncWeekBtn", "click", syncDashboardWeek);
   on("dashboardSyncSeasonBtn", "click", syncDashboardSeason);
@@ -8753,3 +9293,32 @@ window.toggleFirebaseAdminCard = toggleFirebaseAdminCard;
 window.toggleDashboardSyncCard = toggleDashboardSyncCard;
 window.toggleAdminSyncOverview = toggleAdminSyncOverview;
 window.handleTeamLogoError = handleTeamLogoError;
+window.togglePlayerSeasonCheckbox = async function (el) {
+  const playerId = String(el?.dataset?.playerId || "");
+  const seasonId = String(el?.dataset?.seasonId || "");
+  const checked = !!el?.checked;
+
+  if (!playerId || !seasonId) return;
+
+  const player = getPlayerById(playerId);
+  if (!player) return;
+
+  const memberships = getPlayerSeasonMemberships(player);
+  const nextMemberships = {
+    ...memberships,
+    [seasonId]: checked,
+  };
+
+  const result = await persistPlayerSeasonMembership(playerId, nextMemberships);
+
+  if (!result?.success) {
+    showAlert(result?.message || "Sezon katılımı güncellenemedi.", {
+      title: "Kayıt Hatası",
+      type: "warning",
+    });
+    el.checked = isPlayerActiveInSeason(player, seasonId);
+    return;
+  }
+
+  renderAll();
+};
