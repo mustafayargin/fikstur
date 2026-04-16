@@ -144,9 +144,7 @@ async function ensureFirebaseDefaults() {
       createdAt: new Date().toISOString(),
       defaultUsersSeeded: true,
       structure: {
-        seasons: [],
-        weeks: [],
-        teams: [],
+        seasons: {},
         activeSeasonId: null,
         activeWeekId: null,
         updatedAt: new Date().toISOString(),
@@ -791,6 +789,198 @@ function debounceFirebaseRealtimeRender() {
   }, 180);
 }
 
+function buildStructureSnapshot() {
+  const seasonMap = {};
+  state.seasons.forEach((season) => {
+    const teams = getTeamsBySeasonId(season.id).map((team) => ({
+      id: team.id,
+      name: team.name,
+      slug: team.slug || slugify(team.name),
+    }));
+    const weeks = getWeeksBySeasonId(season.id).map((week) => ({
+      id: week.id,
+      number: Number(week.number) || 0,
+      status: week.status || inferWeekStatusFromMatches(week.id) || "aktif",
+    }));
+    seasonMap[sanitizeFirebaseKey(season.id)] = {
+      id: season.id,
+      name: season.name,
+      leagueName: season.leagueName || "",
+      teams,
+      weeks,
+    };
+  });
+
+  return {
+    seasons: seasonMap,
+    activeSeasonId: state.settings.activeSeasonId || null,
+    activeWeekId: state.settings.activeWeekId || null,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function hydrateStructureIntoLocalState(structure = null) {
+  if (!structure || typeof structure !== "object") return false;
+
+  const remoteSeasonsMap = structure.seasons || {};
+  const remoteSeasons = Object.values(remoteSeasonsMap).filter(Boolean);
+  let changed = false;
+
+  remoteSeasons.forEach((remoteSeason) => {
+    if (!remoteSeason?.id || !remoteSeason?.name) return;
+
+    let localSeason = getSeasonById(remoteSeason.id);
+    if (!localSeason) {
+      localSeason = {
+        id: remoteSeason.id,
+        name: remoteSeason.name,
+        leagueName: remoteSeason.leagueName || "",
+      };
+      state.seasons.push(localSeason);
+      changed = true;
+    } else {
+      if (localSeason.name !== remoteSeason.name) {
+        localSeason.name = remoteSeason.name;
+        changed = true;
+      }
+      if ((localSeason.leagueName || "") !== (remoteSeason.leagueName || "")) {
+        localSeason.leagueName = remoteSeason.leagueName || "";
+        changed = true;
+      }
+    }
+
+    const remoteTeams = Array.isArray(remoteSeason.teams) ? remoteSeason.teams : [];
+    remoteTeams.forEach((remoteTeam) => {
+      if (!remoteTeam?.id || !remoteTeam?.name) return;
+      const existingTeam = getTeamById(remoteTeam.id);
+      if (!existingTeam) {
+        state.teams.push({
+          id: remoteTeam.id,
+          seasonId: remoteSeason.id,
+          name: remoteTeam.name,
+          slug: remoteTeam.slug || slugify(remoteTeam.name),
+        });
+        changed = true;
+        return;
+      }
+      if (existingTeam.seasonId !== remoteSeason.id) {
+        existingTeam.seasonId = remoteSeason.id;
+        changed = true;
+      }
+      if (existingTeam.name !== remoteTeam.name) {
+        existingTeam.name = remoteTeam.name;
+        changed = true;
+      }
+      if ((existingTeam.slug || "") !== (remoteTeam.slug || slugify(remoteTeam.name))) {
+        existingTeam.slug = remoteTeam.slug || slugify(remoteTeam.name);
+        changed = true;
+      }
+    });
+
+    const remoteWeeks = Array.isArray(remoteSeason.weeks) ? remoteSeason.weeks : [];
+    remoteWeeks.forEach((remoteWeek) => {
+      if (!remoteWeek?.id || !remoteWeek?.number) return;
+      const existingWeek = getWeekById(remoteWeek.id);
+      if (!existingWeek) {
+        state.weeks.push({
+          id: remoteWeek.id,
+          seasonId: remoteSeason.id,
+          number: Number(remoteWeek.number) || 0,
+          status: remoteWeek.status || "aktif",
+        });
+        changed = true;
+        return;
+      }
+      if (existingWeek.seasonId !== remoteSeason.id) {
+        existingWeek.seasonId = remoteSeason.id;
+        changed = true;
+      }
+      if (Number(existingWeek.number) !== Number(remoteWeek.number)) {
+        existingWeek.number = Number(remoteWeek.number) || 0;
+        changed = true;
+      }
+      if ((existingWeek.status || "") !== (remoteWeek.status || "aktif")) {
+        existingWeek.status = remoteWeek.status || "aktif";
+        changed = true;
+      }
+    });
+  });
+
+  const remoteSeasonIds = new Set(remoteSeasons.map((season) => String(season.id)));
+  const localSeasonIdsWithMatches = new Set(state.matches.map((match) => String(match.seasonId)));
+
+  const beforeSeasonCount = state.seasons.length;
+  state.seasons = state.seasons.filter((season) => {
+    const seasonId = String(season.id);
+    if (remoteSeasonIds.has(seasonId)) return true;
+    return localSeasonIdsWithMatches.has(seasonId);
+  });
+  if (state.seasons.length !== beforeSeasonCount) changed = true;
+
+  const allowedSeasonIds = new Set(state.seasons.map((season) => String(season.id)));
+
+  const beforeWeekCount = state.weeks.length;
+  state.weeks = state.weeks.filter((week) => {
+    const seasonId = String(week.seasonId);
+    if (!allowedSeasonIds.has(seasonId)) return false;
+    const seasonEntry = remoteSeasons.find((item) => String(item.id) === seasonId);
+    if (!seasonEntry) return true;
+    const remoteWeekIds = new Set((Array.isArray(seasonEntry.weeks) ? seasonEntry.weeks : []).map((item) => String(item.id)));
+    const weekHasMatch = state.matches.some((match) => String(match.weekId) === String(week.id));
+    return remoteWeekIds.has(String(week.id)) || weekHasMatch;
+  });
+  if (state.weeks.length != beforeWeekCount) changed = true;
+
+  const beforeTeamCount = state.teams.length;
+  state.teams = state.teams.filter((team) => {
+    const seasonId = String(team.seasonId);
+    if (!allowedSeasonIds.has(seasonId)) return false;
+    const seasonEntry = remoteSeasons.find((item) => String(item.id) === seasonId);
+    if (!seasonEntry) return true;
+    const remoteTeamIds = new Set((Array.isArray(seasonEntry.teams) ? seasonEntry.teams : []).map((item) => String(item.id)));
+    const teamHasMatch = state.matches.some((match) => String(match.seasonId) === seasonId && (normalizeText(match.homeTeam) === normalizeText(team.name) || normalizeText(match.awayTeam) === normalizeText(team.name)));
+    return remoteTeamIds.has(String(team.id)) || teamHasMatch;
+  });
+  if (state.teams.length != beforeTeamCount) changed = true;
+
+  if (Object.prototype.hasOwnProperty.call(structure, "activeSeasonId")) {
+    const nextActiveSeasonId = structure.activeSeasonId || null;
+    if (state.settings.activeSeasonId !== nextActiveSeasonId) {
+      state.settings.activeSeasonId = nextActiveSeasonId;
+      changed = true;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(structure, "activeWeekId")) {
+    const nextActiveWeekId = structure.activeWeekId || null;
+    if (state.settings.activeWeekId !== nextActiveWeekId) {
+      state.settings.activeWeekId = nextActiveWeekId;
+      changed = true;
+    }
+  }
+
+  ensureActiveSelections();
+  return changed;
+}
+
+async function syncStructureToFirebase() {
+  if (!useOnlineMode || !isFirebaseReady()) return false;
+  await firebaseUpdate("settings", {
+    structure: buildStructureSnapshot(),
+    source: "firebase",
+    updatedAt: new Date().toISOString(),
+  });
+  return true;
+}
+
+async function hydrateStructureFromFirebase() {
+  if (!isFirebaseReady()) return false;
+  const settings = (await firebaseRead("settings")) || {};
+  const changed = hydrateStructureIntoLocalState(settings.structure || null);
+  if (changed) saveState();
+  return changed;
+}
+
 async function hydrateFromFirebaseRealtime(source = "manual") {
   if (!isFirebaseReady()) return false;
   if (firebaseRealtimeHydrationPromise) return firebaseRealtimeHydrationPromise;
@@ -798,8 +988,6 @@ async function hydrateFromFirebaseRealtime(source = "manual") {
   firebaseRealtimeHydrationPromise = (async () => {
     try {
       await ensureFirebaseDefaults();
-      const remoteSettings = (await firebaseRead("settings")) || {};
-      applyStructureMetadataFromSettings(remoteSettings);
       await syncUsersFromSheet({ silent: true });
       await syncOnlineMatchesFromSheet({
         silent: true,
@@ -813,7 +1001,7 @@ async function hydrateFromFirebaseRealtime(source = "manual") {
         seasonLabel: "",
         weekNumber: "",
       });
-      applyStructureMetadataFromSettings(remoteSettings);
+      await hydrateStructureFromFirebase();
       if (isAuthenticated()) startPresenceTracking();
       recordAdminSyncActivity({
         lastAction: `Canlı ${getOnlineSourceLabel()} verisi alındı (${source}).`,
@@ -2763,6 +2951,8 @@ async function hydrateOnlineStateForSession(options = {}) {
       });
     }
 
+    await hydrateStructureFromFirebase();
+
     if (updateLoadingUi) {
       setAppLoadingCheck("matches", "done", "Maç verileri hazır");
       setAppLoading(true, {
@@ -3542,119 +3732,6 @@ function createInitialState() {
   };
 }
 
-function buildStructureMetadataFromState() {
-  return {
-    seasons: (state.seasons || []).map((season) => ({
-      id: String(season.id || ""),
-      name: String(season.name || "").trim(),
-      leagueName: String(season.leagueName || "").trim(),
-    })).filter((season) => season.id && season.name),
-    weeks: (state.weeks || []).map((week) => ({
-      id: String(week.id || ""),
-      seasonId: String(week.seasonId || ""),
-      number: Number(week.number || 0),
-      status: String(week.status || "hazirlaniyor"),
-    })).filter((week) => week.id && week.seasonId && week.number),
-    teams: (state.teams || []).map((team) => ({
-      id: String(team.id || ""),
-      seasonId: String(team.seasonId || ""),
-      name: String(team.name || "").trim(),
-      slug: String(team.slug || "").trim(),
-    })).filter((team) => team.id && team.seasonId && team.name),
-    activeSeasonId: state.settings?.activeSeasonId || null,
-    activeWeekId: state.settings?.activeWeekId || null,
-    updatedAt: new Date().toISOString(),
-  };
-}
-
-function applyStructureMetadataFromSettings(settingsValue) {
-  const structure = settingsValue?.structure || settingsValue?.structureMeta || null;
-  if (!structure || typeof structure !== "object") return false;
-
-  const seasonMap = new Map((state.seasons || []).map((item) => [String(item.id), item]));
-  const nextSeasons = [];
-  (Array.isArray(structure.seasons) ? structure.seasons : []).forEach((season) => {
-    const id = String(season?.id || "").trim();
-    const name = String(season?.name || "").trim();
-    if (!id || !name) return;
-    const existing = seasonMap.get(id) || {};
-    nextSeasons.push({
-      ...existing,
-      id,
-      name,
-      leagueName: String(season?.leagueName || existing.leagueName || "").trim(),
-    });
-  });
-  if (nextSeasons.length) {
-    const seen = new Set(nextSeasons.map((item) => String(item.id)));
-    state.seasons = [...nextSeasons, ...(state.seasons || []).filter((item) => !seen.has(String(item.id)))];
-  }
-
-  const weekMap = new Map((state.weeks || []).map((item) => [String(item.id), item]));
-  const nextWeeks = [];
-  (Array.isArray(structure.weeks) ? structure.weeks : []).forEach((week) => {
-    const id = String(week?.id || "").trim();
-    const seasonId = String(week?.seasonId || "").trim();
-    const number = Number(week?.number || 0);
-    if (!id || !seasonId || !number) return;
-    const existing = weekMap.get(id) || {};
-    nextWeeks.push({
-      ...existing,
-      id,
-      seasonId,
-      number,
-      status: String(week?.status || existing.status || "hazirlaniyor"),
-    });
-  });
-  if (nextWeeks.length) {
-    const seen = new Set(nextWeeks.map((item) => String(item.id)));
-    state.weeks = [...nextWeeks, ...(state.weeks || []).filter((item) => !seen.has(String(item.id)))];
-  }
-
-  const teamMap = new Map((state.teams || []).map((item) => [String(item.id), item]));
-  const nextTeams = [];
-  (Array.isArray(structure.teams) ? structure.teams : []).forEach((team) => {
-    const id = String(team?.id || "").trim();
-    const seasonId = String(team?.seasonId || "").trim();
-    const name = String(team?.name || "").trim();
-    if (!id || !seasonId || !name) return;
-    const existing = teamMap.get(id) || {};
-    nextTeams.push({
-      ...existing,
-      id,
-      seasonId,
-      name,
-      slug: String(team?.slug || existing.slug || slugify(name)),
-    });
-  });
-  if (nextTeams.length) {
-    const seen = new Set(nextTeams.map((item) => String(item.id)));
-    state.teams = [...nextTeams, ...(state.teams || []).filter((item) => !seen.has(String(item.id)))];
-  }
-
-  const remoteActiveSeasonId = structure.activeSeasonId ? String(structure.activeSeasonId) : "";
-  const remoteActiveWeekId = structure.activeWeekId ? String(structure.activeWeekId) : "";
-  if (remoteActiveSeasonId && state.seasons.some((item) => String(item.id) === remoteActiveSeasonId)) {
-    state.settings.activeSeasonId = remoteActiveSeasonId;
-  }
-  if (remoteActiveWeekId && state.weeks.some((item) => String(item.id) === remoteActiveWeekId)) {
-    state.settings.activeWeekId = remoteActiveWeekId;
-  }
-
-  ensureActiveSelections();
-  return true;
-}
-
-async function syncStructureMetadataToFirebase() {
-  if (!useOnlineMode || !isFirebaseReady()) return false;
-  await firebaseUpdate("settings", {
-    structure: buildStructureMetadataFromState(),
-    source: "firebase",
-    lastStructureSyncAt: new Date().toISOString(),
-  });
-  return true;
-}
-
 function ensureDefaultSeason(stateObj) {
   if (!stateObj.settings) stateObj.settings = {};
   if (!Array.isArray(stateObj.seasons)) stateObj.seasons = [];
@@ -3943,12 +4020,12 @@ async function setActiveSeason(seasonId) {
   const firstWeek = getWeeksBySeasonId(seasonId)[0];
   state.settings.activeWeekId = firstWeek?.id || null;
   saveState();
+  renderAll();
   if (useOnlineMode) {
-    syncStructureMetadataToFirebase().catch((error) => {
-      console.warn("Takım metadatası Firebase'e yazılamadı:", error);
+    await syncStructureToFirebase().catch((error) => {
+      console.warn("Aktif sezon Firebase'e yazılamadı:", error);
     });
   }
-  renderAll();
   await syncOnlinePredictions({
     seasonId,
     weekId: state.settings.activeWeekId,
@@ -3960,12 +4037,12 @@ async function setActiveWeek(weekId) {
   const week = getWeekById(weekId);
   if (week?.seasonId) state.settings.activeSeasonId = week.seasonId;
   saveState();
+  renderAll();
   if (useOnlineMode) {
-    syncStructureMetadataToFirebase().catch((error) => {
-      console.warn("Hafta metadatası Firebase'e yazılamadı:", error);
+    await syncStructureToFirebase().catch((error) => {
+      console.warn("Aktif hafta Firebase'e yazılamadı:", error);
     });
   }
-  renderAll();
   await syncOnlinePredictions({
     seasonId: state.settings.activeSeasonId,
     weekId,
@@ -5119,11 +5196,6 @@ window.renamePlayer = async function (id, buttonOrEvent) {
 
   player.name = name.trim().toUpperCase();
   saveState();
-  if (useOnlineMode) {
-    syncStructureMetadataToFirebase().catch((error) => {
-      console.warn("Sezon silme metadatası Firebase'e yazılamadı:", error);
-    });
-  }
   renderAll();
   setAsyncButtonState(actionButton, "success", { success: "Kaydedildi" });
 };
@@ -5345,8 +5417,8 @@ window.saveSeasonTeamSlug = function (teamId) {
   team.slug = nextSlug;
   saveState();
   if (useOnlineMode) {
-    syncStructureMetadataToFirebase().catch((error) => {
-      console.warn("Takım logo metadatası Firebase'e yazılamadı:", error);
+    syncStructureToFirebase().catch((error) => {
+      console.warn("Logo yapısı Firebase'e yazılamadı:", error);
     });
   }
   renderSeasons();
@@ -5368,31 +5440,94 @@ window.removeSeason = async function (id) {
   if (!season) return;
   if (
     !(await showConfirm(
-      `${season.name} sezonunu ve içindeki tüm hafta, maç, takım verilerini silmek istiyor musun?`,
+      `${season.name} sezonunu ve içindeki tüm hafta, maç, takım, tahmin verilerini komple silmek istiyor musun?`,
       { title: "Sezon silinsin mi?", type: "danger", confirmText: "Sil" },
     ))
   )
     return;
-  const weekIds = getWeeksBySeasonId(id).map((w) => w.id);
-  const matchIds = getMatchesBySeasonId(id).map((m) => m.id);
-  state.seasons = state.seasons.filter((s) => s.id !== id);
-  state.teams = state.teams.filter((t) => t.seasonId !== id);
-  state.weeks = state.weeks.filter((w) => w.seasonId !== id);
-  state.matches = state.matches.filter((m) => m.seasonId !== id);
-  state.predictions = state.predictions.filter(
-    (p) => !matchIds.includes(p.matchId),
-  );
-  delete state.settings.celebratedChampions[id];
-  state.settings.activeSeasonId = state.seasons[0]?.id || null;
-  state.settings.activeWeekId =
-    getWeeksBySeasonId(state.settings.activeSeasonId)[0]?.id || null;
-  saveState();
-  if (useOnlineMode) {
-    syncStructureMetadataToFirebase().catch((error) => {
-      console.warn("Sezon silme metadatası Firebase'e yazılamadı:", error);
+
+  const weekIds = getWeeksBySeasonId(id).map((w) => String(w.id));
+  const localMatchIds = getMatchesBySeasonId(id).map((m) => String(m.id));
+
+  try {
+    if (useOnlineMode && isFirebaseReady()) {
+      const matchesMap = (await firebaseRead("matches")) || {};
+      const predictionsMap = (await firebaseRead("predictions")) || {};
+      const remoteMatches = firebaseSnapshotToArray(matchesMap);
+      const remotePredictions = firebaseSnapshotToArray(predictionsMap);
+
+      const remoteMatchRecordsToDelete = remoteMatches.filter((item) => {
+        const remoteSeasonLabel = String(item.season ?? item.sezon ?? "").trim();
+        const sameSeasonLabel = normalizeText(remoteSeasonLabel) === normalizeText(season.name);
+        const sameMatchById = localMatchIds.includes(String(item.id ?? ""));
+        const sameMatchBySheetId = getMatchesBySeasonId(id).some(
+          (m) =>
+            String(m.sheetMatchId ?? m.remoteMatchId ?? m.macId ?? "") !== "" &&
+            String(m.sheetMatchId ?? m.remoteMatchId ?? m.macId ?? "") ===
+              String(item.id ?? item.sheetMatchId ?? item.macId ?? ""),
+        );
+        return sameSeasonLabel || sameMatchById || sameMatchBySheetId;
+      });
+
+      const remoteMatchIdsToDelete = remoteMatchRecordsToDelete.map((item) =>
+        String(item.id ?? ""),
+      );
+
+      const remotePredictionRecordsToDelete = remotePredictions.filter((pred) =>
+        remoteMatchIdsToDelete.includes(String(pred.matchId ?? "")),
+      );
+
+      for (const match of remoteMatchRecordsToDelete) {
+        await firebaseRemove(`matches/${sanitizeFirebaseKey(match.id)}`);
+      }
+
+      for (const pred of remotePredictionRecordsToDelete) {
+        const predKey = sanitizeFirebaseKey(
+          pred.id || makePredictionRecordId(pred.matchId, pred.playerId),
+        );
+        await firebaseRemove(`predictions/${predKey}`);
+      }
+    }
+
+    state.seasons = state.seasons.filter((s) => s.id !== id);
+    state.teams = state.teams.filter((t) => t.seasonId !== id);
+    state.weeks = state.weeks.filter((w) => w.seasonId !== id);
+    state.matches = state.matches.filter((m) => m.seasonId !== id);
+    state.predictions = state.predictions.filter(
+      (p) => !localMatchIds.includes(String(p.matchId)),
+    );
+    delete state.settings.celebratedChampions[id];
+    if (String(state.settings.activeSeasonId) === String(id)) {
+      state.settings.activeSeasonId = state.seasons[0]?.id || null;
+    }
+    if (weekIds.includes(String(state.settings.activeWeekId))) {
+      state.settings.activeWeekId =
+        getWeeksBySeasonId(state.settings.activeSeasonId)[0]?.id || null;
+    }
+
+    ensureActiveSelections();
+    saveState();
+    if (useOnlineMode) {
+      await syncStructureToFirebase().catch((error) => {
+        console.warn("Sezon yapısı Firebase'den temizlenemedi:", error);
+      });
+    }
+    renderAll();
+
+    showAlert(`${season.name} sezonu ve bağlı tüm veriler silindi.`, {
+      title: "Silme tamamlandı",
+      type: "success",
     });
+  } catch (error) {
+    console.error("Sezon silme hatası:", error);
+    showAlert(
+      error?.message || "Sezon Firebase üzerinden tam olarak silinemedi.",
+      {
+        title: "Silme hatası",
+        type: "error",
+      },
+    );
   }
-  renderAll();
 };
 
 window.renameSeasonTeam = async function (teamId) {
@@ -5416,8 +5551,8 @@ window.renameSeasonTeam = async function (teamId) {
   team.slug = (slug || slugify(name)).trim();
   saveState();
   if (useOnlineMode) {
-    syncStructureMetadataToFirebase().catch((error) => {
-      console.warn("Takım düzenleme metadatası Firebase'e yazılamadı:", error);
+    syncStructureToFirebase().catch((error) => {
+      console.warn("Takım adı Firebase'e yazılamadı:", error);
     });
   }
   renderAll();
@@ -5445,8 +5580,8 @@ window.removeSeasonTeam = async function (teamId) {
   state.teams = state.teams.filter((t) => t.id !== teamId);
   saveState();
   if (useOnlineMode) {
-    syncStructureMetadataToFirebase().catch((error) => {
-      console.warn("Takım silme metadatası Firebase'e yazılamadı:", error);
+    syncStructureToFirebase().catch((error) => {
+      console.warn("Takım silme Firebase'e yazılamadı:", error);
     });
   }
   renderAll();
@@ -5508,7 +5643,7 @@ window.changeWeekStatus = async function (id) {
   week.status = status;
   saveState();
   if (useOnlineMode) {
-    syncStructureMetadataToFirebase().catch((error) => {
+    syncStructureToFirebase().catch((error) => {
       console.warn("Hafta durumu Firebase'e yazılamadı:", error);
     });
   }
@@ -5600,7 +5735,9 @@ window.removeWeek = async function (id) {
 
     saveState();
     if (useOnlineMode) {
-      await syncStructureMetadataToFirebase();
+      await syncStructureToFirebase().catch((error) => {
+        console.warn("Hafta yapısı Firebase'den temizlenemedi:", error);
+      });
     }
     renderAll();
 
@@ -7785,10 +7922,9 @@ function addSeason() {
   document.getElementById("seasonName").value = "";
   saveState();
   if (useOnlineMode) {
-    syncStructureMetadataToFirebase().catch((error) => {
-      console.warn("Sezon metadatası Firebase'e yazılamadı:", error);
+    syncStructureToFirebase().catch((error) => {
+      console.warn("Sezon yapısı Firebase'e yazılamadı:", error);
     });
-
     Promise.allSettled(
       state.players
         .filter((player) => getPlayerRole(player) !== "admin")
@@ -7841,8 +7977,8 @@ function addSeasonTeam() {
   document.getElementById("seasonTeamSlug").value = "";
   saveState();
   if (useOnlineMode) {
-    syncStructureMetadataToFirebase().catch((error) => {
-      console.warn("Takım metadatası Firebase'e yazılamadı:", error);
+    syncStructureToFirebase().catch((error) => {
+      console.warn("Takım yapısı Firebase'e yazılamadı:", error);
     });
   }
   renderAll();
@@ -8020,8 +8156,8 @@ function addWeek() {
   document.getElementById("weekNumber").value = "";
   saveState();
   if (useOnlineMode) {
-    syncStructureMetadataToFirebase().catch((error) => {
-      console.warn("Hafta metadatası Firebase'e yazılamadı:", error);
+    syncStructureToFirebase().catch((error) => {
+      console.warn("Hafta yapısı Firebase'e yazılamadı:", error);
     });
   }
   renderAll();
@@ -8354,28 +8490,6 @@ async function syncBackupStateToFirebase(stateObj) {
       source: "firebase",
       lastImportAt: stamp,
       backupVersion: 1,
-      structure: {
-        seasons: (safeState.seasons || []).map((season) => ({
-          id: String(season.id || ""),
-          name: String(season.name || "").trim(),
-          leagueName: String(season.leagueName || "").trim(),
-        })).filter((season) => season.id && season.name),
-        weeks: (safeState.weeks || []).map((week) => ({
-          id: String(week.id || ""),
-          seasonId: String(week.seasonId || ""),
-          number: Number(week.number || 0),
-          status: String(week.status || "hazirlaniyor"),
-        })).filter((week) => week.id && week.seasonId && week.number),
-        teams: (safeState.teams || []).map((team) => ({
-          id: String(team.id || ""),
-          seasonId: String(team.seasonId || ""),
-          name: String(team.name || "").trim(),
-          slug: String(team.slug || "").trim(),
-        })).filter((team) => team.id && team.seasonId && team.name),
-        activeSeasonId: safeState.settings?.activeSeasonId || null,
-        activeWeekId: safeState.settings?.activeWeekId || null,
-        updatedAt: stamp,
-      },
     }),
   ]);
 
