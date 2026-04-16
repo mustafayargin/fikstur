@@ -145,8 +145,8 @@ async function ensureFirebaseDefaults() {
       defaultUsersSeeded: true,
       structure: {
         seasons: {},
-        activeSeasonId: null,
-        activeWeekId: null,
+        publicActiveSeasonId: null,
+        publicActiveWeekId: null,
         updatedAt: new Date().toISOString(),
       },
     });
@@ -813,8 +813,8 @@ function buildStructureSnapshot() {
 
   return {
     seasons: seasonMap,
-    activeSeasonId: state.settings.activeSeasonId || null,
-    activeWeekId: state.settings.activeWeekId || null,
+    publicActiveSeasonId: state.settings.publicActiveSeasonId || null,
+    publicActiveWeekId: state.settings.publicActiveWeekId || null,
     updatedAt: new Date().toISOString(),
   };
 }
@@ -943,20 +943,19 @@ function hydrateStructureIntoLocalState(structure = null) {
   });
   if (state.teams.length != beforeTeamCount) changed = true;
 
-  if (Object.prototype.hasOwnProperty.call(structure, "activeSeasonId")) {
-    const nextActiveSeasonId = structure.activeSeasonId || null;
-    if (state.settings.activeSeasonId !== nextActiveSeasonId) {
-      state.settings.activeSeasonId = nextActiveSeasonId;
-      changed = true;
-    }
+  const nextPublicSeasonId =
+    structure.publicActiveSeasonId || structure.activeSeasonId || null;
+  const nextPublicWeekId =
+    structure.publicActiveWeekId || structure.activeWeekId || null;
+
+  if (state.settings.publicActiveSeasonId !== nextPublicSeasonId) {
+    state.settings.publicActiveSeasonId = nextPublicSeasonId;
+    changed = true;
   }
 
-  if (Object.prototype.hasOwnProperty.call(structure, "activeWeekId")) {
-    const nextActiveWeekId = structure.activeWeekId || null;
-    if (state.settings.activeWeekId !== nextActiveWeekId) {
-      state.settings.activeWeekId = nextActiveWeekId;
-      changed = true;
-    }
+  if (state.settings.publicActiveWeekId !== nextPublicWeekId) {
+    state.settings.publicActiveWeekId = nextPublicWeekId;
+    changed = true;
   }
 
   ensureActiveSelections();
@@ -1311,7 +1310,7 @@ function runSessionHydrationWithFastOverlay({
 
 function getCurrentSyncScopeOptions() {
   const seasonId = getActiveSeasonId();
-  const weekId = state.settings.activeWeekId;
+  const weekId = getActiveWeekId();
   return {
     seasonId,
     weekId,
@@ -3722,6 +3721,8 @@ function createInitialState() {
     settings: {
       activeSeasonId: null,
       activeWeekId: null,
+      publicActiveSeasonId: null,
+      publicActiveWeekId: null,
       celebratedChampions: {},
       currentTab: "dashboard",
       predictionShareMode: false,
@@ -3737,6 +3738,16 @@ function ensureDefaultSeason(stateObj) {
   if (!Array.isArray(stateObj.seasons)) stateObj.seasons = [];
   if (stateObj.seasons.length && !stateObj.settings.activeSeasonId) {
     stateObj.settings.activeSeasonId = stateObj.seasons[0].id;
+  }
+}
+
+function ensureSelectionSettings(stateObj) {
+  if (!stateObj.settings) stateObj.settings = {};
+  if (stateObj.settings.publicActiveSeasonId === undefined) {
+    stateObj.settings.publicActiveSeasonId = stateObj.settings.activeSeasonId || null;
+  }
+  if (stateObj.settings.publicActiveWeekId === undefined) {
+    stateObj.settings.publicActiveWeekId = stateObj.settings.activeWeekId || null;
   }
 }
 
@@ -3791,13 +3802,16 @@ function loadState() {
     if (!raw) {
       const fresh = createInitialState();
       ensureAuthState(fresh);
+      ensureSelectionSettings(fresh);
       return fresh;
     }
     const parsed = JSON.parse(raw);
     const migrated = migrateLegacyState(parsed);
+    ensureSelectionSettings(migrated);
     return migrated;
   } catch {
     const fallback = createInitialState();
+    ensureSelectionSettings(fallback);
     return fallback;
   }
 }
@@ -3944,8 +3958,17 @@ window.togglePlayerSeasonParticipation = togglePlayerSeasonParticipation;
 function getTeamById(id) {
   return state.teams.find((t) => t.id === id);
 }
+function getPublicActiveSeasonId() {
+  return state.settings.publicActiveSeasonId || state.seasons[0]?.id || null;
+}
+function getPublicActiveWeekId() {
+  return state.settings.publicActiveWeekId || null;
+}
 function getActiveSeasonId() {
-  return state.settings.activeSeasonId || state.seasons[0]?.id || null;
+  return state.settings.activeSeasonId || getPublicActiveSeasonId() || state.seasons[0]?.id || null;
+}
+function getActiveWeekId() {
+  return state.settings.activeWeekId || getPublicActiveWeekId() || null;
 }
 function getWeeksBySeasonId(seasonId) {
   return state.weeks
@@ -4003,21 +4026,66 @@ function getPrediction(matchId, playerId) {
 }
 
 function ensureActiveSelections() {
-  const activeSeasonId = getActiveSeasonId();
-  if (!state.settings.activeSeasonId && activeSeasonId)
-    state.settings.activeSeasonId = activeSeasonId;
+  const currentSeasonId = getActiveSeasonId();
+  if (!state.settings.activeSeasonId && currentSeasonId) {
+    state.settings.activeSeasonId = currentSeasonId;
+  }
+
   const seasonWeeks = getWeeksBySeasonId(getActiveSeasonId());
   if (!seasonWeeks.length) {
     state.settings.activeWeekId = null;
-    return;
+  } else {
+    const exists = seasonWeeks.some((w) => w.id === state.settings.activeWeekId);
+    if (!exists) {
+      const publicWeekId = getPublicActiveWeekId();
+      const matchingPublicWeek = seasonWeeks.find((w) => String(w.id) === String(publicWeekId));
+      state.settings.activeWeekId = matchingPublicWeek?.id || seasonWeeks[0].id;
+    }
   }
-  const exists = seasonWeeks.some((w) => w.id === state.settings.activeWeekId);
-  if (!exists) state.settings.activeWeekId = seasonWeeks[0].id;
+
+  const publicSeasonId = getPublicActiveSeasonId();
+  if (!state.settings.publicActiveSeasonId && publicSeasonId) {
+    state.settings.publicActiveSeasonId = publicSeasonId;
+  }
+
+  const publicSeasonWeeks = getWeeksBySeasonId(getPublicActiveSeasonId());
+  if (!publicSeasonWeeks.length) {
+    state.settings.publicActiveWeekId = null;
+  } else {
+    const publicExists = publicSeasonWeeks.some((w) => w.id === state.settings.publicActiveWeekId);
+    if (!publicExists) state.settings.publicActiveWeekId = publicSeasonWeeks[0].id;
+  }
 }
 
 async function setActiveSeason(seasonId) {
   state.settings.activeSeasonId = seasonId || null;
   const firstWeek = getWeeksBySeasonId(seasonId)[0];
+  state.settings.activeWeekId = firstWeek?.id || null;
+  saveState();
+  renderAll();
+  await syncOnlinePredictions({
+    seasonId,
+    weekId: getActiveWeekId(),
+  });
+}
+
+async function setActiveWeek(weekId) {
+  state.settings.activeWeekId = weekId || null;
+  const week = getWeekById(weekId);
+  if (week?.seasonId) state.settings.activeSeasonId = week.seasonId;
+  saveState();
+  renderAll();
+  await syncOnlinePredictions({
+    seasonId: state.settings.activeSeasonId,
+    weekId,
+  });
+}
+
+async function setPublicActiveSeason(seasonId) {
+  state.settings.publicActiveSeasonId = seasonId || null;
+  const firstWeek = getWeeksBySeasonId(seasonId)[0];
+  state.settings.publicActiveWeekId = firstWeek?.id || null;
+  state.settings.activeSeasonId = seasonId || null;
   state.settings.activeWeekId = firstWeek?.id || null;
   saveState();
   renderAll();
@@ -4028,13 +4096,15 @@ async function setActiveSeason(seasonId) {
   }
   await syncOnlinePredictions({
     seasonId,
-    weekId: state.settings.activeWeekId,
+    weekId: state.settings.publicActiveWeekId,
   });
 }
 
-async function setActiveWeek(weekId) {
-  state.settings.activeWeekId = weekId || null;
+async function setPublicActiveWeek(weekId) {
+  state.settings.publicActiveWeekId = weekId || null;
   const week = getWeekById(weekId);
+  if (week?.seasonId) state.settings.publicActiveSeasonId = week.seasonId;
+  state.settings.activeWeekId = weekId || null;
   if (week?.seasonId) state.settings.activeSeasonId = week.seasonId;
   saveState();
   renderAll();
@@ -4044,7 +4114,7 @@ async function setActiveWeek(weekId) {
     });
   }
   await syncOnlinePredictions({
-    seasonId: state.settings.activeSeasonId,
+    seasonId: state.settings.publicActiveSeasonId,
     weekId,
   });
 }
@@ -4656,7 +4726,7 @@ function renderWeekOptions(select, seasonId, includePlaceholder = false) {
     ? '<option value="">Hafta seç</option>'
     : "";
   weeks.forEach((week) => {
-    const selected = week.id === state.settings.activeWeekId ? "selected" : "";
+    const selected = week.id === getActiveWeekId() ? "selected" : "";
     select.insertAdjacentHTML(
       "beforeend",
       `<option value="${week.id}" ${selected}>${week.number}. Hafta</option>`,
@@ -4768,7 +4838,7 @@ function renderDashboardSyncCard() {
 
 function buildFirebaseAdminSummary() {
   const activeSeasonId = getActiveSeasonId();
-  const activeWeekId = state.settings.activeWeekId;
+  const activeWeekId = getActiveWeekId();
   const activeWeekMatches = activeWeekId ? getMatchesByWeekId(activeWeekId) : [];
   const activeWeekMatchIds = new Set(activeWeekMatches.map((item) => item.id));
   const activeWeekPredictions = state.predictions.filter((item) => activeWeekMatchIds.has(item.matchId));
@@ -5003,7 +5073,7 @@ async function syncDashboardSeason() {
 
 function renderStats() {
   const activeSeasonId = getActiveSeasonId();
-  const activeWeekId = state.settings.activeWeekId;
+  const activeWeekId = getActiveWeekId();
   const matches = activeWeekId ? getMatchesByWeekId(activeWeekId) : [];
   const season = getSeasonById(activeSeasonId);
   const leader = getGeneralStandings(activeSeasonId)[0];
@@ -5500,9 +5570,16 @@ window.removeSeason = async function (id) {
     if (String(state.settings.activeSeasonId) === String(id)) {
       state.settings.activeSeasonId = state.seasons[0]?.id || null;
     }
+    if (String(state.settings.publicActiveSeasonId) === String(id)) {
+      state.settings.publicActiveSeasonId = state.seasons[0]?.id || null;
+    }
     if (weekIds.includes(String(state.settings.activeWeekId))) {
       state.settings.activeWeekId =
         getWeeksBySeasonId(state.settings.activeSeasonId)[0]?.id || null;
+    }
+    if (weekIds.includes(String(state.settings.publicActiveWeekId))) {
+      state.settings.publicActiveWeekId =
+        getWeeksBySeasonId(state.settings.publicActiveSeasonId)[0]?.id || null;
     }
 
     ensureActiveSelections();
@@ -5598,7 +5675,7 @@ function renderWeeks() {
     .map((week) => {
       const status = inferWeekStatusFromMatches(week.id);
       week.status = status;
-      const isActiveWeek = String(state.settings.activeWeekId) === String(week.id);
+      const isActiveWeek = String(getPublicActiveWeekId()) === String(week.id);
       const statusBadge =
         status === "tamamlandi"
           ? `<span class="badge">✓</span>`
@@ -5610,7 +5687,7 @@ function renderWeeks() {
       <div><strong>${week.number}. Hafta</strong><div class="small-meta">${getMatchesByWeekId(week.id).length} maç</div></div>
       ${statusBadge}
       <div class="inline-actions compact">
-        <button class="small secondary" onclick="setActiveWeek('${week.id}')">Aktif Yap</button>
+        <button class="small secondary" onclick="setPublicActiveWeek('${week.id}')">Aktif Yap</button>
         <button class="small secondary" onclick="changeWeekStatus('${week.id}')">Durum</button>
         <button class="small danger" onclick="removeWeek('${week.id}')">Sil</button>
       </div>
@@ -5733,6 +5810,12 @@ window.removeWeek = async function (id) {
         null;
     }
 
+    if (state.settings.publicActiveWeekId === id) {
+      state.settings.publicActiveWeekId =
+        getWeeksBySeasonId(getPublicActiveSeasonId()).find((w) => w.id !== id)?.id ||
+        null;
+    }
+
     saveState();
     if (useOnlineMode) {
       await syncStructureToFirebase().catch((error) => {
@@ -5759,7 +5842,7 @@ window.removeWeek = async function (id) {
 
 function renderMatches(
   containerId = "matchesList",
-  weekId = state.settings.activeWeekId,
+  weekId = getActiveWeekId(),
 ) {
   const container = document.getElementById(containerId);
   if (!weekId)
@@ -6243,10 +6326,10 @@ function getShareCellPalette(pred, match, shareView) {
 async function createPredictionShareExportCanvas(matches, players, options = {}) {
   const shareView = options.shareView === "post" ? "post" : "pre";
   const seasonName = getSeasonById(getActiveSeasonId())?.name || "Sezon";
-  const weekNumber = getWeekNumberById(state.settings.activeWeekId) || "?";
+  const weekNumber = getWeekNumberById(getActiveWeekId()) || "?";
   const pageIndex = Number(options.pageIndex || 0);
   const totalPages = Number(options.totalPages || 1);
-  const weeklyStandings = shareView === "post" ? getWeeklyStandings(state.settings.activeWeekId) : [];
+  const weeklyStandings = shareView === "post" ? getWeeklyStandings(getActiveWeekId()) : [];
   const summaryRows = shareView === "post"
     ? players.map((player) => {
         const row = weeklyStandings.find((item) => item.id === player.id) || {
@@ -6580,7 +6663,7 @@ async function exportPredictionShareImage() {
     button.textContent = "Hazırlanıyor...";
   }
   try {
-    const weekId = state.settings.activeWeekId;
+    const weekId = getActiveWeekId();
     if (!weekId) {
       await showAlert("Önce bir hafta seçmelisin.", { title: "Hafta gerekli", type: "warning" });
       return;
@@ -6698,7 +6781,7 @@ function renderPredictionShareTable(container, matches, players) {
 function renderPredictions() {
   const container = document.getElementById("predictionsTable");
   if (!container) return;
-  const weekId = state.settings.activeWeekId;
+  const weekId = getActiveWeekId();
 
   renderPredictionLockBanner(weekId);
 
@@ -7229,7 +7312,7 @@ window.deletePredictionEntry = async function (matchId, playerId) {
       recordKey: `${matchId}_${playerId}`,
 
       sezon: getActiveSeasonLabel(),
-      haftaNo: getWeekNumberById(state.settings.activeWeekId),
+      haftaNo: getWeekNumberById(getActiveWeekId()),
     };
 
     const result = await deleteOnlinePrediction(payload);
@@ -7456,7 +7539,7 @@ function standingsRows(rows, showPredictionCount = true, options = {}) {
 function renderStandings() {
   const seasonId = getActiveSeasonId();
   const general = getGeneralStandings(seasonId);
-  const weekId = state.settings.activeWeekId;
+  const weekId = getActiveWeekId();
   const weekly = weekId ? getWeeklyStandings(weekId) : [];
 
   const generalLeaderId = general[0]?.id || null;
@@ -7483,7 +7566,7 @@ function renderStandings() {
 
 function renderMissingPredictions() {
   const container = document.getElementById("missingPredictions");
-  const weekId = state.settings.activeWeekId;
+  const weekId = getActiveWeekId();
   if (!weekId)
     return (container.innerHTML = createEmptyState("Önce aktif hafta seç."));
   const rows = [];
@@ -7864,12 +7947,12 @@ function renderAll() {
   renderMatches(
     "matchesList",
     document.getElementById("matchesFilterWeek").value ||
-      state.settings.activeWeekId,
+      getActiveWeekId(),
   );
   renderPredictions();
   renderStandings();
   renderMissingPredictions();
-  renderMatches("dashboardMatches", state.settings.activeWeekId);
+  renderMatches("dashboardMatches", getActiveWeekId());
   renderAdvancedStats();
   renderBackupPanel();
   updateLoginOverlay();
@@ -8266,7 +8349,7 @@ function switchTab(tabName) {
 
 function getBackupSelectedWeekId() {
   const select = document.getElementById("backupWeekSelect");
-  return select?.value || state.settings.activeWeekId || "";
+  return select?.value || getActiveWeekId() || "";
 }
 
 function getBackupSelectedWeek() {
@@ -8699,7 +8782,7 @@ function renderBackupPanel() {
   const seasonId = getActiveSeasonId();
   const season = getSeasonById(seasonId);
   const weeks = getWeeksBySeasonId(seasonId);
-  const selectedWeekId = select.value || state.settings.activeWeekId || weeks[0]?.id || "";
+  const selectedWeekId = select.value || getActiveWeekId() || weeks[0]?.id || "";
 
   select.innerHTML = weeks.length
     ? weeks
@@ -8857,7 +8940,7 @@ function inferWeekStatusFromMatches(weekId) {
   if (!matches.length) return "hazirlaniyor";
   const allFinished = matches.every((match) => match.played || isMatchDatePast(match));
   if (allFinished) return "tamamlandi";
-  if (String(state.settings.activeWeekId) === String(weekId)) return "aktif";
+  if (String(getPublicActiveWeekId()) === String(weekId)) return "aktif";
   return "hazirlaniyor";
 }
 
@@ -8934,7 +9017,7 @@ function relocateMatchToApiWeek(match, seasonId, apiWeekNumber) {
 
 async function syncSelectedWeekFromApi() {
   const seasonId = getActiveSeasonId();
-  const weekId = state.settings.activeWeekId;
+  const weekId = getActiveWeekId();
   const week = getWeekById(weekId);
   const seasonLabel = getApiSeasonLabel();
   const status = document.getElementById("weekApiStatus");
