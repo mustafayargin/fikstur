@@ -151,7 +151,7 @@
                     API'den Veri Çek
                   </button>
                   <button class="secondary" id="dashboardSyncWeekBtn">
-                    Seçili Haftanın Maçlarını Güncelle
+                    Seçili Haftayı Güncelle
                   </button>
                 </div>
               </div>
@@ -232,67 +232,99 @@
         </section>
 
         <section class="tab-panel" id="tab-seasons">
-          <div class="page-header seasons-page-header compact-page-header">
-            <h2>Sezonlar & Takımlar</h2>
+          <div class="page-header">
+            <div>
+              <h2>Sezonlar & Takımlar</h2>
+              <p>
+                Sezon oluştur, takım listesini yönet ve istersen API ile fikstür
+                çek.
+              </p>
+            </div>
             <div class="header-actions">
               <select id="seasonManagerSelect"></select>
             </div>
           </div>
 
-          <section class="card compact-card season-unified-card">
-            <div class="season-unified-grid">
-              <div class="season-unified-block">
-                <div class="card-header"><h3>Yeni Sezon</h3></div>
-                <div class="form-grid three season-top-grid">
-                  <div class="field">
-                    <label for="seasonName">Sezon adı</label>
-                    <input
-                      type="text"
-                      id="seasonName"
-                      placeholder="Örn: 2025-2026"
-                    />
-                  </div>
-                  <div class="field">
-                    <label for="seasonLeague">Lig adı</label>
-                    <input type="text" id="seasonLeague" value="Süper Lig" />
-                  </div>
-                  <div class="field button-field">
-                    <button id="addSeasonBtn">Sezon Ekle</button>
-                  </div>
+          <div class="dashboard-grid standings-layout">
+            <section class="card form-card">
+              <div class="card-header"><h3>Yeni Sezon</h3></div>
+              <div class="form-grid three">
+                <div class="field">
+                  <label for="seasonName">Sezon adı</label>
+                  <input
+                    type="text"
+                    id="seasonName"
+                    placeholder="Örn: 2025-2026"
+                  />
+                </div>
+                <div class="field">
+                  <label for="seasonLeague">Lig adı</label>
+                  <input type="text" id="seasonLeague" value="Süper Lig" />
+                </div>
+                <div class="field button-field">
+                  <button id="addSeasonBtn">Sezon Ekle</button>
                 </div>
               </div>
+            </section>
 
-              <div class="season-unified-divider" aria-hidden="true"></div>
-
-              <div class="season-unified-block">
-                <div class="card-header"><h3>API ile İçeri Aktar</h3></div>
-                <div class="stack-actions compact-stack-actions">
-                  <div class="field">
-                    <label for="apiSeasonText">API sezon etiketi</label>
-                    <input
-                      type="text"
-                      id="apiSeasonText"
-                      placeholder="Örn: 2025-2026"
-                    />
-                  </div>
-                  <div class="inline-actions compact api-actions-row">
-                    <button class="secondary" id="apiImportFixturesBtn">
-                      Sezonu API'den Çek
-                    </button>
-                    <button class="secondary" id="apiUpdateResultsBtn">
-                      Skorları API'den Güncelle
-                    </button>
-                  </div>
-                  <div class="status-note" id="apiStatus">Hazır.</div>
+            <section class="card form-card">
+              <div class="card-header"><h3>Takım Ekle</h3></div>
+              <div class="form-grid three">
+                <div class="field">
+                  <label for="seasonTeamName">Takım adı</label>
+                  <input
+                    type="text"
+                    id="seasonTeamName"
+                    placeholder="Örn: Kocaelispor"
+                  />
+                </div>
+                <div class="field">
+                  <label for="seasonTeamSlug">Logo dosya adı</label>
+                  <input
+                    type="text"
+                    id="seasonTeamSlug"
+                    placeholder="Örn: kocaelispor"
+                  />
+                </div>
+                <div class="field button-field">
+                  <button id="addSeasonTeamBtn">Takım Ekle</button>
                 </div>
               </div>
-            </div>
-          </section>
+            </section>
+          </div>
 
-          <section class="card season-management-card compact-management-card">
-            <div class="card-header"><h3>Sezon Takımları</h3></div>
-            <div id="seasonTeamsList"></div>
-          </section>
+          <div class="dashboard-grid standings-layout">
+            <section class="card">
+              <div class="card-header"><h3>Sezon Takımları</h3></div>
+              <div id="seasonTeamsList"></div>
+            </section>
+            <section class="card">
+              <div class="card-header"><h3>API ile İçeri Aktar</h3></div>
+              <div class="stack-actions">
+                <div class="field">
+                  <label for="apiSeasonText">API sezon etiketi</label>
+                  <input
+                    type="text"
+                    id="apiSeasonText"
+                    placeholder="Örn: 2025-2026"
+                  />
+                </div>
+                <div class="small-meta">
+                  TheSportsDB free API ile sezon fikstürü çekilir. İstersen aynı
+                  sezon için sonuç güncellemesi de yapılır.
+                </div>
+                <div class="inline-actions compact">
+                  <button class="secondary" id="apiImportFixturesBtn">
+                    Fikstürü Çek
+                  </button>
+                  <button class="secondary" id="apiUpdateResultsBtn">
+                    Sonuçları Güncelle
+                  </button>
+                </div>
+                <div class="status-note" id="apiStatus">Hazır.</div>
+              </div>
+            </section>
+          </div>
         </section>
 
         <section class="tab-panel" id="tab-players">
@@ -336,7 +368,8 @@
             <div>
               <h2>Haftalar</h2>
               <p>
-                Aktif sezondaki haftaları yönetebilir, seçili haftanın maçlarını API'den güncelleyebilir ve durum takibi yapabilirsin.
+                Aktif sezona hafta oluşturabilir, aktif haftayı seçebilir ve
+                durum takibi yapabilirsin.
               </p>
             </div>
             <div class="header-actions double-selects">
@@ -384,16 +417,12 @@
                 />
               </div>
               <div class="small-meta">
-                Seçili sezon için API'den tüm maçlar okunur, bulunan bütün hafta
-                numaraları oluşturulur. Biten haftalar tamamlandı olur, bekleyen
-                haftalar pasif kalır.
+                Seçili hafta API'den tekrar okunur. Gelecek maçlarda tarih-saat
+                güncellenir, oynanmış maçlarda skorlar işlenir.
               </div>
-              <div class="inline-actions compact wrap">
-                <button class="secondary" id="apiImportSeasonWeeksBtn">
-                  Sezonun Tüm Haftalarını ve Skorlarını Çek
-                </button>
+              <div class="inline-actions compact">
                 <button class="secondary" id="apiSyncWeekBtn">
-                  Seçili Haftanın Maçlarını Güncelle
+                  Seçili Haftayı Güncelle
                 </button>
               </div>
               <div class="status-note" id="weekApiStatus">Hazır.</div>
