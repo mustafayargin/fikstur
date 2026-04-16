@@ -4236,13 +4236,6 @@ function renderPredictionLockBanner(weekId) {
         banner.className = "prediction-lock-banner closed";
         banner.innerHTML =
           "<strong>🔒 Tahminler kilitlendi</strong><span>Bu hafta için yeni tahmin ve silme işlemleri kapalı.</span>";
-        if (!predictionLockRerenderPending) {
-          predictionLockRerenderPending = true;
-          setTimeout(() => {
-            predictionLockRerenderPending = false;
-            renderPredictions();
-          }, 80);
-        }
       }
       return;
     }
