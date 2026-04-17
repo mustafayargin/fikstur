@@ -5825,3 +5825,168 @@ body.login-locked {
     font-size: 13px;
   }
 }
+/* =========================
+   Kişiler sayfası presence iyileştirme + dashboard sadeleştirme
+   ========================= */
+
+.firebase-admin-focus-card {
+  margin-top: 14px;
+  padding: 18px 20px;
+  border-radius: 18px;
+  border: 1px solid rgba(108, 140, 213, 0.18);
+  background:
+    radial-gradient(circle at top right, rgba(52, 211, 153, 0.12), transparent 35%),
+    linear-gradient(135deg, rgba(18, 27, 48, 0.96), rgba(11, 17, 31, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+.firebase-admin-focus-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.firebase-admin-focus-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #f4f8ff;
+  margin-bottom: 4px;
+}
+
+.player-card-top-right {
+  margin-left: auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.player-card-username {
+  margin-top: 5px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(171, 194, 241, 0.7);
+}
+
+.player-presence-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  min-width: 176px;
+  padding: 10px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 10px 20px rgba(0,0,0,0.18);
+}
+
+.player-presence-pill.is-online {
+  background: linear-gradient(135deg, rgba(11, 68, 47, 0.92), rgba(17, 124, 89, 0.36));
+  border-color: rgba(52, 211, 153, 0.42);
+}
+
+.player-presence-pill.is-offline {
+  background: linear-gradient(135deg, rgba(84, 25, 40, 0.88), rgba(46, 30, 67, 0.65));
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.player-presence-dot {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px rgba(255,255,255,0.08);
+}
+
+.player-presence-pill.is-online .player-presence-dot {
+  background: #4ade80;
+  box-shadow:
+    0 0 0 4px rgba(74, 222, 128, 0.18),
+    0 0 14px rgba(74, 222, 128, 0.6);
+}
+
+.player-presence-pill.is-offline .player-presence-dot {
+  background: #fb7185;
+  box-shadow:
+    0 0 0 4px rgba(251, 113, 133, 0.16),
+    0 0 14px rgba(251, 113, 133, 0.38);
+}
+
+.player-presence-text-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.player-presence-text-wrap strong {
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #ffffff;
+}
+
+.player-presence-text-wrap small {
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(239, 244, 255, 0.82);
+}
+
+.player-stat-pill-wide {
+  flex: 1 1 100%;
+}
+
+.player-premium-card.is-online {
+  border-color: rgba(52, 211, 153, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 16px 36px rgba(0, 0, 0, 0.24),
+    0 0 0 1px rgba(52, 211, 153, 0.06);
+}
+
+.player-premium-card.is-online .player-card-glow {
+  background: radial-gradient(circle, rgba(74, 222, 128, 0.24), transparent 70%);
+}
+
+.player-premium-card.is-offline {
+  border-color: rgba(244, 114, 182, 0.18);
+}
+
+.player-card-actions .small.secondary[onclick*="forceLogoutUserSession"] {
+  background: rgba(36, 53, 88, 0.92);
+  border-color: rgba(112, 144, 220, 0.22);
+  color: #f3f7ff;
+}
+
+@media (max-width: 768px) {
+  .firebase-admin-focus-head {
+    align-items: stretch;
+  }
+
+  .firebase-admin-focus-head .small {
+    width: 100%;
+  }
+
+  .player-card-title-row {
+    align-items: flex-start;
+  }
+
+  .player-card-top-right {
+    margin-left: 0;
+    width: 100%;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .player-presence-pill {
+    width: 100%;
+    min-width: 0;
+  }
+}

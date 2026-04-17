@@ -41,12 +41,15 @@ function getFirebaseConfig() {
 function isFirebaseConfigured() {
   const cfg = getFirebaseConfig();
   if (!cfg) return false;
-  return Object.values(cfg).every((value) => value && !String(value).startsWith("BURAYA_"));
+  return Object.values(cfg).every(
+    (value) => value && !String(value).startsWith("BURAYA_"),
+  );
 }
 
 function getFirebaseDb() {
   if (!isFirebaseConfigured()) return null;
-  if (!window.firebase || typeof window.firebase.initializeApp !== "function") return null;
+  if (!window.firebase || typeof window.firebase.initializeApp !== "function")
+    return null;
   try {
     if (!window.__fiksturFirebaseApp) {
       window.__fiksturFirebaseApp = window.firebase.apps?.length
@@ -166,22 +169,34 @@ async function firebaseApiGet(action, params = {}) {
       const haftaNo = String(params.haftaNo || "").trim();
       let matches = firebaseSnapshotToArray(await firebaseRead("matches"));
       if (sezon) {
-        matches = matches.filter((item) => String(item.season || item.sezon || "").trim() === sezon);
+        matches = matches.filter(
+          (item) => String(item.season || item.sezon || "").trim() === sezon,
+        );
       }
       if (haftaNo) {
-        matches = matches.filter((item) => String(item.weekNo || item.haftaNo || "").trim() === haftaNo);
+        matches = matches.filter(
+          (item) =>
+            String(item.weekNo || item.haftaNo || "").trim() === haftaNo,
+        );
       }
       return { success: true, matches };
     }
     case "getPredictions": {
       const sezon = String(params.sezon || "").trim();
       const haftaNo = String(params.haftaNo || "").trim();
-      let predictions = firebaseSnapshotToArray(await firebaseRead("predictions"));
+      let predictions = firebaseSnapshotToArray(
+        await firebaseRead("predictions"),
+      );
       if (sezon) {
-        predictions = predictions.filter((item) => String(item.season || item.sezon || "").trim() === sezon);
+        predictions = predictions.filter(
+          (item) => String(item.season || item.sezon || "").trim() === sezon,
+        );
       }
       if (haftaNo) {
-        predictions = predictions.filter((item) => String(item.weekNo || item.haftaNo || "").trim() === haftaNo);
+        predictions = predictions.filter(
+          (item) =>
+            String(item.weekNo || item.haftaNo || "").trim() === haftaNo,
+        );
       }
       return { success: true, predictions };
     }
@@ -288,8 +303,12 @@ async function firebaseApiPost(action, payload = {}) {
           ? { aktif: payload.aktif !== false }
           : {}),
         ...(payload.seasonStates ? { seasonStates: payload.seasonStates } : {}),
-        ...(payload.seasonMemberships ? { seasonMemberships: payload.seasonMemberships } : {}),
-        ...(payload.activeSeasons ? { activeSeasons: payload.activeSeasons } : {}),
+        ...(payload.seasonMemberships
+          ? { seasonMemberships: payload.seasonMemberships }
+          : {}),
+        ...(payload.activeSeasons
+          ? { activeSeasons: payload.activeSeasons }
+          : {}),
         updatedAt: new Date().toISOString(),
       };
       await firebaseWrite(`users/${id}`, next);
@@ -390,7 +409,9 @@ async function firebaseApiPost(action, payload = {}) {
 
 async function runFirebaseConnectionTest() {
   if (!isFirebaseReady()) {
-    throw new Error("Önce index.html içindeki Firebase config alanlarını doldur.");
+    throw new Error(
+      "Önce index.html içindeki Firebase config alanlarını doldur.",
+    );
   }
   await ensureFirebaseDefaults();
   const stamp = new Date().toISOString();
@@ -436,12 +457,10 @@ function formatAdminPanelDateTime(value) {
 }
 
 function getCurrentPresenceUserId() {
-  const authUser = (typeof getAuthUser === "function" ? getAuthUser() : null) || null;
+  const authUser =
+    (typeof getAuthUser === "function" ? getAuthUser() : null) || null;
   const rawId =
-    authUser?.id ||
-    authUser?.playerId ||
-    state?.settings?.auth?.playerId ||
-    "";
+    authUser?.id || authUser?.playerId || state?.settings?.auth?.playerId || "";
   return rawId ? sanitizeFirebaseKey(String(rawId)) : "";
 }
 
@@ -467,10 +486,7 @@ function getPresenceUserMeta() {
       authUser?.username ||
       "",
     username:
-      player?.username ||
-      authUser?.kullaniciAdi ||
-      authUser?.username ||
-      "",
+      player?.username || authUser?.kullaniciAdi || authUser?.username || "",
     role:
       String(
         authUser?.rol || player?.role || state?.settings?.auth?.role || "user",
@@ -486,9 +502,9 @@ function getPlayerRole(player) {
   ).toLowerCase();
   if (rawRole === "admin") return "admin";
 
-  const rawUsername = String(
-    player?.username || player?.kullaniciAdi || "",
-  ).trim().toLowerCase();
+  const rawUsername = String(player?.username || player?.kullaniciAdi || "")
+    .trim()
+    .toLowerCase();
   if (rawUsername === "admin") return "admin";
 
   return "user";
@@ -631,10 +647,13 @@ function ensureForcedLogoutWatcher() {
       new Date(forcedLogoutAt).getTime() > new Date(sessionStartedAt).getTime()
     ) {
       stopPresenceTracking();
-      showAlert("Admin seni sistemden çıkardı. Tekrar giriş yapman gerekiyor.", {
-        title: "Oturum kapatıldı",
-        type: "warning",
-      });
+      showAlert(
+        "Admin seni sistemden çıkardı. Tekrar giriş yapman gerekiyor.",
+        {
+          title: "Oturum kapatıldı",
+          type: "warning",
+        },
+      );
       logoutUser();
     }
   };
@@ -656,10 +675,17 @@ function startPresenceTracking() {
   const sessionStartedAt =
     authUser.sessionStartedAt || new Date().toISOString();
 
-  if (state?.settings?.auth?.user && !state.settings.auth.user.sessionStartedAt) {
+  if (
+    state?.settings?.auth?.user &&
+    !state.settings.auth.user.sessionStartedAt
+  ) {
     state.settings.auth.user.sessionStartedAt = sessionStartedAt;
   }
-  if (typeof currentSessionUser !== "undefined" && currentSessionUser && !currentSessionUser.sessionStartedAt) {
+  if (
+    typeof currentSessionUser !== "undefined" &&
+    currentSessionUser &&
+    !currentSessionUser.sessionStartedAt
+  ) {
     currentSessionUser.sessionStartedAt = sessionStartedAt;
   }
 
@@ -668,7 +694,9 @@ function startPresenceTracking() {
   sessionStorage.setItem(`fikstur_presence_${userId}`, presenceSessionId);
 
   presenceUserRef = db.ref(`presence/${userId}`);
-  presenceSessionRef = db.ref(`presence/${userId}/sessions/${presenceSessionId}`);
+  presenceSessionRef = db.ref(
+    `presence/${userId}/sessions/${presenceSessionId}`,
+  );
   presenceConnectedRef = db.ref(".info/connected");
 
   const heartbeat = () => {
@@ -705,12 +733,10 @@ function startPresenceTracking() {
 
     if (snapshot.val() === true) {
       presenceSessionRef.onDisconnect().remove();
-      presenceUserRef
-        ?.onDisconnect()
-        .update({
-          online: false,
-          lastSeen: new Date().toISOString(),
-        });
+      presenceUserRef?.onDisconnect().update({
+        online: false,
+        lastSeen: new Date().toISOString(),
+      });
       heartbeat();
       return;
     }
@@ -1212,7 +1238,9 @@ function ensureHeaderSyncButtons() {
     const panel = header.closest(".tab-panel");
     const isPredictionsHeader = panel?.id === "tab-predictions";
     let actions = header.querySelector(".header-actions");
-    const existingButtons = header.querySelectorAll('[data-role="global-sync-btn"]');
+    const existingButtons = header.querySelectorAll(
+      '[data-role="global-sync-btn"]',
+    );
 
     existingButtons.forEach((btn, index) => {
       if (index > 0 || !isPredictionsHeader) btn.remove();
@@ -1283,7 +1311,8 @@ function bindAdminPanelTableScroll() {
 
     shell.addEventListener("pointerdown", (event) => {
       if (event.pointerType === "mouse" && event.button !== 0) return;
-      if (event.target.closest("button, input, select, textarea, label, a")) return;
+      if (event.target.closest("button, input, select, textarea, label, a"))
+        return;
 
       pointerId = event.pointerId;
       startX = event.clientX;
@@ -1393,6 +1422,20 @@ async function flushPendingPredictionQueue(options = {}) {
   const failedItems = [];
 
   for (const item of queue) {
+    const queuedPlayer = getPlayerById(item.playerId);
+    const queuedMatch = state.matches.find(
+      (match) => String(match.id) === String(item.matchId),
+    );
+
+    if (
+      queuedPlayer &&
+      queuedMatch &&
+      getPlayerRole(queuedPlayer) !== "admin" &&
+      !isPlayerActiveForSeason(queuedPlayer, queuedMatch.seasonId)
+    ) {
+      failed += 1;
+      continue;
+    }
     try {
       const action = getPredictionQueueAction(item);
       if (action === "delete") {
@@ -1864,7 +1907,10 @@ function pruneLocalMatchesAgainstRemote(rows = [], requestedSeasonLabel = "") {
   const remoteRows = Array.isArray(rows) ? rows : [];
   const affectedSeasonLabels = new Set(
     remoteRows
-      .map((row) => row.season || row.sezon || row.seasonName || row.sezonAdi || "")
+      .map(
+        (row) =>
+          row.season || row.sezon || row.seasonName || row.sezonAdi || "",
+      )
       .filter(Boolean)
       .map((value) => normalizeText(value)),
   );
@@ -1873,7 +1919,11 @@ function pruneLocalMatchesAgainstRemote(rows = [], requestedSeasonLabel = "") {
     affectedSeasonLabels.add(normalizeText(requestedSeasonLabel));
   }
 
-  if (!affectedSeasonLabels.size && !requestedSeasonLabel && !remoteRows.length) {
+  if (
+    !affectedSeasonLabels.size &&
+    !requestedSeasonLabel &&
+    !remoteRows.length
+  ) {
     state.matches = [];
     state.predictions = [];
     state.weeks = [];
@@ -1887,7 +1937,12 @@ function pruneLocalMatchesAgainstRemote(rows = [], requestedSeasonLabel = "") {
 
   remoteRows.forEach((row) => {
     const seasonLabel = normalizeText(
-      row.season || row.sezon || row.seasonName || row.sezonAdi || requestedSeasonLabel || "",
+      row.season ||
+        row.sezon ||
+        row.seasonName ||
+        row.sezonAdi ||
+        requestedSeasonLabel ||
+        "",
     );
     if (!seasonLabel) return;
     if (!remoteKeysBySeason.has(seasonLabel)) {
@@ -1895,7 +1950,9 @@ function pruneLocalMatchesAgainstRemote(rows = [], requestedSeasonLabel = "") {
     }
 
     const keys = remoteKeysBySeason.get(seasonLabel);
-    const weekNo = String(row.weekNo || row.haftaNo || row.week || row.hafta || "");
+    const weekNo = String(
+      row.weekNo || row.haftaNo || row.week || row.hafta || "",
+    );
     const homeTeam = normalizeText(row.homeTeam || row.evSahibi || "");
     const awayTeam = normalizeText(row.awayTeam || row.deplasman || "");
     const remoteId = String(row.id || row.sheetMatchId || row.macId || "");
@@ -1906,7 +1963,9 @@ function pruneLocalMatchesAgainstRemote(rows = [], requestedSeasonLabel = "") {
 
   const removedMatchIds = state.matches
     .filter((match) => {
-      const seasonLabel = normalizeText(getSeasonById(match.seasonId)?.name || "");
+      const seasonLabel = normalizeText(
+        getSeasonById(match.seasonId)?.name || "",
+      );
       if (!affectedSeasonLabels.has(seasonLabel)) return false;
 
       const seasonKeys = remoteKeysBySeason.get(seasonLabel) || new Set();
@@ -2097,6 +2156,23 @@ async function fetchOnlineStandings(sezon = "") {
 }
 
 async function saveOnlinePrediction(payload) {
+  const player = getPlayerById(payload.playerId);
+  const match = state.matches.find(
+    (item) => String(item.id) === String(payload.matchId),
+  );
+
+  if (
+    player &&
+    match &&
+    getPlayerRole(player) !== "admin" &&
+    !isPlayerActiveForSeason(player, match.seasonId)
+  ) {
+    return {
+      success: false,
+      message: "Bu kullanıcı bu sezonda tahmin giremez.",
+    };
+  }
+
   return await apiPost("savePrediction", payload);
 }
 
@@ -2140,13 +2216,19 @@ function normalizeSeasonRegistryItem(item) {
 async function syncSeasonRegistryFromFirebase() {
   if (!isFirebaseReady()) return [];
   const settings = (await firebaseRead("settings")) || {};
-  const rawList = Array.isArray(settings.seasonsMeta) ? settings.seasonsMeta : [];
+  const rawList = Array.isArray(settings.seasonsMeta)
+    ? settings.seasonsMeta
+    : [];
   const seasonList = rawList.map(normalizeSeasonRegistryItem).filter(Boolean);
   const remoteIds = new Set(seasonList.map((item) => String(item.id)));
 
   state.seasons = seasonList.map((item) => ({ ...item }));
-  state.teams = state.teams.filter((team) => remoteIds.has(String(team.seasonId)));
-  state.weeks = state.weeks.filter((week) => remoteIds.has(String(week.seasonId)));
+  state.teams = state.teams.filter((team) =>
+    remoteIds.has(String(team.seasonId)),
+  );
+  state.weeks = state.weeks.filter((week) =>
+    remoteIds.has(String(week.seasonId)),
+  );
   const validWeekIds = new Set(state.weeks.map((week) => String(week.id)));
   state.matches = state.matches.filter(
     (match) =>
@@ -2172,11 +2254,13 @@ async function syncSeasonRegistryFromFirebase() {
 
 async function persistSeasonRegistryToFirebase() {
   if (!isFirebaseReady()) return false;
-  const seasonsMeta = state.seasons.map((season) => ({
-    id: String(season.id || "").trim(),
-    name: String(season.name || "").trim(),
-    leagueName: String(season.leagueName || "").trim(),
-  })).filter((season) => season.id && season.name);
+  const seasonsMeta = state.seasons
+    .map((season) => ({
+      id: String(season.id || "").trim(),
+      name: String(season.name || "").trim(),
+      leagueName: String(season.leagueName || "").trim(),
+    }))
+    .filter((season) => season.id && season.name);
 
   await firebaseUpdate("settings", {
     seasonsMeta,
@@ -2196,9 +2280,11 @@ async function syncUsersFromSheet(options = {}) {
     name: user.adSoyad || user.kullaniciAdi || "",
     password: user.sifre || "1234",
     username: user.kullaniciAdi || "",
-    role: String(user.rol || "user").toLowerCase() === "admin" ? "admin" : "user",
+    role:
+      String(user.rol || "user").toLowerCase() === "admin" ? "admin" : "user",
     aktif: user.aktif !== false,
-    seasonStates: user.seasonStates || user.seasonMemberships || user.activeSeasons || {},
+    seasonStates:
+      user.seasonStates || user.seasonMemberships || user.activeSeasons || {},
   }));
   state.players = users;
   const authUser = getAuthUser();
@@ -2330,7 +2416,7 @@ function isReadOnlyMode() {
   return getCurrentRole() === "user";
 }
 
-function canEditPrediction(playerId) {
+function canEditPrediction(playerId, seasonId = getActiveSeasonId()) {
   if (getCurrentRole() === "admin") return true;
 
   const currentPlayerId = getCurrentPlayerId();
@@ -2338,7 +2424,12 @@ function canEditPrediction(playerId) {
   const normalizedCurrentPlayerId = normalizeEntityId(currentPlayerId);
 
   if (!normalizedPlayerId || !normalizedCurrentPlayerId) return false;
-  return normalizedPlayerId === normalizedCurrentPlayerId;
+  if (normalizedPlayerId !== normalizedCurrentPlayerId) return false;
+
+  const currentPlayer = getPlayerById(normalizedCurrentPlayerId);
+  if (!currentPlayer) return false;
+
+  return isPlayerActiveForSeason(currentPlayer, seasonId);
 }
 
 function getPredictionOutcomeClass(pred, match) {
@@ -2354,7 +2445,8 @@ function getVisiblePlayersOrdered() {
   const activeSeasonId = getActiveSeasonId();
   const players = [...state.players].filter(
     (player) =>
-      getPlayerRole(player) !== "admin" && isPlayerActiveForSeason(player, activeSeasonId),
+      getPlayerRole(player) !== "admin" &&
+      isPlayerActiveForSeason(player, activeSeasonId),
   );
   const currentPlayerId = getCurrentPlayerId();
   if (getCurrentRole() !== "user" || !currentPlayerId) return players;
@@ -2378,7 +2470,10 @@ function normalizeSeasonStateMap(value = {}) {
 
 function getPlayerSeasonStateMap(player) {
   return normalizeSeasonStateMap(
-    player?.seasonStates || player?.seasonMemberships || player?.activeSeasons || {},
+    player?.seasonStates ||
+      player?.seasonMemberships ||
+      player?.activeSeasons ||
+      {},
   );
 }
 
@@ -2666,7 +2761,10 @@ async function syncOnlinePredictions(options = {}) {
   const weekId = Object.prototype.hasOwnProperty.call(options, "weekId")
     ? options.weekId
     : state.settings.activeWeekId;
-  const seasonLabel = Object.prototype.hasOwnProperty.call(options, "seasonLabel")
+  const seasonLabel = Object.prototype.hasOwnProperty.call(
+    options,
+    "seasonLabel",
+  )
     ? options.seasonLabel
     : getSeasonById(seasonId)?.name || "";
   const weekNumber = Object.prototype.hasOwnProperty.call(options, "weekNumber")
@@ -2767,7 +2865,9 @@ async function hydrateOnlineStateForSession(options = {}) {
       setAppLoadingCheck(
         "login",
         isSessionRestore ? "active" : "done",
-        isSessionRestore ? "Kayıtlı oturum doğrulanıyor..." : "Giriş başarılı oldu",
+        isSessionRestore
+          ? "Kayıtlı oturum doğrulanıyor..."
+          : "Giriş başarılı oldu",
       );
       setAppLoadingCheck("users", "active", "Kullanıcılar kontrol ediliyor...");
     }
@@ -2900,7 +3000,9 @@ function updateSessionCard() {
   const isAuth = isAuthenticated();
   const isAdmin = getCurrentRole() === "admin";
   const currentName = isAuth
-    ? (isAdmin ? (currentSessionUser?.name || "Admin") : (getCurrentPlayer()?.name || currentSessionUser?.name || "Kullanıcı"))
+    ? isAdmin
+      ? currentSessionUser?.name || "Admin"
+      : getCurrentPlayer()?.name || currentSessionUser?.name || "Kullanıcı"
     : "Giriş yapılmadı";
   const online = isAuth ? navigator.onLine : false;
   const statusText = online ? "Online" : "Offline";
@@ -2951,10 +3053,18 @@ function closeAccountMenus() {
 
 function toggleAccountMenu(type = "mobile") {
   const isMobileMenu = type === "mobile";
-  const menu = document.getElementById(isMobileMenu ? "mobileAccountMenu" : "desktopAccountMenu");
-  const btn = document.getElementById(isMobileMenu ? "mobileAccountBtn" : "desktopAccountBtn");
-  const otherMenu = document.getElementById(isMobileMenu ? "desktopAccountMenu" : "mobileAccountMenu");
-  const otherBtn = document.getElementById(isMobileMenu ? "desktopAccountBtn" : "mobileAccountBtn");
+  const menu = document.getElementById(
+    isMobileMenu ? "mobileAccountMenu" : "desktopAccountMenu",
+  );
+  const btn = document.getElementById(
+    isMobileMenu ? "mobileAccountBtn" : "desktopAccountBtn",
+  );
+  const otherMenu = document.getElementById(
+    isMobileMenu ? "desktopAccountMenu" : "mobileAccountMenu",
+  );
+  const otherBtn = document.getElementById(
+    isMobileMenu ? "desktopAccountBtn" : "mobileAccountBtn",
+  );
   if (!menu || !btn) return;
   const willOpen = menu.hidden;
   if (otherMenu) otherMenu.hidden = true;
@@ -2998,15 +3108,24 @@ async function changeOwnPassword() {
 
   if (useOnlineMode) {
     try {
-      const result = await updateOnlineUser({ id: player.id, sifre: password.trim() });
+      const result = await updateOnlineUser({
+        id: player.id,
+        sifre: password.trim(),
+      });
       if (!result?.success) {
-        showAlert(result?.message || "Şifre güncellenemedi.", { title: "Kayıt Hatası", type: "warning" });
+        showAlert(result?.message || "Şifre güncellenemedi.", {
+          title: "Kayıt Hatası",
+          type: "warning",
+        });
         return;
       }
       await syncUsersFromSheet();
     } catch (error) {
       console.error("Kendi şifre güncelleme hatası:", error);
-      showAlert(error?.message || "Şifre güncellenemedi.", { title: "Kayıt Hatası", type: "warning" });
+      showAlert(error?.message || "Şifre güncellenemedi.", {
+        title: "Kayıt Hatası",
+        type: "warning",
+      });
       return;
     }
   } else {
@@ -3014,12 +3133,16 @@ async function changeOwnPassword() {
   }
 
   if (currentSessionUser) currentSessionUser.password = password.trim();
-  if (state?.settings?.auth?.user) state.settings.auth.user.password = password.trim();
+  if (state?.settings?.auth?.user)
+    state.settings.auth.user.password = password.trim();
   saveState(true);
   updateSessionCard();
   closeAccountMenus();
   renderAll();
-  showAlert("Şifren başarıyla güncellendi.", { title: "İşlem tamam", type: "success" });
+  showAlert("Şifren başarıyla güncellendi.", {
+    title: "İşlem tamam",
+    type: "success",
+  });
 }
 
 function clearLoginErrorState() {
@@ -3176,7 +3299,10 @@ async function loginUser() {
 
     if (!result?.success || !result?.user) {
       resetLoginForm();
-      setLoginFeedback("error", result?.message || "Kullanıcı adı veya şifre hatalı.");
+      setLoginFeedback(
+        "error",
+        result?.message || "Kullanıcı adı veya şifre hatalı.",
+      );
       document.getElementById("loginUsername")?.focus();
       return;
     }
@@ -3234,7 +3360,6 @@ async function loginUser() {
   }
 }
 
-
 function closeLandscapeSidebar() {}
 
 function updateNavSelection(tabName) {
@@ -3254,7 +3379,6 @@ function updateNavSelection(tabName) {
       btn.classList.toggle("active", btn.dataset.tab === tabName),
     );
 }
-
 
 let predictionViewportRestoreToken = 0;
 
@@ -3290,7 +3414,8 @@ function capturePredictionViewport(options = {}) {
 
   const focusId = Object.prototype.hasOwnProperty.call(options, "focusId")
     ? options.focusId
-    : activeInput?.id || `pred_home_${options.matchId || ""}_${options.playerId || ""}`;
+    : activeInput?.id ||
+      `pred_home_${options.matchId || ""}_${options.playerId || ""}`;
 
   return {
     windowX: scrollPos.x,
@@ -3318,8 +3443,10 @@ function restorePredictionViewport(snapshot) {
   window.scrollTo(snapshot.windowX || 0, snapshot.windowY || 0);
 
   if (shell) {
-    if (typeof snapshot.shellLeft === "number") shell.scrollLeft = snapshot.shellLeft;
-    if (typeof snapshot.shellTop === "number") shell.scrollTop = snapshot.shellTop;
+    if (typeof snapshot.shellLeft === "number")
+      shell.scrollLeft = snapshot.shellLeft;
+    if (typeof snapshot.shellTop === "number")
+      shell.scrollTop = snapshot.shellTop;
   }
 
   let focusTarget = null;
@@ -3595,14 +3722,14 @@ function renderMobilePredictions(container, matches) {
           .map((player) => {
             const pred = ensurePrediction(match.id, player.id);
             const hasPrediction = pred.homePred !== "" || pred.awayPred !== "";
-            const canEdit = canEditPrediction(player.id);
+            const canEdit = canEditPrediction(player.id, match.seasonId);
             const statusClass = hasPrediction
               ? "filled-prediction"
               : "empty-prediction";
-              const lockedClass =
-                lockedForUi || !canEdit
-                  ? "locked-cell locked-mobile-card"
-                  : "editable-cell";
+            const lockedClass =
+              lockedForUi || !canEdit
+                ? "locked-cell locked-mobile-card"
+                : "editable-cell";
             const ownClass =
               player.id === currentPlayerId ? "own-player-card" : "";
             const outcomeClass = getPredictionOutcomeClass(pred, match);
@@ -3618,7 +3745,8 @@ function renderMobilePredictions(container, matches) {
               pred.homePred !== "" || pred.awayPred !== ""
                 ? `${pred.homePred !== "" ? pred.homePred : "-"} - ${pred.awayPred !== "" ? pred.awayPred : "-"}`
                 : "--";
-            const showSaveAction = canEdit && shouldShowPredictionSaveAction(match.id, player.id);
+            const showSaveAction =
+              canEdit && shouldShowPredictionSaveAction(match.id, player.id);
             if (!isOwnPlayer && !isAdmin) {
               return `
               <div class="mobile-other-prediction premium-user-card compact-user-row ${pointLabel(pred.points)} ${outcomeClass} ${statusClass}">
@@ -3627,7 +3755,7 @@ function renderMobilePredictions(container, matches) {
                   <span class="compact-score-pill">${scoreDisplay}</span>
                 </div>
                 <div class="compact-user-meta">
-                  <span class="mini-points premium-points compact-points">${ `${pred.points || 0} puan`}</span>
+                  <span class="mini-points premium-points compact-points">${`${pred.points || 0} puan`}</span>
                   <div class="prediction-status-chip ${outcomeClass} compact-status" id="pred_status_${match.id}_${player.id}">
                     ${statusText}
                   </div>
@@ -3916,21 +4044,29 @@ function getPrediction(matchId, playerId) {
 
 function ensureActiveSelections() {
   const activeSeasonId = getActiveSeasonId();
-  if (!state.settings.activeSeasonId && activeSeasonId)
+  if (!state.settings.activeSeasonId && activeSeasonId) {
     state.settings.activeSeasonId = activeSeasonId;
-  const seasonWeeks = getWeeksBySeasonId(getActiveSeasonId());
+  }
+
+  const seasonId = getActiveSeasonId();
+  const seasonWeeks = getWeeksBySeasonId(seasonId);
+
   if (!seasonWeeks.length) {
     state.settings.activeWeekId = null;
     return;
   }
+
   const exists = seasonWeeks.some((w) => w.id === state.settings.activeWeekId);
-  if (!exists) state.settings.activeWeekId = seasonWeeks[0].id;
+  const preferredWeekId = getPreferredWeekIdForSeason(seasonId);
+
+  if (!exists || !state.settings.activeWeekId) {
+    state.settings.activeWeekId = preferredWeekId;
+  }
 }
 
 async function setActiveSeason(seasonId) {
   state.settings.activeSeasonId = seasonId || null;
-  const firstWeek = getWeeksBySeasonId(seasonId)[0];
-  state.settings.activeWeekId = firstWeek?.id || null;
+  state.settings.activeWeekId = getPreferredWeekIdForSeason(seasonId);
   saveState();
   renderAll();
   await syncOnlinePredictions({
@@ -3985,23 +4121,23 @@ const remoteTeamLogoUrlCache = new Map();
 const remoteTeamLogoPromiseCache = new Map();
 
 const TEAM_REMOTE_SEARCH_ALIASES = {
-  "Başakşehir": ["Istanbul Basaksehir", "Basaksehir"],
+  Başakşehir: ["Istanbul Basaksehir", "Basaksehir"],
   "İstanbul Başakşehir": ["Istanbul Basaksehir", "Basaksehir"],
-  "Beşiktaş": ["Besiktas", "Besiktas JK"],
+  Beşiktaş: ["Besiktas", "Besiktas JK"],
   "Çaykur Rizespor": ["Rizespor", "Caykur Rizespor"],
-  "Eyüpspor": ["Eyupspor"],
+  Eyüpspor: ["Eyupspor"],
   "Fatih Karagümrük": ["Fatih Karagumruk"],
   "Fatih Karagümrük SK": ["Fatih Karagumruk"],
-  "Fenerbahçe": ["Fenerbahce"],
-  "Galatasaray": ["Galatasaray SK"],
+  Fenerbahçe: ["Fenerbahce"],
+  Galatasaray: ["Galatasaray SK"],
   "Gaziantep FK": ["Gaziantep", "Gaziantep FK"],
-  "Gençlerbirliği": ["Genclerbirligi"],
-  "Göztepe": ["Goztepe", "Goztepe Izmir"],
-  "İstanbulspor": ["Istanbulspor"],
-  "Kasımpaşa": ["Kasimpasa"],
-  "Kocaelispor": ["Kocaelispor"],
-  "Sivasspor": ["Sivasspor"],
-  "Trabzonspor": ["Trabzonspor"],
+  Gençlerbirliği: ["Genclerbirligi"],
+  Göztepe: ["Goztepe", "Goztepe Izmir"],
+  İstanbulspor: ["Istanbulspor"],
+  Kasımpaşa: ["Kasimpasa"],
+  Kocaelispor: ["Kocaelispor"],
+  Sivasspor: ["Sivasspor"],
+  Trabzonspor: ["Trabzonspor"],
 };
 
 function normalizeTeamSearchToken(value) {
@@ -4017,25 +4153,39 @@ function normalizeTeamSearchToken(value) {
 
 function getTeamRemoteSearchNames(teamName) {
   const aliases = TEAM_REMOTE_SEARCH_ALIASES[teamName] || [];
-  return [...new Set([
-    teamName,
-    ...aliases,
-    String(teamName || "").replace(/İ/g, "I").replace(/ı/g, "i"),
-    String(teamName || "").replace(/FK$/i, "").trim(),
-  ].map((item) => String(item || "").trim()).filter(Boolean))];
+  return [
+    ...new Set(
+      [
+        teamName,
+        ...aliases,
+        String(teamName || "")
+          .replace(/İ/g, "I")
+          .replace(/ı/g, "i"),
+        String(teamName || "")
+          .replace(/FK$/i, "")
+          .trim(),
+      ]
+        .map((item) => String(item || "").trim())
+        .filter(Boolean),
+    ),
+  ];
 }
 
 async function fetchRemoteTeamLogoUrl(teamName) {
   const cacheKey = normalizeTeamSearchToken(teamName);
   if (!cacheKey) return "";
-  if (remoteTeamLogoUrlCache.has(cacheKey)) return remoteTeamLogoUrlCache.get(cacheKey) || "";
-  if (remoteTeamLogoPromiseCache.has(cacheKey)) return remoteTeamLogoPromiseCache.get(cacheKey);
+  if (remoteTeamLogoUrlCache.has(cacheKey))
+    return remoteTeamLogoUrlCache.get(cacheKey) || "";
+  if (remoteTeamLogoPromiseCache.has(cacheKey))
+    return remoteTeamLogoPromiseCache.get(cacheKey);
 
   const request = (async () => {
     const wanted = normalizeTeamSearchToken(teamName);
     for (const searchName of getTeamRemoteSearchNames(teamName)) {
       try {
-        const response = await fetch(`https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=${encodeURIComponent(searchName)}`);
+        const response = await fetch(
+          `https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=${encodeURIComponent(searchName)}`,
+        );
         if (!response.ok) continue;
         const payload = await response.json();
         const teams = Array.isArray(payload?.teams) ? payload.teams : [];
@@ -4049,9 +4199,13 @@ async function fetchRemoteTeamLogoUrl(teamName) {
             ]
               .map(normalizeTeamSearchToken)
               .join(" ");
-            return hay.includes(wanted) || wanted.includes(normalizeTeamSearchToken(item?.strTeam));
+            return (
+              hay.includes(wanted) ||
+              wanted.includes(normalizeTeamSearchToken(item?.strTeam))
+            );
           }) || teams[0];
-        const logoUrl = matched?.strBadge || matched?.strTeamBadge || matched?.strLogo || "";
+        const logoUrl =
+          matched?.strBadge || matched?.strTeamBadge || matched?.strLogo || "";
         if (logoUrl) {
           remoteTeamLogoUrlCache.set(cacheKey, logoUrl);
           return logoUrl;
@@ -4073,11 +4227,18 @@ async function fetchRemoteTeamLogoUrl(teamName) {
 }
 
 async function hydrateTeamLogoImage(img) {
-  if (!img || img.dataset.remoteLoading === "1" || img.dataset.remoteResolved === "1") return;
+  if (
+    !img ||
+    img.dataset.remoteLoading === "1" ||
+    img.dataset.remoteResolved === "1"
+  )
+    return;
   img.dataset.remoteLoading = "1";
   const fallback = img.nextElementSibling;
   try {
-    const remoteUrl = await fetchRemoteTeamLogoUrl(img.dataset.teamName || img.alt || "");
+    const remoteUrl = await fetchRemoteTeamLogoUrl(
+      img.dataset.teamName || img.alt || "",
+    );
     if (remoteUrl) {
       img.src = remoteUrl;
       img.style.display = "block";
@@ -4115,7 +4276,8 @@ function teamLogoHtml(teamName, seasonId, extraClass = "") {
   const team = getTeamMetaByName(teamName, seasonId);
   const slug = team.slug || slugify(teamName);
   const localSrc = `logos/${slug}.png`;
-  const explicitRemote = team.logoUrl || team.logo || team.badge || team.image || "";
+  const explicitRemote =
+    team.logoUrl || team.logo || team.badge || team.image || "";
   return `
     <span class="team-logo-wrap ${extraClass}">
       <img class="team-logo-img" src="${explicitRemote || localSrc}" data-local-src="${localSrc}" data-team-name="${escapeHtml(teamName)}" alt="${escapeHtml(teamName)} logosu" onerror="window.handleTeamLogoError && window.handleTeamLogoError(this);" />
@@ -4297,7 +4459,24 @@ function pointLabel(points) {
 function getWeekNumberById(weekId) {
   return getWeekById(weekId)?.number || 0;
 }
+function isWeekCompleted(weekId) {
+  const matches = getMatchesByWeekId(weekId);
+  if (!matches.length) return false;
+  return matches.every((match) => match.played);
+}
 
+function getPreferredWeekIdForSeason(seasonId) {
+  const weeks = getWeeksBySeasonId(seasonId).sort(
+    (a, b) => Number(a.number) - Number(b.number),
+  );
+
+  if (!weeks.length) return null;
+
+  const firstIncompleteWeek = weeks.find((week) => !isWeekCompleted(week.id));
+  if (firstIncompleteWeek) return firstIncompleteWeek.id;
+
+  return weeks[weeks.length - 1].id;
+}
 function ensureWeekForSeason(seasonId, weekNumber) {
   if (!weekNumber) return null;
   let week = getWeeksBySeasonId(seasonId).find(
@@ -4494,15 +4673,23 @@ function renderSeasonOptions(select, includePlaceholder = false) {
 }
 
 function renderWeekOptions(select, seasonId, includePlaceholder = false) {
-  const weeks = getWeeksBySeasonId(seasonId);
+  const weeks = getWeeksBySeasonId(seasonId).sort(
+    (a, b) => Number(a.number) - Number(b.number),
+  );
+  const preferredWeekId = getPreferredWeekIdForSeason(seasonId);
+
   select.innerHTML = includePlaceholder
     ? '<option value="">Hafta seç</option>'
     : "";
+
   weeks.forEach((week) => {
     const selected = week.id === state.settings.activeWeekId ? "selected" : "";
+    const completedMark = isWeekCompleted(week.id) ? " ✅" : "";
+    const currentMark = week.id === preferredWeekId ? " 🟢" : "";
+
     select.insertAdjacentHTML(
       "beforeend",
-      `<option value="${week.id}" ${selected}>${week.number}. Hafta</option>`,
+      `<option value="${week.id}" ${selected}>${week.number}. Hafta${completedMark}${currentMark}</option>`,
     );
   });
 }
@@ -4612,12 +4799,21 @@ function renderDashboardSyncCard() {
 function buildFirebaseAdminSummary() {
   const activeSeasonId = getActiveSeasonId();
   const activeWeekId = state.settings.activeWeekId;
-  const activeWeekMatches = activeWeekId ? getMatchesByWeekId(activeWeekId) : [];
+  const activeWeekMatches = activeWeekId
+    ? getMatchesByWeekId(activeWeekId)
+    : [];
   const activeWeekMatchIds = new Set(activeWeekMatches.map((item) => item.id));
-  const activeWeekPredictions = state.predictions.filter((item) => activeWeekMatchIds.has(item.matchId));
-  const lastPrediction = [...state.predictions]
-    .filter((item) => item.updatedAt || item.remoteId || item.id)
-    .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime())[0] || null;
+  const activeWeekPredictions = state.predictions.filter((item) =>
+    activeWeekMatchIds.has(item.matchId),
+  );
+  const lastPrediction =
+    [...state.predictions]
+      .filter((item) => item.updatedAt || item.remoteId || item.id)
+      .sort(
+        (a, b) =>
+          new Date(b.updatedAt || 0).getTime() -
+          new Date(a.updatedAt || 0).getTime(),
+      )[0] || null;
 
   return {
     source: getOnlineSourceLabel(),
@@ -4626,8 +4822,12 @@ function buildFirebaseAdminSummary() {
     weekCount: activeSeasonId ? getWeeksBySeasonId(activeSeasonId).length : 0,
     matchCount: state.matches.length,
     activeWeekMatchCount: activeWeekMatches.length,
-    predictionCount: state.predictions.filter((item) => item.homePred !== "" && item.awayPred !== "").length,
-    activeWeekPredictionCount: activeWeekPredictions.filter((item) => item.homePred !== "" && item.awayPred !== "").length,
+    predictionCount: state.predictions.filter(
+      (item) => item.homePred !== "" && item.awayPred !== "",
+    ).length,
+    activeWeekPredictionCount: activeWeekPredictions.filter(
+      (item) => item.homePred !== "" && item.awayPred !== "",
+    ).length,
     queueCount: getPendingPredictionQueue().length,
     lastPrediction,
   };
@@ -4646,53 +4846,6 @@ function renderFirebaseAdminPanel() {
   panel.classList.remove("hidden");
 
   const summary = buildFirebaseAdminSummary();
-  const recentPredictions = [...state.predictions]
-    .filter((item) => item.homePred !== "" && item.awayPred !== "")
-    .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime())
-    .slice(0, 12);
-
-  const playerRows = state.players
-    .map((player) => {
-      const count = state.predictions.filter((p) => p.playerId === player.id && p.homePred !== "" && p.awayPred !== "").length;
-      const presence = getPresenceStatusForUser(player.id);
-      const statusClass = presence.isOnline ? "online" : "offline";      const statusText = presence.isOnline ? "Online" : "Offline";
-      const canForceLogout = getPlayerRole(player) !== "admin";
-      return `
-        <tr>
-          <td>${escapeHtml(player.name)}</td>
-          <td>${escapeHtml(player.username || player.name.toLowerCase())}</td>
-          <td>${count}</td>
-          <td>${escapeHtml(player.password || "1234")}</td>
-          <td><span class="badge ${statusClass}">${statusText}</span></td>
-          <td>${formatAdminPanelDateTime(presence.lastSeen)}</td>
-          <td>${canForceLogout ? `<button type="button" class="small danger" onclick="forceLogoutUserSession('${player.id}')">Sistemden Çıkar</button>` : '<span class="small-meta">Admin</span>'}</td>
-        </tr>
-      `;
-    })
-    .join("");
-
-  const predictionRows = recentPredictions.length
-    ? recentPredictions
-        .map((pred) => {
-          const player = getPlayerById(pred.playerId);
-          const match = state.matches.find((item) => item.id === pred.matchId);
-          const weekNo = match ? getWeekNumberById(match.weekId) : "-";
-          const seasonName = match ? getSeasonById(match.seasonId)?.name || "-" : "-";
-          const playedLabel = match?.played ? "Oynandı" : isMatchLocked(match) ? "Kilitli" : "Açık";
-          return `
-            <tr>
-              <td>${escapeHtml(player?.name || pred.username || pred.playerId || "-")}</td>
-              <td>${escapeHtml(match ? `${match.homeTeam} - ${match.awayTeam}` : pred.matchId || "-")}</td>
-              <td>${pred.homePred} - ${pred.awayPred}</td>
-              <td>${escapeHtml(String(weekNo))}</td>
-              <td>${escapeHtml(seasonName)}</td>
-              <td>${escapeHtml(playedLabel)}</td>
-              <td>${formatAdminPanelDateTime(pred.updatedAt)}</td>
-            </tr>
-          `;
-        })
-        .join("")
-    : '<tr><td colspan="7">Henüz kayıtlı tahmin yok.</td></tr>';
 
   panel.innerHTML = `
     <section class="card firebase-admin-card collapsible-card is-open" id="firebaseAdminCard">
@@ -4720,24 +4873,13 @@ function renderFirebaseAdminPanel() {
       </div>
 
       <div class="status-note firebase-admin-status" id="firebaseAdminPanelStatus">Son tahmin: ${summary.lastPrediction ? formatAdminPanelDateTime(summary.lastPrediction.updatedAt) : "Henüz yok"}</div>
-      <div class="firebase-admin-table-grid">
-        <div class="firebase-admin-table-wrap">
-          <div class="firebase-admin-table-title">Kullanıcılar</div>
-          <div class="firebase-admin-table-scroll">
-            <table class="firebase-admin-table">
-              <thead><tr><th>Ad</th><th>Kullanıcı</th><th>Tahmin</th><th>Şifre</th><th>Durum</th><th>Son Görülme</th><th>İşlem</th></tr></thead>
-              <tbody>${playerRows || '<tr><td colspan="7">Kayıt yok.</td></tr>'}</tbody>
-            </table>
+      <div class="firebase-admin-focus-card">
+        <div class="firebase-admin-focus-head">
+          <div>
+            <div class="firebase-admin-focus-title">Kişi oturumları artık Kişiler sayfasında</div>
+            <div class="small-meta">Online / offline ve son giriş bilgilerini kartların içinde canlı olarak takip edebilirsin.</div>
           </div>
-        </div>
-        <div class="firebase-admin-table-wrap">
-          <div class="firebase-admin-table-title">Son Tahminler</div>
-          <div class="firebase-admin-table-scroll">
-            <table class="firebase-admin-table">
-              <thead><tr><th>Kişi</th><th>Maç</th><th>Tahmin</th><th>Hafta</th><th>Sezon</th><th>Durum</th><th>Güncelleme</th></tr></thead>
-              <tbody>${predictionRows}</tbody>
-            </table>
-          </div>
+          <button type="button" class="secondary small" onclick="switchTab('players')">Kişiler sayfasına git</button>
         </div>
       </div>
       </div>
@@ -4749,12 +4891,14 @@ async function refreshFirebaseAdminPanel(buttonOrEvent) {
   const actionButton = getActionButtonFromArg(buttonOrEvent);
   const status = document.getElementById("firebaseAdminPanelStatus");
   setAsyncButtonState(actionButton, "loading", { loading: "Yenileniyor..." });
-  if (status) status.textContent = `${getOnlineSourceLabel()} verileri yenileniyor...`;
+  if (status)
+    status.textContent = `${getOnlineSourceLabel()} verileri yenileniyor...`;
   try {
     await hydrateFromFirebaseRealtime("manuel");
     renderFirebaseAdminPanel();
     bindAdminPanelTableScroll();
-    if (status) status.textContent = `${getOnlineSourceLabel()} verileri güncellendi • ${formatAdminPanelDateTime(new Date().toISOString())}`;
+    if (status)
+      status.textContent = `${getOnlineSourceLabel()} verileri güncellendi • ${formatAdminPanelDateTime(new Date().toISOString())}`;
     setAsyncButtonState(actionButton, "success", { success: "Hazır" });
   } catch (error) {
     if (status) status.textContent = error?.message || "Panel yenilenemedi.";
@@ -4768,12 +4912,20 @@ async function testFirebaseAdminConnection(buttonOrEvent) {
   setAsyncButtonState(actionButton, "loading", { loading: "Test ediliyor..." });
   try {
     const result = await runFirebaseConnectionTest();
-    if (status) status.textContent = `Bağlantı başarılı • ${formatAdminPanelDateTime(result.timestamp)}`;
-    showAlert("Firebase bağlantısı başarılı.", { title: "Bağlantı Testi", type: "success" });
+    if (status)
+      status.textContent = `Bağlantı başarılı • ${formatAdminPanelDateTime(result.timestamp)}`;
+    showAlert("Firebase bağlantısı başarılı.", {
+      title: "Bağlantı Testi",
+      type: "success",
+    });
     setAsyncButtonState(actionButton, "success", { success: "Başarılı" });
   } catch (error) {
-    if (status) status.textContent = error?.message || "Bağlantı testi başarısız.";
-    showAlert(error?.message || "Firebase bağlantı testi başarısız.", { title: "Bağlantı Hatası", type: "warning" });
+    if (status)
+      status.textContent = error?.message || "Bağlantı testi başarısız.";
+    showAlert(error?.message || "Firebase bağlantı testi başarısız.", {
+      title: "Bağlantı Hatası",
+      type: "warning",
+    });
     setAsyncButtonState(actionButton, "error", { error: "Hata" });
   }
 }
@@ -4854,8 +5006,14 @@ function renderStats() {
     { label: "Aktif Sezon", value: escapeHtml(season?.name || "-") },
     { label: "Kişi Sayısı", value: String(getVisiblePlayersOrdered().length) },
     { label: "Haftadaki Maç", value: String(matches.length) },
-    { label: "Oynanmış Maç", value: String(matches.filter((m) => m.played).length) },
-    { label: "Eksik Tahmin", value: String(activeWeekId ? countMissingPredictions(activeWeekId) : 0) },
+    {
+      label: "Oynanmış Maç",
+      value: String(matches.filter((m) => m.played).length),
+    },
+    {
+      label: "Eksik Tahmin",
+      value: String(activeWeekId ? countMissingPredictions(activeWeekId) : 0),
+    },
     {
       label: "Lider",
       value: leader
@@ -4924,17 +5082,34 @@ function renderPlayers() {
               `
               : `<div class="player-empty-seasons">Önce sezon ekle. Sezonlar oluştukça burada kutular çıkacak.</div>`;
 
+          const presence = getPresenceStatusForUser(player.id);
+          const statusClass = presence.isOnline ? "is-online" : "is-offline";
+          const statusText = presence.isOnline ? "Online" : "Offline";
+
           return `
-            <div class="player-premium-card ${isAdminUser ? "is-admin" : ""}">
+            <div class="player-premium-card ${isAdminUser ? "is-admin" : ""} ${statusClass}">
               <div class="player-card-glow"></div>
 
               <div class="player-card-top">
                 <div class="player-card-title-row">
-                  <div class="player-card-name">${escapeHtml(player.name)}</div>
+                  <div>
+                    <div class="player-card-name">${escapeHtml(player.name)}</div>
+                    <div class="player-card-username">@${escapeHtml(player.username || player.name)}</div>
+                  </div>
+                  <div class="player-card-top-right">
                   ${isAdminUser ? '<span class="player-role-badge">Admin</span>' : ""}
+                  <div class="player-presence-pill ${statusClass}">
+                    <span class="player-presence-dot"></span>
+                    <strong>${statusText}</strong>
+                  </div>
+                </div>
                 </div>
 
                 <div class="player-card-stats">
+                  <div class="player-stat-pill player-stat-pill-wide">
+                    <span class="player-stat-label">Son giriş</span>
+                    <strong>${presence.lastSeen ? formatAdminPanelDateTime(presence.lastSeen) : "Henüz giriş yok"}</strong>
+                  </div>
                   <div class="player-stat-pill">
                     <span class="player-stat-label">Şifre</span>
                     <strong>${escapeHtml(player.password || "1234")}</strong>
@@ -4952,8 +5127,9 @@ function renderPlayers() {
               </div>
 
               <div class="player-card-actions">
-                <button class="small secondary" onclick="renamePlayer('${player.id}', this)">Adı Düzenle</button>
-                <button class="small secondary" onclick="changePlayerPassword('${player.id}', this)">Şifre Değiştir</button>
+                <button class="small secondary" onclick="renamePlayer('${player.id}', this)">Düzenle</button>
+                <button class="small secondary" onclick="changePlayerPassword('${player.id}', this)">Ş. Değiştir</button>
+                ${isAdminUser ? "" : `<button class="small secondary" onclick="forceLogoutUserSession('${player.id}', this)">Sistemden At</button>`}
                 ${isAdminUser ? "" : `<button class="small danger" onclick="removePlayer('${player.id}', this)">Sil</button>`}
               </div>
             </div>
@@ -5193,7 +5369,9 @@ function renderSeasons() {
   const teams = getTeamsBySeasonId(seasonId);
   const season = getSeasonById(seasonId);
   if (!season) {
-    container.innerHTML = createEmptyState("Önce lig adıyla birlikte bir sezon oluştur.");
+    container.innerHTML = createEmptyState(
+      "Önce lig adıyla birlikte bir sezon oluştur.",
+    );
     return;
   }
 
@@ -5268,7 +5446,9 @@ window.saveSeasonTeamSlug = async function (teamId, buttonOrEvent) {
   const actionButton = getActionButtonFromArg(buttonOrEvent);
   const team = getTeamById(teamId);
   if (!team) return;
-  const nextSlug = String(team._draftSlug || team.slug || slugify(team.name) || "").trim();
+  const nextSlug = String(
+    team._draftSlug || team.slug || slugify(team.name) || "",
+  ).trim();
   if (!nextSlug) {
     return showAlert("Logo dosya adı boş olamaz.", {
       title: "Eksik bilgi",
@@ -5344,7 +5524,10 @@ window.removeSeason = async function (id) {
 
       for (const user of remoteUsers) {
         const seasonStates = normalizeSeasonStateMap(
-          user.seasonStates || user.seasonMemberships || user.activeSeasons || {},
+          user.seasonStates ||
+            user.seasonMemberships ||
+            user.activeSeasons ||
+            {},
         );
         if (!Object.prototype.hasOwnProperty.call(seasonStates, id)) continue;
         delete seasonStates[id];
@@ -5365,7 +5548,9 @@ window.removeSeason = async function (id) {
   state.teams = state.teams.filter((t) => t.seasonId !== id);
   state.weeks = state.weeks.filter((w) => w.seasonId !== id);
   state.matches = state.matches.filter((m) => m.seasonId !== id);
-  state.predictions = state.predictions.filter((p) => !matchIds.includes(String(p.matchId)));
+  state.predictions = state.predictions.filter(
+    (p) => !matchIds.includes(String(p.matchId)),
+  );
   state.players = state.players.map((player) => {
     const seasonStates = getPlayerSeasonStateMap(player);
     if (!Object.prototype.hasOwnProperty.call(seasonStates, id)) return player;
@@ -5704,7 +5889,11 @@ window.forceLogoutUserSession = async function (playerId) {
   if (
     !(await showConfirm(
       `${player.name} kullanıcısını sistemden çıkarmak istiyor musun?`,
-      { title: "Kullanıcı çıkarılsın mı?", type: "danger", confirmText: "Çıkar" },
+      {
+        title: "Kullanıcı çıkarılsın mı?",
+        type: "danger",
+        confirmText: "Çıkar",
+      },
     ))
   )
     return;
@@ -5749,8 +5938,13 @@ window.removeMatch = async function (matchId) {
       const remotePredictions = firebaseSnapshotToArray(predictionsMap).filter(
         (pred) =>
           String(pred.matchId || "") ===
-            String(match.sheetMatchId || match.remoteMatchId || match.macId || match.id || "") ||
-          String(pred.matchId || "") === String(match.id),
+            String(
+              match.sheetMatchId ||
+                match.remoteMatchId ||
+                match.macId ||
+                match.id ||
+                "",
+            ) || String(pred.matchId || "") === String(match.id),
       );
 
       await firebaseRemove(
@@ -5878,9 +6072,13 @@ function downloadBlobFile(blob, fileName) {
 
 function getTeamPalette(name) {
   const index = Math.max(0, DEFAULT_TEAM_NAMES.indexOf(name));
-  return TEAM_COLORS[
-    index >= 0 ? index % TEAM_COLORS.length : Math.abs(String(name || "").length) % TEAM_COLORS.length
-  ] || ["#38bdf8", "#22c55e"];
+  return (
+    TEAM_COLORS[
+      index >= 0
+        ? index % TEAM_COLORS.length
+        : Math.abs(String(name || "").length) % TEAM_COLORS.length
+    ] || ["#38bdf8", "#22c55e"]
+  );
 }
 
 function truncateCanvasText(ctx, text, maxWidth) {
@@ -5894,7 +6092,16 @@ function truncateCanvasText(ctx, text, maxWidth) {
   return `${output}…`;
 }
 
-function fillRoundedRect(ctx, x, y, width, height, radius, fillStyle, strokeStyle = "") {
+function fillRoundedRect(
+  ctx,
+  x,
+  y,
+  width,
+  height,
+  radius,
+  fillStyle,
+  strokeStyle = "",
+) {
   const r = Math.min(radius, width / 2, height / 2);
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -5918,7 +6125,8 @@ const shareLogoImageCache = new Map();
 function getTeamLogoCandidateSources(teamName, seasonId = getActiveSeasonId()) {
   const team = getTeamMetaByName(teamName, seasonId);
   const slug = team?.slug || DEFAULT_TEAM_SLUGS[teamName] || slugify(teamName);
-  const remoteCached = remoteTeamLogoUrlCache.get(normalizeTeamSearchToken(teamName)) || "";
+  const remoteCached =
+    remoteTeamLogoUrlCache.get(normalizeTeamSearchToken(teamName)) || "";
   return [
     slug ? `logos/${slug}.png` : "",
     team?.logoUrl || "",
@@ -5968,7 +6176,14 @@ async function getTeamLogoImage(teamName, seasonId = getActiveSeasonId()) {
   return null;
 }
 
-async function drawTeamBadgeOnCanvas(ctx, teamName, x, y, size, seasonId = getActiveSeasonId()) {
+async function drawTeamBadgeOnCanvas(
+  ctx,
+  teamName,
+  x,
+  y,
+  size,
+  seasonId = getActiveSeasonId(),
+) {
   const logoImg = await getTeamLogoImage(teamName, seasonId);
   if (logoImg) {
     ctx.save();
@@ -5979,7 +6194,13 @@ async function drawTeamBadgeOnCanvas(ctx, teamName, x, y, size, seasonId = getAc
     ctx.fill();
     ctx.clip();
     const inset = Math.max(3, Math.round(size * 0.08));
-    ctx.drawImage(logoImg, x + inset, y + inset, size - inset * 2, size - inset * 2);
+    ctx.drawImage(
+      logoImg,
+      x + inset,
+      y + inset,
+      size - inset * 2,
+      size - inset * 2,
+    );
     ctx.restore();
     ctx.save();
     ctx.strokeStyle = "rgba(255,255,255,0.22)";
@@ -5995,7 +6216,16 @@ async function drawTeamBadgeOnCanvas(ctx, teamName, x, y, size, seasonId = getAc
   const gradient = ctx.createLinearGradient(x, y, x + size, y + size);
   gradient.addColorStop(0, colorA);
   gradient.addColorStop(1, colorB);
-  fillRoundedRect(ctx, x, y, size, size, size / 2, gradient, "rgba(255,255,255,0.18)");
+  fillRoundedRect(
+    ctx,
+    x,
+    y,
+    size,
+    size,
+    size / 2,
+    gradient,
+    "rgba(255,255,255,0.18)",
+  );
   ctx.fillStyle = "#f8fafc";
   ctx.font = `800 ${Math.max(14, Math.round(size * 0.32))}px Inter, Arial, sans-serif`;
   ctx.textAlign = "center";
@@ -6004,11 +6234,28 @@ async function drawTeamBadgeOnCanvas(ctx, teamName, x, y, size, seasonId = getAc
   ctx.textAlign = "left";
 }
 
-function drawPredictionShareHeader(ctx, x, y, width, title, subtitle, pageText) {
+function drawPredictionShareHeader(
+  ctx,
+  x,
+  y,
+  width,
+  title,
+  subtitle,
+  pageText,
+) {
   const headGradient = ctx.createLinearGradient(x, y, x + width, y + 80);
   headGradient.addColorStop(0, "rgba(15,23,42,0.96)");
   headGradient.addColorStop(1, "rgba(12,36,74,0.96)");
-  fillRoundedRect(ctx, x, y, width, 88, 24, headGradient, "rgba(148,163,184,0.16)");
+  fillRoundedRect(
+    ctx,
+    x,
+    y,
+    width,
+    88,
+    24,
+    headGradient,
+    "rgba(148,163,184,0.16)",
+  );
   ctx.fillStyle = "#38bdf8";
   ctx.font = "800 22px Inter, Arial, sans-serif";
   ctx.fillText("PAYLAŞIM EKRANI", x + 24, y + 28);
@@ -6018,7 +6265,16 @@ function drawPredictionShareHeader(ctx, x, y, width, title, subtitle, pageText) 
   ctx.fillStyle = "#94a3b8";
   ctx.font = "600 18px Inter, Arial, sans-serif";
   ctx.fillText(subtitle, x + 360, y + 62);
-  fillRoundedRect(ctx, x + width - 150, y + 22, 126, 40, 20, "rgba(15,23,42,0.88)", "rgba(255,255,255,0.16)");
+  fillRoundedRect(
+    ctx,
+    x + width - 150,
+    y + 22,
+    126,
+    40,
+    20,
+    "rgba(15,23,42,0.88)",
+    "rgba(255,255,255,0.16)",
+  );
   ctx.fillStyle = "#e2e8f0";
   ctx.font = "800 18px Inter, Arial, sans-serif";
   ctx.textAlign = "center";
@@ -6069,24 +6325,30 @@ function getShareCellPalette(pred, match, shareView) {
   };
 }
 
-async function createPredictionShareExportCanvas(matches, players, options = {}) {
+async function createPredictionShareExportCanvas(
+  matches,
+  players,
+  options = {},
+) {
   const shareView = options.shareView === "post" ? "post" : "pre";
   const seasonName = getSeasonById(getActiveSeasonId())?.name || "Sezon";
   const weekNumber = getWeekNumberById(state.settings.activeWeekId) || "?";
   const pageIndex = Number(options.pageIndex || 0);
   const totalPages = Number(options.totalPages || 1);
-  const weeklyStandings = shareView === "post" ? getWeeklyStandings(state.settings.activeWeekId) : [];
-  const summaryRows = shareView === "post"
-    ? players.map((player) => {
-        const row = weeklyStandings.find((item) => item.id === player.id) || {
-          id: player.id,
-          total: 0,
-          exact: 0,
-          resultOnly: 0,
-        };
-        return { ...row, id: player.id, name: player.name };
-      })
-    : [];
+  const weeklyStandings =
+    shareView === "post" ? getWeeklyStandings(state.settings.activeWeekId) : [];
+  const summaryRows =
+    shareView === "post"
+      ? players.map((player) => {
+          const row = weeklyStandings.find((item) => item.id === player.id) || {
+            id: player.id,
+            total: 0,
+            exact: 0,
+            resultOnly: 0,
+          };
+          return { ...row, id: player.id, name: player.name };
+        })
+      : [];
 
   const rankingMap = new Map(
     [...summaryRows]
@@ -6108,7 +6370,8 @@ async function createPredictionShareExportCanvas(matches, players, options = {})
   const playerColW = shareView === "post" ? 152 : 140;
   const summaryW = shareView === "post" ? 340 : 0;
   const width = margin * 2 + matchColW + players.length * playerColW + summaryW;
-  const height = margin * 2 + headerH + tableHeadH + matches.length * rowH + footerH;
+  const height =
+    margin * 2 + headerH + tableHeadH + matches.length * rowH + footerH;
 
   const canvas = document.createElement("canvas");
   const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
@@ -6151,7 +6414,16 @@ async function createPredictionShareExportCanvas(matches, players, options = {})
     "rgba(15,23,42,0.86)",
     "rgba(148,163,184,0.16)",
   );
-  fillRoundedRect(ctx, tableX, tableY, tableW, tableHeadH, 22, "rgba(17,24,39,0.94)", "");
+  fillRoundedRect(
+    ctx,
+    tableX,
+    tableY,
+    tableW,
+    tableHeadH,
+    22,
+    "rgba(17,24,39,0.94)",
+    "",
+  );
   ctx.fillStyle = "#e2e8f0";
   ctx.font = "800 22px Inter, Arial, sans-serif";
   ctx.fillText("MAÇ", tableX + 18, tableY + 34);
@@ -6171,7 +6443,11 @@ async function createPredictionShareExportCanvas(matches, players, options = {})
     ctx.fillStyle = "#f8fafc";
     ctx.font = "900 18px Inter, Arial, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(String(player.name || "").toUpperCase(), cellX + playerColW / 2, tableY + 32);
+    ctx.fillText(
+      String(player.name || "").toUpperCase(),
+      cellX + playerColW / 2,
+      tableY + 32,
+    );
     ctx.textAlign = "left";
   });
 
@@ -6196,7 +6472,13 @@ async function createPredictionShareExportCanvas(matches, players, options = {})
     const rightTeamMaxW = 150;
     const centerX = tableX + matchColW / 2;
 
-    await drawTeamBadgeOnCanvas(ctx, match.homeTeam, leftX, rowY + 20, badgeSize);
+    await drawTeamBadgeOnCanvas(
+      ctx,
+      match.homeTeam,
+      leftX,
+      rowY + 20,
+      badgeSize,
+    );
     ctx.fillStyle = "#f8fafc";
     ctx.font = "800 18px Inter, Arial, sans-serif";
     ctx.fillText(
@@ -6206,7 +6488,13 @@ async function createPredictionShareExportCanvas(matches, players, options = {})
     );
 
     const rightBadgeX = tableX + matchColW - 18 - badgeSize;
-    await drawTeamBadgeOnCanvas(ctx, match.awayTeam, rightBadgeX, rowY + 20, badgeSize);
+    await drawTeamBadgeOnCanvas(
+      ctx,
+      match.awayTeam,
+      rightBadgeX,
+      rowY + 20,
+      badgeSize,
+    );
     const awayText = truncateCanvasText(ctx, match.awayTeam, rightTeamMaxW);
     const awayWidth = ctx.measureText(awayText).width;
     ctx.fillText(awayText, rightBadgeX - 12 - awayWidth, rowY + 42);
@@ -6257,7 +6545,11 @@ async function createPredictionShareExportCanvas(matches, players, options = {})
       ctx.fillStyle = match.played ? "#bfdbfe" : "#94a3b8";
       ctx.font = "700 11px Inter, Arial, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(match.played ? "Fikstür skoru" : "Bekleniyor", centerX, rowY + 70);
+      ctx.fillText(
+        match.played ? "Fikstür skoru" : "Bekleniyor",
+        centerX,
+        rowY + 70,
+      );
       ctx.textAlign = "left";
     }
 
@@ -6288,7 +6580,11 @@ async function createPredictionShareExportCanvas(matches, players, options = {})
       ctx.fillStyle = palette.accent;
       ctx.font = "900 28px Inter, Arial, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(getPredictionDisplayValue(pred), cellX + playerColW / 2, rowY + 38);
+      ctx.fillText(
+        getPredictionDisplayValue(pred),
+        cellX + playerColW / 2,
+        rowY + 38,
+      );
       ctx.font = "800 13px Inter, Arial, sans-serif";
       ctx.fillStyle = shareView === "post" ? palette.accent : "#bfdbfe";
       const status =
@@ -6316,7 +6612,10 @@ async function createPredictionShareExportCanvas(matches, players, options = {})
     const sumWidth = summaryW - 18;
     const summaryCardH = 78;
     const summaryGap = 10;
-    const sumHeight = Math.min(panelH, 84 + summaryRows.length * (summaryCardH + summaryGap));
+    const sumHeight = Math.min(
+      panelH,
+      84 + summaryRows.length * (summaryCardH + summaryGap),
+    );
     fillRoundedRect(
       ctx,
       sumX,
@@ -6356,7 +6655,16 @@ async function createPredictionShareExportCanvas(matches, players, options = {})
               ? "rgba(59,130,246,0.30)"
               : "rgba(148,163,184,0.18)";
 
-      fillRoundedRect(ctx, cardX, cardY, cardW, summaryCardH, 16, rankFill, rankStroke);
+      fillRoundedRect(
+        ctx,
+        cardX,
+        cardY,
+        cardW,
+        summaryCardH,
+        16,
+        rankFill,
+        rankStroke,
+      );
       fillRoundedRect(
         ctx,
         cardX + 12,
@@ -6364,7 +6672,13 @@ async function createPredictionShareExportCanvas(matches, players, options = {})
         28,
         28,
         14,
-        rank === 1 ? "#10b981" : rank === 2 ? "#f59e0b" : rank === 3 ? "#3b82f6" : "#334155",
+        rank === 1
+          ? "#10b981"
+          : rank === 2
+            ? "#f59e0b"
+            : rank === 3
+              ? "#3b82f6"
+              : "#334155",
         "",
       );
       ctx.fillStyle = "#ffffff";
@@ -6375,17 +6689,54 @@ async function createPredictionShareExportCanvas(matches, players, options = {})
 
       ctx.fillStyle = "#0f172a";
       ctx.font = "900 16px Inter, Arial, sans-serif";
-      const summaryName = truncateCanvasText(ctx, String(row.name || "").toUpperCase(), cardW - 68);
+      const summaryName = truncateCanvasText(
+        ctx,
+        String(row.name || "").toUpperCase(),
+        cardW - 68,
+      );
       ctx.fillText(summaryName, cardX + 50, cardY + 24);
 
       const chips = [
-        { label: `Hafta ${row.total || 0}P`, x: cardX + 50, y: cardY + 40, w: 84, fill: "rgba(16,185,129,0.14)", stroke: "rgba(16,185,129,0.26)", text: "#047857" },
-        { label: `Tam ${row.exact || 0}`, x: cardX + 142, y: cardY + 40, w: 68, fill: "rgba(56,189,248,0.14)", stroke: "rgba(56,189,248,0.24)", text: "#0369a1" },
-        { label: `Yakın ${row.resultOnly || 0}`, x: cardX + 218, y: cardY + 40, w: 78, fill: "rgba(245,158,11,0.14)", stroke: "rgba(245,158,11,0.24)", text: "#b45309" },
+        {
+          label: `Hafta ${row.total || 0}P`,
+          x: cardX + 50,
+          y: cardY + 40,
+          w: 84,
+          fill: "rgba(16,185,129,0.14)",
+          stroke: "rgba(16,185,129,0.26)",
+          text: "#047857",
+        },
+        {
+          label: `Tam ${row.exact || 0}`,
+          x: cardX + 142,
+          y: cardY + 40,
+          w: 68,
+          fill: "rgba(56,189,248,0.14)",
+          stroke: "rgba(56,189,248,0.24)",
+          text: "#0369a1",
+        },
+        {
+          label: `Yakın ${row.resultOnly || 0}`,
+          x: cardX + 218,
+          y: cardY + 40,
+          w: 78,
+          fill: "rgba(245,158,11,0.14)",
+          stroke: "rgba(245,158,11,0.24)",
+          text: "#b45309",
+        },
       ];
 
       chips.forEach((chip) => {
-        fillRoundedRect(ctx, chip.x, chip.y, chip.w, 24, 12, chip.fill, chip.stroke);
+        fillRoundedRect(
+          ctx,
+          chip.x,
+          chip.y,
+          chip.w,
+          24,
+          12,
+          chip.fill,
+          chip.stroke,
+        );
         ctx.fillStyle = chip.text;
         ctx.font = "800 11px Inter, Arial, sans-serif";
         ctx.fillText(chip.label, chip.x + 9, chip.y + 16);
@@ -6396,7 +6747,11 @@ async function createPredictionShareExportCanvas(matches, players, options = {})
   ctx.fillStyle = "rgba(148,163,184,0.72)";
   ctx.font = "700 12px Inter, Arial, sans-serif";
   ctx.textAlign = "right";
-  ctx.fillText(`Oluşturuldu: ${formatDate(new Date())}`, width - margin, height - 8);
+  ctx.fillText(
+    `Oluşturuldu: ${formatDate(new Date())}`,
+    width - margin,
+    height - 8,
+  );
   ctx.textAlign = "left";
 
   return canvas;
@@ -6411,13 +6766,19 @@ async function exportPredictionShareImage() {
   try {
     const weekId = state.settings.activeWeekId;
     if (!weekId) {
-      await showAlert("Önce bir hafta seçmelisin.", { title: "Hafta gerekli", type: "warning" });
+      await showAlert("Önce bir hafta seçmelisin.", {
+        title: "Hafta gerekli",
+        type: "warning",
+      });
       return;
     }
     const matches = getMatchesByWeekId(weekId);
     const players = getVisiblePlayersOrdered();
     if (!matches.length || !players.length) {
-      await showAlert("Görsel oluşturmak için maç ve kullanıcı verisi gerekli.", { title: "Veri eksik", type: "warning" });
+      await showAlert(
+        "Görsel oluşturmak için maç ve kullanıcı verisi gerekli.",
+        { title: "Veri eksik", type: "warning" },
+      );
       return;
     }
 
@@ -6428,13 +6789,18 @@ async function exportPredictionShareImage() {
     const downloaded = [];
 
     for (let pageIndex = 0; pageIndex < totalPages; pageIndex += 1) {
-      const chunk = players.slice(pageIndex * playersPerPage, pageIndex * playersPerPage + playersPerPage);
+      const chunk = players.slice(
+        pageIndex * playersPerPage,
+        pageIndex * playersPerPage + playersPerPage,
+      );
       const canvas = await createPredictionShareExportCanvas(matches, chunk, {
         shareView,
         pageIndex,
         totalPages,
       });
-      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+      const blob = await new Promise((resolve) =>
+        canvas.toBlob(resolve, "image/png"),
+      );
       if (!blob) throw new Error("PNG dosyası oluşturulamadı.");
       const suffix = totalPages > 1 ? `-sayfa-${pageIndex + 1}` : "";
       const fileName = `tahmin-paylasim-${shareView === "post" ? "mac-sonrasi" : "mac-oncesi"}-hafta-${weekLabel}${suffix}.png`;
@@ -6451,10 +6817,13 @@ async function exportPredictionShareImage() {
     );
   } catch (error) {
     console.error("Paylaşım görseli oluşturulamadı:", error);
-    await showAlert(error?.message || "Görsel oluşturulurken bir hata oluştu.", {
-      title: "İndirme başarısız",
-      type: "error",
-    });
+    await showAlert(
+      error?.message || "Görsel oluşturulurken bir hata oluştu.",
+      {
+        title: "İndirme başarısız",
+        type: "error",
+      },
+    );
   } finally {
     if (button) {
       button.classList.remove("is-busy");
@@ -6559,7 +6928,6 @@ function renderPredictions() {
     return;
   }
 
-
   const currentPlayerId = getCurrentPlayerId();
 
   const headerPlayers = players
@@ -6600,7 +6968,8 @@ function renderPredictions() {
 
           const statusText = getPredictionBaseStatus(match.id, player.id);
           const showDeleteAction = hasPrediction || pred.remoteId || isSaving;
-          const showSaveAction = canEdit && shouldShowPredictionSaveAction(match.id, player.id);
+          const showSaveAction =
+            canEdit && shouldShowPredictionSaveAction(match.id, player.id);
 
           const pointValue = Number(pred.points || 0);
           const showPointBadge = hasPrediction;
@@ -6733,7 +7102,9 @@ function getPredictionBaseStatus(matchId, playerId) {
 }
 
 function bindPredictionTableDesktopScroll() {
-  const shell = document.querySelector("#predictionsTable .predictions-scroll-shell");
+  const shell = document.querySelector(
+    "#predictionsTable .predictions-scroll-shell",
+  );
   if (!shell) return;
 
   if (shell._dragScrollBound) return;
@@ -6759,7 +7130,8 @@ function bindPredictionTableDesktopScroll() {
 
   shell.addEventListener("pointerdown", (event) => {
     if (event.pointerType === "mouse" && event.button !== 0) return;
-    if (event.target.closest("button, input, select, textarea, label, a")) return;
+    if (event.target.closest("button, input, select, textarea, label, a"))
+      return;
 
     pointerId = event.pointerId;
     startX = event.clientX;
@@ -6842,7 +7214,10 @@ function getPredictionInputElements(matchId, playerId) {
 
 function getPredictionInputSnapshot(matchId, playerId) {
   const pred = ensurePrediction(matchId, playerId);
-  const { homeInput, awayInput } = getPredictionInputElements(matchId, playerId);
+  const { homeInput, awayInput } = getPredictionInputElements(
+    matchId,
+    playerId,
+  );
   const homePred = parseNumberOrEmpty(homeInput?.value ?? pred.homePred ?? "");
   const awayPred = parseNumberOrEmpty(awayInput?.value ?? pred.awayPred ?? "");
   return {
@@ -6863,14 +7238,21 @@ function hasStoredPredictionRecord(matchId, playerId) {
 }
 
 function hasPredictionInputChanged(matchId, playerId) {
-  const { pred, homePred, awayPred } = getPredictionInputSnapshot(matchId, playerId);
-  return homePred !== parseNumberOrEmpty(pred.homePred) || awayPred !== parseNumberOrEmpty(pred.awayPred);
+  const { pred, homePred, awayPred } = getPredictionInputSnapshot(
+    matchId,
+    playerId,
+  );
+  return (
+    homePred !== parseNumberOrEmpty(pred.homePred) ||
+    awayPred !== parseNumberOrEmpty(pred.awayPred)
+  );
 }
 
 function shouldShowPredictionSaveAction(matchId, playerId) {
   const key = getPredictionUiKey(matchId, playerId);
   const uiState = predictionUiState[key] || "idle";
-  if (["saving", "queued", "error", "deleteError"].includes(uiState)) return true;
+  if (["saving", "queued", "error", "deleteError"].includes(uiState))
+    return true;
 
   if (!hasStoredPredictionRecord(matchId, playerId)) return false;
 
@@ -6883,7 +7265,10 @@ function shouldShowPredictionSaveAction(matchId, playerId) {
 function shouldAutoSavePrediction(matchId, playerId) {
   const match = state.matches.find((item) => item.id === matchId);
   if (!match) return false;
-  if ((isMatchLocked(match) && getCurrentRole() !== "admin") || !canEditPrediction(playerId)) {
+  if (
+    (isMatchLocked(match) && getCurrentRole() !== "admin") ||
+    !canEditPrediction(playerId)
+  ) {
     return false;
   }
 
@@ -7134,7 +7519,8 @@ window.deletePredictionEntry = async function (matchId, playerId) {
 
 window.savePrediction = async function (matchId, playerId, options = {}) {
   const viewportSnapshot =
-    options.viewportSnapshot || capturePredictionViewport({ matchId, playerId });
+    options.viewportSnapshot ||
+    capturePredictionViewport({ matchId, playerId });
   const match = state.matches.find((m) => m.id === matchId);
 
   if (
@@ -7418,9 +7804,13 @@ function getPlayerSeasonStats(seasonId = getActiveSeasonId()) {
       const total = preds.reduce((sum, pred) => sum + (pred.points || 0), 0);
       const exact = preds.filter((pred) => pred.points === 3).length;
       const resultOnly = preds.filter((pred) => pred.points === 1).length;
-      const average = filledPreds.length ? (total / filledPreds.length).toFixed(2) : "0.00";
+      const average = filledPreds.length
+        ? (total / filledPreds.length).toFixed(2)
+        : "0.00";
       const recentForm = seasonMatches
-        .map((match) => preds.find((pred) => String(pred.matchId) === String(match.id)))
+        .map((match) =>
+          preds.find((pred) => String(pred.matchId) === String(match.id)),
+        )
         .filter(Boolean)
         .filter((pred) => pred.homePred !== "" && pred.awayPred !== "")
         .slice(-5)
@@ -7457,18 +7847,21 @@ function renderAdvancedStats() {
   const champion = getChampion(seasonId);
   const playerStats = getPlayerSeasonStats(seasonId);
   const liveLeader = playerStats[0] || null;
-  const risingStar = [...playerStats].sort(
-    (a, b) =>
-      b.recentForm.reduce((sum, point) => sum + point, 0) -
-        a.recentForm.reduce((sum, point) => sum + point, 0) ||
-      b.average - a.average,
-  )[0] || null;
-  const sharpShooter = [...playerStats].sort(
-    (a, b) => b.exact - a.exact || b.total - a.total,
-  )[0] || null;
-  const safePredictor = [...playerStats].sort(
-    (a, b) => b.resultOnly - a.resultOnly || b.total - a.total,
-  )[0] || null;
+  const risingStar =
+    [...playerStats].sort(
+      (a, b) =>
+        b.recentForm.reduce((sum, point) => sum + point, 0) -
+          a.recentForm.reduce((sum, point) => sum + point, 0) ||
+        b.average - a.average,
+    )[0] || null;
+  const sharpShooter =
+    [...playerStats].sort(
+      (a, b) => b.exact - a.exact || b.total - a.total,
+    )[0] || null;
+  const safePredictor =
+    [...playerStats].sort(
+      (a, b) => b.resultOnly - a.resultOnly || b.total - a.total,
+    )[0] || null;
 
   document.getElementById("advancedStatsGrid").innerHTML = [
     ["Sezon Maçı", info.totalMatches],
@@ -7484,7 +7877,6 @@ function renderAdvancedStats() {
         ? `${info.bestResult.name} (${info.bestResult.resultOnly})`
         : "-",
     ],
-    
   ]
     .map(
       ([label, value]) =>
@@ -7497,9 +7889,7 @@ function renderAdvancedStats() {
         .map((player) => {
           const formMarkup = player.recentForm.length
             ? player.recentForm
-                .map(
-                  (point) => `<span class="form-pill">${point}p</span>`,
-                )
+                .map((point) => `<span class="form-pill">${point}p</span>`)
                 .join("")
             : '<span class="small-meta">Henüz tahmin yok</span>';
           return `
@@ -7871,12 +8261,12 @@ function addPlayer(buttonOrEvent) {
       type: "warning",
     });
 
-    const newPlayer = {
-      id: `player-${slugify(name) || "oyuncu"}`,
-      name: name.toUpperCase(),
-      password,
-      seasonStates: createDefaultSeasonStateMap(true),
-    };
+  const newPlayer = {
+    id: `player-${slugify(name) || "oyuncu"}`,
+    name: name.toUpperCase(),
+    password,
+    seasonStates: createDefaultSeasonStateMap(true),
+  };
 
   if (useOnlineMode) {
     addUserOnline(newPlayer, actionButton);
@@ -8010,9 +8400,7 @@ function addMatch() {
   if (useOnlineMode) {
     window.__ALLOW_MATCH_WRITE__ = true;
     sendMatchesToSheet([newMatch], { force: true })
-      .catch((error) =>
-        console.error("Tek maç Sheets senkron hatası:", error),
-      )
+      .catch((error) => console.error("Tek maç Sheets senkron hatası:", error))
       .finally(() => {
         window.__ALLOW_MATCH_WRITE__ = false;
       });
@@ -8068,7 +8456,11 @@ function formatBackupDateStamp() {
   return new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
 }
 
-function downloadTextFile(content, fileName, mimeType = "text/plain;charset=utf-8") {
+function downloadTextFile(
+  content,
+  fileName,
+  mimeType = "text/plain;charset=utf-8",
+) {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -8109,10 +8501,16 @@ function buildWeekExportPayload(weekId) {
   const season = getSeasonById(week.seasonId);
   const matches = getMatchesByWeekId(weekId);
   const matchIds = new Set(matches.map((match) => String(match.id)));
-  const predictions = state.predictions.filter((pred) => matchIds.has(String(pred.matchId)));
+  const predictions = state.predictions.filter((pred) =>
+    matchIds.has(String(pred.matchId)),
+  );
   const playerIds = new Set(predictions.map((pred) => String(pred.playerId)));
-  const players = state.players.filter((player) => playerIds.has(String(player.id)));
-  const teams = state.teams.filter((team) => String(team.seasonId) === String(week.seasonId));
+  const players = state.players.filter((player) =>
+    playerIds.has(String(player.id)),
+  );
+  const teams = state.teams.filter(
+    (team) => String(team.seasonId) === String(week.seasonId),
+  );
 
   return {
     type: "week-backup",
@@ -8216,12 +8614,16 @@ async function syncBackupStateToFirebase(stateObj) {
 
   const usersMap = {};
   (safeState.players || []).forEach((player) => {
-    const id = sanitizeFirebaseKey(player.id || buildPlayerKeyFromName(player.name || "oyuncu", usersMap));
+    const id = sanitizeFirebaseKey(
+      player.id || buildPlayerKeyFromName(player.name || "oyuncu", usersMap),
+    );
     usersMap[id] = {
       id,
       kullaniciAdi: normalizeLoginName(player.username || player.name || id),
       sifre: String(player.password || "1234"),
-      adSoyad: String(player.name || player.username || id).trim().toUpperCase(),
+      adSoyad: String(player.name || player.username || id)
+        .trim()
+        .toUpperCase(),
       rol: getPlayerRole(player) === "admin" ? "admin" : "user",
       aktif: true,
       importedAt: stamp,
@@ -8229,15 +8631,21 @@ async function syncBackupStateToFirebase(stateObj) {
   });
 
   if (!Object.values(usersMap).some((item) => item.rol === "admin")) {
-    FIREBASE_DEFAULT_USERS.filter((item) => String(item.rol || "user").toLowerCase() === "admin").forEach((item) => {
+    FIREBASE_DEFAULT_USERS.filter(
+      (item) => String(item.rol || "user").toLowerCase() === "admin",
+    ).forEach((item) => {
       usersMap[sanitizeFirebaseKey(item.id)] = { ...item, importedAt: stamp };
     });
   }
 
   const matchesMap = {};
   (safeState.matches || []).forEach((match) => {
-    const season = safeState.seasons?.find((item) => String(item.id) === String(match.seasonId));
-    const week = safeState.weeks?.find((item) => String(item.id) === String(match.weekId));
+    const season = safeState.seasons?.find(
+      (item) => String(item.id) === String(match.seasonId),
+    );
+    const week = safeState.weeks?.find(
+      (item) => String(item.id) === String(match.weekId),
+    );
     const id = sanitizeFirebaseKey(match.id || uid("match"));
     matchesMap[id] = {
       ...match,
@@ -8252,11 +8660,21 @@ async function syncBackupStateToFirebase(stateObj) {
 
   const predictionsMap = {};
   (safeState.predictions || []).forEach((pred) => {
-    const match = (safeState.matches || []).find((item) => String(item.id) === String(pred.matchId));
-    const season = safeState.seasons?.find((item) => String(item.id) === String(match?.seasonId));
-    const week = safeState.weeks?.find((item) => String(item.id) === String(match?.weekId));
-    const player = (safeState.players || []).find((item) => String(item.id) === String(pred.playerId));
-    const id = sanitizeFirebaseKey(pred.id || makePredictionRecordId(pred.matchId, pred.playerId));
+    const match = (safeState.matches || []).find(
+      (item) => String(item.id) === String(pred.matchId),
+    );
+    const season = safeState.seasons?.find(
+      (item) => String(item.id) === String(match?.seasonId),
+    );
+    const week = safeState.weeks?.find(
+      (item) => String(item.id) === String(match?.weekId),
+    );
+    const player = (safeState.players || []).find(
+      (item) => String(item.id) === String(pred.playerId),
+    );
+    const id = sanitizeFirebaseKey(
+      pred.id || makePredictionRecordId(pred.matchId, pred.playerId),
+    );
     predictionsMap[id] = {
       ...pred,
       id,
@@ -8280,11 +8698,13 @@ async function syncBackupStateToFirebase(stateObj) {
       source: "firebase",
       lastImportAt: stamp,
       backupVersion: 1,
-      seasonsMeta: (safeState.seasons || []).map((season) => ({
-        id: String(season.id || "").trim(),
-        name: String(season.name || "").trim(),
-        leagueName: String(season.leagueName || "").trim(),
-      })).filter((season) => season.id && season.name),
+      seasonsMeta: (safeState.seasons || [])
+        .map((season) => ({
+          id: String(season.id || "").trim(),
+          name: String(season.name || "").trim(),
+          leagueName: String(season.leagueName || "").trim(),
+        }))
+        .filter((season) => season.id && season.name),
     }),
   ]);
 
@@ -8374,7 +8794,9 @@ function mergeWeekBackupIntoState(payload) {
 
   let targetSeasonId = season?.id || null;
   if (season) {
-    const existingSeason = next.seasons.find((item) => normalizeText(item.name) === normalizeText(season.name || ""));
+    const existingSeason = next.seasons.find(
+      (item) => normalizeText(item.name) === normalizeText(season.name || ""),
+    );
     if (existingSeason) {
       targetSeasonId = existingSeason.id;
     } else {
@@ -8385,7 +8807,9 @@ function mergeWeekBackupIntoState(payload) {
 
   let targetWeekId = week.id || uid("week");
   const existingWeek = next.weeks.find(
-    (item) => String(item.seasonId) === String(targetSeasonId) && Number(item.number) === Number(week.number),
+    (item) =>
+      String(item.seasonId) === String(targetSeasonId) &&
+      Number(item.number) === Number(week.number),
   );
   if (existingWeek) {
     targetWeekId = existingWeek.id;
@@ -8396,10 +8820,16 @@ function mergeWeekBackupIntoState(payload) {
   (payload.teams || []).forEach((team) => {
     if (
       !next.teams.some(
-        (item) => String(item.seasonId) === String(targetSeasonId) && normalizeText(item.name) === normalizeText(team.name || ""),
+        (item) =>
+          String(item.seasonId) === String(targetSeasonId) &&
+          normalizeText(item.name) === normalizeText(team.name || ""),
       )
     ) {
-      next.teams.push({ ...team, id: team.id || uid("team"), seasonId: targetSeasonId });
+      next.teams.push({
+        ...team,
+        id: team.id || uid("team"),
+        seasonId: targetSeasonId,
+      });
     }
   });
 
@@ -8409,8 +8839,12 @@ function mergeWeekBackupIntoState(payload) {
     }
   });
 
-  const incomingMatches = (payload.matches || []).map((match) => ({ ...match }));
-  const incomingPredictions = (payload.predictions || []).map((pred) => ({ ...pred }));
+  const incomingMatches = (payload.matches || []).map((match) => ({
+    ...match,
+  }));
+  const incomingPredictions = (payload.predictions || []).map((pred) => ({
+    ...pred,
+  }));
   const matchIdMap = new Map();
 
   const removedMatchIds = new Set(
@@ -8419,13 +8853,22 @@ function mergeWeekBackupIntoState(payload) {
       .map((match) => String(match.id)),
   );
 
-  next.matches = next.matches.filter((match) => String(match.weekId) !== String(targetWeekId));
-  next.predictions = next.predictions.filter((pred) => !removedMatchIds.has(String(pred.matchId)));
+  next.matches = next.matches.filter(
+    (match) => String(match.weekId) !== String(targetWeekId),
+  );
+  next.predictions = next.predictions.filter(
+    (pred) => !removedMatchIds.has(String(pred.matchId)),
+  );
 
   incomingMatches.forEach((match) => {
     const newId = uid("match");
     matchIdMap.set(String(match.id), newId);
-    next.matches.push({ ...match, id: newId, seasonId: targetSeasonId, weekId: targetWeekId });
+    next.matches.push({
+      ...match,
+      id: newId,
+      seasonId: targetSeasonId,
+      weekId: targetWeekId,
+    });
   });
 
   incomingPredictions.forEach((pred) => {
@@ -8438,7 +8881,8 @@ function mergeWeekBackupIntoState(payload) {
     });
   });
 
-  next.settings.activeSeasonId = targetSeasonId || next.settings.activeSeasonId || null;
+  next.settings.activeSeasonId =
+    targetSeasonId || next.settings.activeSeasonId || null;
   next.settings.activeWeekId = targetWeekId;
   return next;
 }
@@ -8454,7 +8898,12 @@ async function importData(file) {
         nextState = parsed.data;
       } else if (parsed?.type === "week-backup" && parsed?.week) {
         nextState = mergeWeekBackupIntoState(parsed);
-      } else if (parsed?.seasons || parsed?.matches || parsed?.players || parsed?.predictions) {
+      } else if (
+        parsed?.seasons ||
+        parsed?.matches ||
+        parsed?.players ||
+        parsed?.predictions
+      ) {
         nextState = parsed;
       } else {
         throw new Error("Geçersiz yedek formatı.");
@@ -8494,12 +8943,14 @@ function renderBackupPanel() {
   const seasonId = getActiveSeasonId();
   const season = getSeasonById(seasonId);
   const weeks = getWeeksBySeasonId(seasonId);
-  const selectedWeekId = select.value || state.settings.activeWeekId || weeks[0]?.id || "";
+  const selectedWeekId =
+    select.value || state.settings.activeWeekId || weeks[0]?.id || "";
 
   select.innerHTML = weeks.length
     ? weeks
         .map(
-          (week) => `<option value="${week.id}" ${String(week.id) === String(selectedWeekId) ? "selected" : ""}>Hafta ${week.number}</option>`,
+          (week) =>
+            `<option value="${week.id}" ${String(week.id) === String(selectedWeekId) ? "selected" : ""}>Hafta ${week.number}</option>`,
         )
         .join("")
     : '<option value="">Hafta bulunamadı</option>';
@@ -8507,13 +8958,17 @@ function renderBackupPanel() {
   const activeWeek = selectedWeekId ? getWeekById(selectedWeekId) : null;
   const matches = activeWeek ? getMatchesByWeekId(activeWeek.id) : [];
   const matchIds = new Set(matches.map((match) => String(match.id)));
-  const predictionCount = state.predictions.filter((pred) => matchIds.has(String(pred.matchId))).length;
+  const predictionCount = state.predictions.filter((pred) =>
+    matchIds.has(String(pred.matchId)),
+  ).length;
 
   summary.textContent = activeWeek
     ? `${season?.name || "Sezon seçilmedi"} • Hafta ${activeWeek.number} • ${matches.length} maç • ${predictionCount} tahmin`
     : "Önce aktif sezonda bir hafta oluşturmalısın.";
 
-  setBackupImportStatus(document.getElementById("backupImportStatus")?.textContent || "Hazır.");
+  setBackupImportStatus(
+    document.getElementById("backupImportStatus")?.textContent || "Hazır.",
+  );
 }
 
 async function handleDangerousReset() {
@@ -8528,21 +8983,21 @@ async function handleDangerousReset() {
   );
   if (!approved) return;
 
-  const typed = await showPrompt(
-    'Onay için kutuya SIL yaz.',
-    '',
-    {
-      title: 'Son güvenlik adımı',
-      placeholder: 'SIL',
-      confirmText: 'Verileri sil',
-      cancelText: 'Vazgeç',
-    },
-  );
+  const typed = await showPrompt("Onay için kutuya SIL yaz.", "", {
+    title: "Son güvenlik adımı",
+    placeholder: "SIL",
+    confirmText: "Verileri sil",
+    cancelText: "Vazgeç",
+  });
 
-  if (String(typed || '').trim().toUpperCase() !== 'SIL') {
-    showAlert('İşlem iptal edildi. Onay metni doğru girilmedi.', {
-      title: 'Silme durduruldu',
-      type: 'warning',
+  if (
+    String(typed || "")
+      .trim()
+      .toUpperCase() !== "SIL"
+  ) {
+    showAlert("İşlem iptal edildi. Onay metni doğru girilmedi.", {
+      title: "Silme durduruldu",
+      type: "warning",
     });
     return;
   }
@@ -8550,19 +9005,22 @@ async function handleDangerousReset() {
   const adminPlayers = (state.players || []).filter(
     (player) => getPlayerRole(player) === "admin",
   );
-  const preservedAuth = state.settings?.auth ? { ...state.settings.auth } : null;
+  const preservedAuth = state.settings?.auth
+    ? { ...state.settings.auth }
+    : null;
 
   state = createInitialState();
   state.players = adminPlayers;
   ensureAuthState(state);
-  if (preservedAuth) state.settings.auth = { ...state.settings.auth, ...preservedAuth };
+  if (preservedAuth)
+    state.settings.auth = { ...state.settings.auth, ...preservedAuth };
   saveState(true);
   await syncBackupStateToFirebase(state);
   renderAll();
-  setBackupImportStatus('Tüm veriler temizlendi.');
-  showAlert('Tüm veriler silindi. Admin erişimi korundu.', {
-    title: 'Temizleme tamamlandı',
-    type: 'success',
+  setBackupImportStatus("Tüm veriler temizlendi.");
+  showAlert("Tüm veriler silindi. Admin erişimi korundu.", {
+    title: "Temizleme tamamlandı",
+    type: "success",
   });
 }
 
@@ -8866,7 +9324,11 @@ async function importFixturesFromApi(updateResultsOnly = false) {
       ...new Set(events.flatMap((e) => [e.homeTeam, e.awayTeam])),
     ].filter(Boolean);
     teamNames.forEach((name) => {
-      if (!getTeamsBySeasonId(seasonId).some((t) => normalizeText(t.name) === normalizeText(name))) {
+      if (
+        !getTeamsBySeasonId(seasonId).some(
+          (t) => normalizeText(t.name) === normalizeText(name),
+        )
+      ) {
         state.teams.push({
           id: uid("team"),
           seasonId,
@@ -8881,7 +9343,8 @@ async function importFixturesFromApi(updateResultsOnly = false) {
       renderAll();
       status.textContent = `API'den ${teamNames.length} takım kontrol edildi. Yeni sezona yalnızca takım listesi işlendi; otomatik sezon/hafta eklenmedi.`;
       recordAdminSyncActivity({
-        lastAction: "Sezon ekranından yalnızca takım listesi API üzerinden güncellendi.",
+        lastAction:
+          "Sezon ekranından yalnızca takım listesi API üzerinden güncellendi.",
         success: true,
       });
       return true;
@@ -8982,7 +9445,9 @@ const DASHBOARD_CARD_STATE_STORAGE_PREFIX = "dashboardCardState:";
 
 function getStoredDashboardCardOpen(key, defaultOpen = true) {
   try {
-    const saved = localStorage.getItem(`${DASHBOARD_CARD_STATE_STORAGE_PREFIX}${key}`);
+    const saved = localStorage.getItem(
+      `${DASHBOARD_CARD_STATE_STORAGE_PREFIX}${key}`,
+    );
     if (saved === null) return defaultOpen;
     return saved !== "closed";
   } catch {
@@ -8999,7 +9464,12 @@ function setStoredDashboardCardOpen(key, isOpen) {
   } catch {}
 }
 
-function applyCollapsibleCardState({ cardId, buttonId, storageKey, defaultOpen = true }) {
+function applyCollapsibleCardState({
+  cardId,
+  buttonId,
+  storageKey,
+  defaultOpen = true,
+}) {
   const card = document.getElementById(cardId);
   const button = document.getElementById(buttonId);
   if (!card || !button) return;
@@ -9009,7 +9479,12 @@ function applyCollapsibleCardState({ cardId, buttonId, storageKey, defaultOpen =
   button.setAttribute("title", isOpen ? "Daralt" : "Genişlet");
 }
 
-function toggleCollapsibleCard(cardId, buttonId, storageKey, defaultOpen = true) {
+function toggleCollapsibleCard(
+  cardId,
+  buttonId,
+  storageKey,
+  defaultOpen = true,
+) {
   const card = document.getElementById(cardId);
   const button = document.getElementById(buttonId);
   if (!card || !button) return;
@@ -9071,7 +9546,6 @@ function toggleFirebaseAdminCard() {
 function updateAdminSyncToggleButton() {
   applyDashboardCollapseStates();
 }
-
 
 function bindEvents() {
   on("appModal", "click", (e) => {
@@ -9311,7 +9785,9 @@ function bindEvents() {
   on("mobileAdminMenuBackdrop", "click", closeMobileAdminMenu);
   document
     .querySelectorAll(".mobile-admin-menu-item[data-tab]")
-    .forEach((btn) => btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
+    .forEach((btn) =>
+      btn.addEventListener("click", () => switchTab(btn.dataset.tab)),
+    );
   on("desktopChangePasswordBtn", "click", changeOwnPassword);
   on("mobileChangePasswordBtn", "click", changeOwnPassword);
   on("loginBtn", "click", loginUser);
@@ -9323,14 +9799,17 @@ function bindEvents() {
 
   let lastWindowWidth = window.innerWidth;
   window.addEventListener("resize", () => {
-    if (!window.matchMedia("(max-width: 950px) and (orientation: landscape)").matches) {
+    if (
+      !window.matchMedia("(max-width: 950px) and (orientation: landscape)")
+        .matches
+    ) {
     }
     const currentWidth = window.innerWidth;
     if (currentWidth !== lastWindowWidth) {
       lastWindowWidth = currentWidth;
       renderAll();
       updateAdminSyncToggleButton();
-        }
+    }
   });
 
   [
