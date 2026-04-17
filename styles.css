@@ -5668,6 +5668,12 @@ body.login-locked {
   border: 1px solid rgba(16, 185, 129, 0.24);
 }
 
+.player-role-badge.panel-admin {
+  color: #dbeafe;
+  background: rgba(59, 130, 246, 0.16);
+  border: 1px solid rgba(96, 165, 250, 0.28);
+}
+
 .player-card-stats {
   display: flex;
   flex-wrap: wrap;

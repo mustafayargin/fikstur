@@ -271,6 +271,7 @@ async function firebaseApiPost(action, payload = {}) {
           String(payload.rol || "user").toLowerCase() === "admin"
             ? "admin"
             : "user",
+        panelAdmin: payload.panelAdmin === true,
         aktif: true,
         createdAt: new Date().toISOString(),
       };
@@ -298,6 +299,9 @@ async function firebaseApiPost(action, payload = {}) {
                   ? "admin"
                   : "user",
             }
+          : {}),
+        ...(Object.prototype.hasOwnProperty.call(payload, "panelAdmin")
+          ? { panelAdmin: payload.panelAdmin === true }
           : {}),
         ...(Object.prototype.hasOwnProperty.call(payload, "aktif")
           ? { aktif: payload.aktif !== false }
@@ -487,12 +491,7 @@ function getPresenceUserMeta() {
       "",
     username:
       player?.username || authUser?.kullaniciAdi || authUser?.username || "",
-    role:
-      String(
-        authUser?.rol || player?.role || state?.settings?.auth?.role || "user",
-      ).toLowerCase() === "admin"
-        ? "admin"
-        : "user",
+    role: hasPanelAdminAccess(player || authUser) ? "admin" : "user",
   };
 }
 
@@ -508,6 +507,24 @@ function getPlayerRole(player) {
   if (rawUsername === "admin") return "admin";
 
   return "user";
+}
+
+function hasPanelAdminAccess(userOrPlayer) {
+  if (!userOrPlayer) return false;
+
+  const rawRole = String(
+    userOrPlayer?.rol || userOrPlayer?.role || userOrPlayer?.kullaniciRol || "user",
+  ).toLowerCase();
+  if (rawRole === "admin") return true;
+
+  const rawUsername = String(
+    userOrPlayer?.kullaniciAdi || userOrPlayer?.username || "",
+  )
+    .trim()
+    .toLowerCase();
+  if (rawUsername === "admin") return true;
+
+  return userOrPlayer?.panelAdmin === true;
 }
 
 function getOnlineThresholdMs() {
@@ -2282,6 +2299,7 @@ async function syncUsersFromSheet(options = {}) {
     username: user.kullaniciAdi || "",
     role:
       String(user.rol || "user").toLowerCase() === "admin" ? "admin" : "user",
+    panelAdmin: user.panelAdmin === true,
     aktif: user.aktif !== false,
     seasonStates:
       user.seasonStates || user.seasonMemberships || user.activeSeasons || {},
@@ -2291,6 +2309,13 @@ async function syncUsersFromSheet(options = {}) {
   if (authUser) {
     const matched = findPlayerForSessionUser(authUser);
     state.settings.auth.playerId = matched ? matched.id : null;
+    if (matched && currentSessionUser) {
+      currentSessionUser.panelAdmin = matched.panelAdmin === true;
+      state.settings.auth.user = {
+        ...(state.settings.auth.user || {}),
+        panelAdmin: matched.panelAdmin === true,
+      };
+    }
   }
   saveState(true);
   if (!options.silent) renderPlayers();
@@ -2383,11 +2408,12 @@ function ensureAuthState(stateObj) {
   stateObj.players = (stateObj.players || []).map((player) => ({
     ...player,
     password: player.password || "1234",
+    panelAdmin: player.panelAdmin === true,
   }));
 }
 
 function getCurrentRole() {
-  if (getAuthUser()?.rol === "user") return "user";
+  if (hasPanelAdminAccess(getAuthUser())) return "admin";
   return state.settings?.auth?.role === "user" ? "user" : "admin";
 }
 
@@ -2999,14 +3025,24 @@ async function hydrateOnlineStateForSession(options = {}) {
 function updateSessionCard() {
   const isAuth = isAuthenticated();
   const isAdmin = getCurrentRole() === "admin";
+  const isPanelAdminUser =
+    currentSessionUser?.rol === "user" && currentSessionUser?.panelAdmin === true;
   const currentName = isAuth
-    ? isAdmin
-      ? currentSessionUser?.name || "Admin"
-      : getCurrentPlayer()?.name || currentSessionUser?.name || "Kullanıcı"
+    ? isPanelAdminUser
+      ? getCurrentPlayer()?.name || currentSessionUser?.adSoyad || currentSessionUser?.name || "Kullanıcı"
+      : isAdmin
+        ? currentSessionUser?.adSoyad || currentSessionUser?.name || "Admin"
+        : getCurrentPlayer()?.name || currentSessionUser?.adSoyad || currentSessionUser?.name || "Kullanıcı"
     : "Giriş yapılmadı";
   const online = isAuth ? navigator.onLine : false;
   const statusText = online ? "Online" : "Offline";
-  const roleText = !isAuth ? "Misafir" : isAdmin ? "Admin" : "Kullanıcı";
+  const roleText = !isAuth
+    ? "Misafir"
+    : currentSessionUser?.rol === "user" && currentSessionUser?.panelAdmin === true
+      ? "Panel Admin"
+      : isAdmin
+        ? "Admin"
+        : "Kullanıcı";
 
   const mappings = [
     ["desktopAccountName", currentName],
@@ -3325,6 +3361,7 @@ async function loginUser() {
       kullaniciAdi: result.user.kullaniciAdi || "",
       adSoyad: result.user.adSoyad || result.user.name || "",
       rol: result.user.rol || "user",
+      panelAdmin: result.user.panelAdmin === true,
       sessionStartedAt: new Date().toISOString(),
       connectedAt: new Date().toISOString(),
     };
@@ -5097,7 +5134,7 @@ function renderPlayers() {
                     <div class="player-card-username">@${escapeHtml(player.username || player.name)}</div>
                   </div>
                   <div class="player-card-top-right">
-                  ${isAdminUser ? '<span class="player-role-badge">Admin</span>' : ""}
+                  ${isAdminUser ? '<span class="player-role-badge">Admin</span>' : player.panelAdmin ? '<span class="player-role-badge panel-admin">Panel Admin</span>' : ""}
                   <div class="player-presence-pill ${statusClass}">
                     <span class="player-presence-dot"></span>
                     <strong>${statusText}</strong>
@@ -5129,6 +5166,7 @@ function renderPlayers() {
               <div class="player-card-actions">
                 <button class="small secondary" onclick="renamePlayer('${player.id}', this)">Düzenle</button>
                 <button class="small secondary" onclick="changePlayerPassword('${player.id}', this)">Ş. Değiştir</button>
+                ${isAdminUser ? "" : `<button class="small secondary" onclick="togglePanelAdmin('${player.id}', this)">${player.panelAdmin ? "Admin Yetkisini Kaldır" : "Admin Yap"}</button>`}
                 ${isAdminUser ? "" : `<button class="small secondary" onclick="forceLogoutUserSession('${player.id}', this)">Sistemden At</button>`}
                 ${isAdminUser ? "" : `<button class="small danger" onclick="removePlayer('${player.id}', this)">Sil</button>`}
               </div>
@@ -5241,6 +5279,93 @@ window.renamePlayer = async function (id, buttonOrEvent) {
   renderAll();
   setAsyncButtonState(actionButton, "success", { success: "Kaydedildi" });
 };
+
+window.togglePanelAdmin = async function (id, buttonOrEvent) {
+  if (isReadOnlyMode())
+    return showAlert("Kullanıcı görünümünde admin yetkisi değiştirilemez.", {
+      title: "Yetki yok",
+      type: "warning",
+    });
+  const actionButton = getActionButtonFromArg(buttonOrEvent);
+  const player = getPlayerById(id);
+  if (!player) return;
+  if (getPlayerRole(player) === "admin") {
+    return showAlert("Ana admin hesabının yetkisi buradan değiştirilemez.", {
+      title: "İşlem kapalı",
+      type: "warning",
+    });
+  }
+
+  const nextValue = player.panelAdmin !== true;
+  const confirmText = nextValue ? "Admin yap" : "Yetkiyi kaldır";
+  const message = nextValue
+    ? `${player.name} kullanıcısına panel admin yetkisi verilsin mi? Bu kullanıcı tahmin oyuncusu olarak görünmeye devam eder ama yönetim ekranlarını da açabilir.`
+    : `${player.name} kullanıcısının panel admin yetkisi kaldırılsın mı? Kullanıcı tahmin oyuncusu olarak kalır ama yönetim ekranlarına erişemez.`;
+
+  if (!(await showConfirm(message, {
+    title: nextValue ? "Panel admin verilsin mi?" : "Panel admin kaldırılsın mı?",
+    type: "warning",
+    confirmText,
+  }))) {
+    return;
+  }
+
+  if (useOnlineMode) {
+    setAsyncButtonState(actionButton, "loading", {
+      loading: "Kaydediliyor...",
+      success: "Kaydedildi",
+    });
+    try {
+      const result = await updateOnlineUser({
+        id: player.id,
+        panelAdmin: nextValue,
+      });
+      if (!result?.success) {
+        showAlert(result?.message || "Panel admin yetkisi güncellenemedi.", {
+          title: "Kayıt Hatası",
+          type: "warning",
+        });
+        setAsyncButtonState(actionButton, "error", { error: "Hata" });
+        return;
+      }
+      if (currentSessionUser && String(currentSessionUser.id) === String(player.id)) {
+        currentSessionUser.panelAdmin = nextValue;
+        state.settings.auth.user = { ...(state.settings.auth.user || {}), panelAdmin: nextValue };
+      }
+      await syncUsersFromSheet();
+      renderAll();
+      setAsyncButtonState(actionButton, "success", { success: "Kaydedildi" });
+      showAlert(
+        nextValue
+          ? "Kullanıcı artık panel admin yetkisine sahip. Tahmin tablosunda görünmeye devam eder."
+          : "Kullanıcının panel admin yetkisi kaldırıldı.",
+        {
+          title: "Başarılı",
+          type: "success",
+        },
+      );
+      return;
+    } catch (error) {
+      console.error("Panel admin güncelleme hatası:", error);
+      showAlert(error?.message || "Firebase güncellemesi başarısız.", {
+        title: "Kayıt Hatası",
+        type: "warning",
+      });
+      setAsyncButtonState(actionButton, "error", { error: "Hata" });
+      return;
+    }
+  }
+
+  player.panelAdmin = nextValue;
+  if (currentSessionUser && String(currentSessionUser.id) === String(player.id)) {
+    currentSessionUser.panelAdmin = nextValue;
+    state.settings.auth.user = { ...(state.settings.auth.user || {}), panelAdmin: nextValue };
+  }
+  saveState(true);
+  renderAll();
+  setAsyncButtonState(actionButton, "success", { success: "Kaydedildi" });
+};
+
 window.changePlayerPassword = async function (id, buttonOrEvent) {
   if (isReadOnlyMode())
     return showAlert("Kullanıcı görünümünde şifre değiştirilemez.", {
@@ -8265,6 +8390,7 @@ function addPlayer(buttonOrEvent) {
     id: `player-${slugify(name) || "oyuncu"}`,
     name: name.toUpperCase(),
     password,
+    panelAdmin: false,
     seasonStates: createDefaultSeasonStateMap(true),
   };
 
@@ -8292,6 +8418,7 @@ async function addUserOnline(player, actionButton = null) {
       sifre: player.password || "1234",
       adSoyad: player.name,
       seasonStates: player.seasonStates || createDefaultSeasonStateMap(true),
+      panelAdmin: player.panelAdmin === true,
     });
 
     if (!result?.success) {
