@@ -36,16 +36,28 @@
               Yedekleme
             </button>
           </nav>
-          <div
+                  </div>
+      </aside>
+
+      <main class="content">
+        <div class="desktop-topbar">
+          <div class="desktop-topbar__spacer"></div>
+<div
             class="role-switch-card session-card compact-account-card"
             id="sessionCard"
           >
             <button
-              class="secondary full account-trigger"
+              class="secondary full account-trigger desktop-account-trigger"
               type="button"
               id="desktopAccountBtn"
             >
-              Hesap
+              <span class="account-trigger-avatar" id="desktopAccountAvatar"></span>
+              <span class="account-trigger-copy">
+                <strong id="desktopAccountBtnName">Hesap</strong>
+                <small id="desktopAccountBtnRole">Misafir</small>
+                <small >Çıkış Yapmak için tıklayınız</small>
+              
+              </span>
             </button>
             <div class="account-menu" id="desktopAccountMenu" hidden>
               <div class="account-menu-head">
@@ -81,28 +93,30 @@
               </div>
             </div>
           </div>
-        </div>
-      </aside>
 
-      <main class="content">
-        <div class="mobile-top-brand" aria-hidden="true">
-          <div class="mobile-top-brand__logo">
-            <img src="favicon.png" alt="Logo" class="logo-img">
+        </div>
+
+        <div class="mobile-top-brand">
+          <div class="mobile-top-brand__main">
+            <div class="mobile-top-brand__logo">
+              <img src="favicon.png" alt="Logo" class="logo-img">
+            </div>
+            <div class="mobile-top-brand__copy">
+              <strong>Fikstür Tahmin</strong>
+              <span>Pro Panel</span>
+            </div>
           </div>
-          <div class="mobile-top-brand__copy">
-            <strong>Fikstür Tahmin</strong>
-            <span>Pro Panel</span>
-          </div>
+          <button class="mobile-top-profile-btn" type="button" id="mobileTopProfileBtn" aria-label="Profil menüsünü aç">
+            <span class="mobile-top-profile-avatar" id="mobileTopProfileAvatar"></span>
+          </button>
         </div>
 
         <section class="tab-panel active" id="tab-dashboard">
-          <div class="page-header">
+          <div class="page-header dashboard-page-header dashboard-page-header--compact">
             <div>
+              <div class="dashboard-eyebrow">Canlı hafta merkezi</div>
               <h2>Genel Bakış</h2>
-              <p>
-                Aktif sezon, haftalık durum, eksik tahminler ve liderlik tablosu
-                burada.
-              </p>
+              <p>Önce maçlar ve skorlar, altında mini özetler ve haftanın nabzı.</p>
             </div>
 
             <div class="header-actions double-selects dashboard-top-actions">
@@ -111,127 +125,105 @@
             </div>
           </div>
 
-          <div class="stats-grid" id="statsGrid"></div>
-
-          <section
-            class="card dashboard-sync-card collapsible-card is-open"
-            id="dashboardSyncCard"
-          >
-            <div class="card-header collapsible-card-header">
-              <h3>Akıllı Güncelleme</h3>
-              <button
-                type="button"
-                class="secondary card-collapse-btn"
-                id="dashboardSyncToggleBtn"
-                aria-expanded="true"
-                aria-controls="dashboardSyncCardBody"
-                title="Daralt / genişlet"
-              >
-                <span class="collapse-arrow" aria-hidden="true">⌄</span>
-              </button>
-            </div>
-            <div class="collapsible-card-body" id="dashboardSyncCardBody">
-              <div class="dashboard-sync-grid">
+          <section class="dashboard-hero-strip" id="dashboardHeroStrip">
+            <div class="dashboard-hero-main">
+              <div class="dashboard-hero-main__top">
                 <div>
-                  <div class="small-meta">
-                    Sistem sadece aktif sezon ve aktif hafta üzerinden çalışır.
-                    Yanlış hafta ya da yanlış sezon seçme riski olmaz.
-                  </div>
-                  <div class="dashboard-sync-meta">
-                    <span class="badge gray" id="dashboardActiveSeasonBadge"
-                      >Aktif sezon: -</span
-                    >
-                    <span class="badge gray" id="dashboardActiveWeekBadge"
-                      >Aktif hafta: -</span
-                    >
-                  </div>
+                  <div class="dashboard-hero-main__eyebrow">Seçili hafta özeti</div>
+                  <h3 id="dashboardHeroTitle">Hafta yükleniyor</h3>
                 </div>
-                <div class="inline-actions dashboard-sync-actions">
-                  <button class="secondary" id="dashboardSyncSeasonBtn">
-                    API'den Veri Çek
-                  </button>
-                  <button class="secondary" id="dashboardSyncWeekBtn">
-                    Seçili Haftayı Güncelle
-                  </button>
-                </div>
+                <div class="dashboard-hero-live" id="dashboardHeroLiveBadge">Beklemede</div>
               </div>
-              <div class="status-note" id="dashboardSyncStatus">Hazır.</div>
+              <p class="dashboard-hero-main__text" id="dashboardHeroText">Aktif hafta bilgileri hazırlanıyor.</p>
+              <div class="dashboard-hero-chips" id="dashboardHeroChips"></div>
             </div>
+            <div class="dashboard-hero-side" id="dashboardHeroSide"></div>
           </section>
 
-          <section
-            class="card admin-sync-overview-card admin-only is-open"
-            id="adminSyncOverviewCard"
-          >
-            <div class="card-header admin-sync-header-row">
-              <div>
-                <h3>Senkron Durumu</h3>
-                <span class="small-meta">Admin tarafında son durum özeti</span>
-              </div>
-              <button
-                type="button"
-                class="secondary admin-sync-toggle-btn card-collapse-btn"
-                id="adminSyncToggleBtn"
-                aria-expanded="true"
-                aria-controls="adminSyncOverviewBody"
-              >
-                <span class="collapse-arrow" aria-hidden="true">⌄</span>
-              </button>
-            </div>
-            <div class="admin-sync-overview-body" id="adminSyncOverviewBody">
-              <div class="admin-sync-overview-grid">
-                <div class="admin-sync-stat">
-                  <span class="admin-sync-label">Son işlem</span>
-                  <strong id="adminSyncLastAction">Hazır.</strong>
+          <div class="dashboard-main-layout">
+            <section class="card dashboard-score-card dashboard-score-card--compact">
+              <div class="card-header dashboard-score-card__header">
+                <div>
+                  <h3>Haftanın Maç Merkezi</h3>
+                  <p class="small-meta">Skoru gör, kartı aç ve herkesin tahminini tek bakışta incele.</p>
                 </div>
-                <div class="admin-sync-stat">
-                  <span class="admin-sync-label">Başarılı son senkron</span>
-                  <strong id="adminSyncLastSuccess">Henüz yok</strong>
-                </div>
-                <div class="admin-sync-stat">
-                  <span class="admin-sync-label">Bekleyen tahmin</span>
-                  <strong id="adminSyncQueueCount">0</strong>
-                </div>
-                <div class="admin-sync-stat">
-                  <span class="admin-sync-label"
-                    >Son işlemde etkilenen maç</span
-                  >
-                  <strong id="adminSyncUpdatedMatches">0</strong>
-                </div>
-              </div>
-              <div class="status-note admin-sync-last-error">
-                <strong>Son hata:</strong>
-                <span id="adminSyncLastError">Yok</span>
-              </div>
-              <div class="status-note" id="adminSyncFooter">
-                Henüz senkron yapılmadı.
-              </div>
-            </div>
-          </section>
-
-          <div
-            id="firebaseAdminPanel"
-            class="firebase-admin-panel hidden"
-          ></div>
-
-          <div class="dashboard-grid">
-            <section class="card">
-              <div class="card-header">
-                <h3>Seçili Haftadaki Maçlar</h3>
               </div>
               <div id="dashboardMatches"></div>
             </section>
 
-            <section class="card missing-predictions">
-              <div class="card-header">
-                <h3>Eksik Tahminler</h3>
+            <div class="dashboard-side-stack">
+              <section class="card dashboard-side-card">
+                <div class="card-header dashboard-side-card__header">
+                  <div>
+                    <h3>Hafta Nabzı</h3>
+                    <p class="small-meta">En kritik kısa özetler</p>
+                  </div>
+                </div>
+                <div id="dashboardPulseList"></div>
+              </section>
+
+              <section class="card dashboard-side-card">
+                <div class="card-header dashboard-side-card__header">
+                  <div>
+                    <h3>Mini Sıralama</h3>
+                    <p class="small-meta">Sezon liderliği ve yakın takip</p>
+                  </div>
+                </div>
+                <div id="dashboardLeaderboardPreview"></div>
+              </section>
+            </div>
+          </div>
+
+          <div class="stats-grid dashboard-stats-grid--compact" id="statsGrid"></div>
+
+          <section class="card dashboard-api-card dashboard-api-card--compact">
+            <div class="card-header dashboard-api-header">
+              <div>
+                <h3>Hafta Skor Güncelleme</h3>
+                <p class="small-meta">
+                  Seçili haftanın skorlarını API'den çek ve sonucu anlık çubuktan takip et.
+                </p>
               </div>
-              <div id="missingPredictions"></div>
-            </section>
+              <button class="secondary" id="dashboardWeekScoreUpdateBtn">
+                Skorları Güncelle
+              </button>
+            </div>
+
+            <div class="dashboard-api-meta">
+              <span class="badge gray" id="dashboardActiveSeasonBadge">Aktif sezon: -</span>
+              <span class="badge gray" id="dashboardActiveWeekBadge">Aktif hafta: -</span>
+            </div>
+
+            <div class="dashboard-progress-wrap" aria-live="polite">
+              <div class="dashboard-progress-label-row">
+                <strong id="dashboardApiProgressLabel">Beklemede</strong>
+                <span id="dashboardApiProgressValue">0%</span>
+              </div>
+              <div class="dashboard-progress-track">
+                <div class="dashboard-progress-fill" id="dashboardApiProgressFill"></div>
+              </div>
+            </div>
+
+            <div class="status-note" id="dashboardSyncStatus">Hazır.</div>
+          </section>
+
+          <div class="dashboard-detail-modal hidden" id="dashboardMatchModal">
+            <div class="dashboard-detail-backdrop" onclick="closeDashboardMatchModal()"></div>
+            <div class="dashboard-detail-sheet">
+              <div class="dashboard-detail-sheet__head">
+                <div>
+                  <div class="dashboard-detail-sheet__eyebrow">Maç detayları</div>
+                  <h3 id="dashboardMatchModalTitle">Maç Tahminleri</h3>
+                  <p id="dashboardMatchModalMeta">-</p>
+                </div>
+                <button class="secondary small" type="button" onclick="closeDashboardMatchModal()">Kapat</button>
+              </div>
+              <div id="dashboardMatchModalBody"></div>
+            </div>
           </div>
         </section>
 
-        <section class="tab-panel seasons-page" id="tab-seasons">
+<section class="tab-panel seasons-page" id="tab-seasons">
           <div class="page-header seasons-header">
             <div>
               <h2>Sezonlar & Takımlar</h2>
@@ -311,8 +303,8 @@
             </div>
           </div>
 
-          <div class="card form-card">
-            <div class="form-grid three">
+          <div class="card form-card player-form-card-enhanced">
+            <div class="form-grid four player-form-grid-enhanced">
               <div class="field">
                 <label for="playerName">Kişi adı</label>
                 <input type="text" id="playerName" placeholder="Örn: Veli" />
@@ -325,6 +317,12 @@
                   placeholder="Örn: 1234"
                 />
               </div>
+              <div class="field">
+                <label for="playerSupportedTeam">Tuttuğu takım</label>
+                <select id="playerSupportedTeam">
+                  <option value="">Takım seç</option>
+                </select>
+              </div>
               <div class="field button-field">
                 <button id="addPlayerBtn">Kişi Ekle</button>
               </div>
@@ -336,6 +334,19 @@
               <h3>Kayıtlı Kişiler</h3>
             </div>
             <div id="playersList"></div>
+          </div>
+          <div id="playerDetailModal" class="player-detail-modal hidden">
+            <div class="player-detail-modal__backdrop" onclick="closePlayerDetailModal()"></div>
+            <div class="player-detail-modal__dialog">
+              <button
+                type="button"
+                class="player-detail-modal__close"
+                onclick="closePlayerDetailModal()"
+              >
+                ✕
+              </button>
+              <div id="playerDetailModalBody"></div>
+            </div>
           </div>
         </section>
 
@@ -461,9 +472,6 @@
           <div class="page-header">
             <div>
               <h2>Tahminler</h2>
-              <p>
-                Seçili hafta için tüm kullanıcı tahminlerini tek ekrandan gir.
-              </p>
             </div>
             <div class="header-actions prediction-header-actions">
               <div class="double-selects">
@@ -542,11 +550,11 @@
           </div>
         </section>
 
-        <section class="tab-panel" id="tab-standings">
-          <div class="page-header">
+        <section class="tab-panel" id="tab-standings"> 
+          <div class="page-header standings-page-header standings-page-header--luxury"> 
             <div>
               <h2>Puan Durumu</h2>
-              <p>Genel toplam, haftalık puanlar ve başarı istatistikleri.</p>
+              <p>Sezon liderliği, haftalık yarış ve oyuncu performansı tek ekranda.</p>
             </div>
             <div class="header-actions double-selects">
               <select id="standingsSeasonSelect"></select>
@@ -554,19 +562,53 @@
             </div>
           </div>
 
-          <div class="dashboard-grid standings-layout">
-            <section class="card">
-              <div class="card-header">
-                <h3>Seçili Hafta Puanları</h3>
+          <div class="standings-summary-strip standings-summary-strip--compact" id="standingsSummaryStrip" hidden></div>
+
+          <section class="standings-hero-shell standings-hero-shell--immersive card">
+            <div class="standings-stage-head">
+              <div class="standings-stage-copy">
+                <span class="standings-hero-kicker">Sezon Liderlik Sahnesi</span>
+                <h3>İlk 3 yarışta kim önde?</h3>
+                <p>Tahtada ilk 3 burada, geri kalan sıralama ve haftalık yarış hemen aşağıda.</p>
               </div>
-              <div id="weeklyStandings"></div>
-            </section>
-            <section class="card">
-              <div class="card-header">
-                <h3>Genel Sıralama</h3>
+            </div>
+            <div id="standingsHero"></div>
+          </section>
+
+          <div class="standings-luxury-layout">
+            <section class="card standings-board-card">
+              <div class="card-header standings-card-head standings-list-head">
+                <div>
+                  <h3>Genel Sıralama</h3>
+                  <p class="card-subtitle">Toplam puan, tam skor ve yakın tahmin başarısı.</p>
+                </div>
+                <span class="badge gray" id="generalLeaderBadge">Sezon lideri bekleniyor</span>
               </div>
               <div id="standingsTable"></div>
             </section>
+
+            <aside class="standings-side-stack standings-side-stack--luxury">
+              <section class="card standings-week-card">
+                <div class="card-header standings-card-head standings-list-head">
+                  <div>
+                    <h3>Haftalık Yarış</h3>
+                    <p class="card-subtitle">Seçili haftada kim daha formda?</p>
+                  </div>
+                  <span class="badge info" id="weeklyLeaderBadge">Hafta lideri bekleniyor</span>
+                </div>
+                <div id="weeklyStandings"></div>
+              </section>
+
+              <section class="card standings-insight-card standings-insight-card--luxury">
+                <div class="card-header standings-card-head standings-list-head">
+                  <div>
+                    <h3>Hafta Özeti</h3>
+                    <p class="card-subtitle">Yarışın nabzı ve anlık özet.</p>
+                  </div>
+                </div>
+                <div id="standingsInsights"></div>
+              </section>
+            </aside>
           </div>
         </section>
 
@@ -606,6 +648,111 @@
               </p>
             </div>
           </div>
+
+          <section class="card backup-admin-hub admin-only">
+            <div class="card-header">
+              <div>
+                <h3>Sistem Yönetimi</h3>
+                <p class="small-meta">
+                  Genel bakış ekranındaki yoğun alanlar buraya taşındı. Senkron, Firebase özeti ve akıllı güncelleme artık tek yerde.
+                </p>
+              </div>
+            </div>
+
+            <div class="backup-admin-hub-grid">
+              <section
+                class="card dashboard-sync-card collapsible-card is-open"
+                id="dashboardSyncCard"
+              >
+                <div class="card-header collapsible-card-header">
+                  <h3>Akıllı Güncelleme</h3>
+                  <button
+                    type="button"
+                    class="secondary card-collapse-btn"
+                    id="dashboardSyncToggleBtn"
+                    aria-expanded="true"
+                    aria-controls="dashboardSyncCardBody"
+                    title="Daralt / genişlet"
+                  >
+                    <span class="collapse-arrow" aria-hidden="true">⌄</span>
+                  </button>
+                </div>
+                <div class="collapsible-card-body" id="dashboardSyncCardBody">
+                  <div class="dashboard-sync-grid">
+                    <div>
+                      <div class="small-meta">
+                        Sistem sadece aktif sezon ve aktif hafta üzerinden çalışır.
+                        Yanlış hafta ya da yanlış sezon seçme riski olmaz.
+                      </div>
+                      <div class="dashboard-sync-meta">
+                        <span class="badge gray" id="dashboardAdminSeasonBadge">Aktif sezon: -</span>
+                        <span class="badge gray" id="dashboardAdminWeekBadge">Aktif hafta: -</span>
+                      </div>
+                    </div>
+                    <div class="inline-actions dashboard-sync-actions">
+                      <button class="secondary" id="dashboardSyncSeasonBtn">
+                        API'den Veri Çek
+                      </button>
+                      <button class="secondary" id="dashboardSyncWeekBtn">
+                        Seçili Haftayı Güncelle
+                      </button>
+                    </div>
+                  </div>
+                  <div class="status-note" id="dashboardSyncAdminStatus">Hazır.</div>
+                </div>
+              </section>
+
+              <section
+                class="card admin-sync-overview-card admin-only is-open"
+                id="adminSyncOverviewCard"
+              >
+                <div class="card-header admin-sync-header-row">
+                  <div>
+                    <h3>Senkron Durumu</h3>
+                    <span class="small-meta">Admin tarafında son durum özeti</span>
+                  </div>
+                  <button
+                    type="button"
+                    class="secondary admin-sync-toggle-btn card-collapse-btn"
+                    id="adminSyncToggleBtn"
+                    aria-expanded="true"
+                    aria-controls="adminSyncOverviewBody"
+                  >
+                    <span class="collapse-arrow" aria-hidden="true">⌄</span>
+                  </button>
+                </div>
+                <div class="admin-sync-overview-body" id="adminSyncOverviewBody">
+                  <div class="admin-sync-overview-grid">
+                    <div class="admin-sync-stat">
+                      <span class="admin-sync-label">Son işlem</span>
+                      <strong id="adminSyncLastAction">Hazır.</strong>
+                    </div>
+                    <div class="admin-sync-stat">
+                      <span class="admin-sync-label">Başarılı son senkron</span>
+                      <strong id="adminSyncLastSuccess">Henüz yok</strong>
+                    </div>
+                    <div class="admin-sync-stat">
+                      <span class="admin-sync-label">Bekleyen tahmin</span>
+                      <strong id="adminSyncQueueCount">0</strong>
+                    </div>
+                    <div class="admin-sync-stat">
+                      <span class="admin-sync-label">Son işlemde etkilenen maç</span>
+                      <strong id="adminSyncUpdatedMatches">0</strong>
+                    </div>
+                  </div>
+                  <div class="status-note admin-sync-last-error">
+                    <strong>Son hata:</strong>
+                    <span id="adminSyncLastError">Yok</span>
+                  </div>
+                  <div class="status-note" id="adminSyncFooter">
+                    Henüz senkron yapılmadı.
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <div id="firebaseAdminPanel" class="firebase-admin-panel hidden"></div>
+          </section>
 
           <div class="dashboard-grid backup-layout backup-layout-redesign">
             <section class="card stack-actions backup-main-card">
@@ -672,9 +819,6 @@
       </button>
       <button class="mobile-nav-btn admin-only" type="button" id="mobileAdminMenuBtn">
         Menü
-      </button>
-      <button class="mobile-nav-btn" type="button" id="mobileAccountBtn">
-        Hesap
       </button>
     </nav>
 
@@ -759,6 +903,17 @@
         <button class="full" id="loginBtn">Giriş Yap</button>
 
         <div class="status-note" id="loginStatus">Hazır.</div>
+      </div>
+    </div>
+
+
+    <div class="welcome-overlay hidden" id="welcomeOverlay" aria-hidden="true">
+      <div class="welcome-overlay__backdrop"></div>
+      <div class="welcome-card" id="welcomeCard">
+        <div class="welcome-card__glow"></div>
+        <div class="welcome-card__avatar" id="welcomeAvatar"></div>
+        <h2 class="welcome-card__title" id="welcomeTitle">Hoş geldin!</h2>
+        <p class="welcome-card__message" id="welcomeMessage">İyi haftalar, bol şans! ✨</p>
       </div>
     </div>
 
@@ -922,18 +1077,22 @@
 
     <script>
       window.FIKSTUR_FIREBASE_CONFIG = {
-        apiKey: "AIzaSyDNBlZiB--PvK2QGJbumfvrt16mkD-fPQ0",
-        authDomain: "superlig-tahmin-panel.firebaseapp.com",
-        databaseURL:
-          "https://superlig-tahmin-panel-default-rtdb.europe-west1.firebasedatabase.app",
-        projectId: "superlig-tahmin-panel",
-        storageBucket: "superlig-tahmin-panel.firebasestorage.app",
-        messagingSenderId: "89142067230",
-        appId: "1:89142067230:web:96a69696dc1dbcac16ee0f",
-        measurementId: "G-9E1VX0KTQH",
+  apiKey: "AIzaSyDNBlZiB--PvK2QGJbumfvrt16mkD-fPQ0",
+  authDomain: "superlig-tahmin-panel.firebaseapp.com",
+  databaseURL: "https://superlig-tahmin-panel-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "superlig-tahmin-panel",
+  storageBucket: "superlig-tahmin-panel.firebasestorage.app",
+  messagingSenderId: "89142067230",
+  appId: "1:89142067230:web:96a69696dc1dbcac16ee0f",
+  measurementId: "G-9E1VX0KTQH",
       };
     </script>
 
-    <script src="app.js"></script>
+    <script src="js/01-bootstrap-firebase.js"></script>
+    <script src="js/02-state-core.js"></script>
+    <script src="js/03-management-ui.js"></script>
+    
+    <script src="js/04-predictions-avatar.js"></script>
+    <script src="js/05-actions-init.js"></script>
   </body>
 </html>
