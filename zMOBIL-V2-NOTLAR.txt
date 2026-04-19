@@ -1,0 +1,5 @@
+Mobil V2 yapildi:
+1) Mobil prediction card yapisi kompaktlastirildi
+2) Mobil render sonunda saveState(true) kaldirildi
+3) getPredictionBaseStatus artik bos kayit olusturmuyor
+4) Mobil buton / input / chip alanlari eski telefonlar icin hafifletildi
