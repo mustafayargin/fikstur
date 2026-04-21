@@ -5614,7 +5614,6 @@ body.login-locked {
   gap: 18px;
   justify-content: start;
 }
-
 .player-premium-card {
   --team-glow-a: rgba(88, 144, 255, 0.22);
   --team-glow-b: rgba(56, 189, 248, 0.12);
@@ -5624,33 +5623,20 @@ body.login-locked {
   overflow: hidden;
   padding: 18px;
   border-radius: 24px;
-  border: 1px solid var(--team-border-color);
+  border: 3px solid red;
   background:
-    radial-gradient(
-      circle at 88% 18%,
-      color-mix(in srgb, var(--team-glow-a) 34%, transparent),
-      transparent 34%
-    ),
+    
     linear-gradient(145deg, rgba(27, 41, 74, 0.96), rgba(13, 19, 35, 0.98));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 14px 32px rgba(0, 0, 0, 0.24),
-    0 0 0 1px color-mix(in srgb, var(--team-glow-a) 18%, transparent);
+    0 14px 32px rgba(0, 0, 0, 0.24),;
   transition:
     transform 0.18s ease,
     border-color 0.18s ease,
     box-shadow 0.18s ease;
 }
 
-.player-premium-card:hover {
-  transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--team-border-color) 82%, white 18%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 18px 40px rgba(0, 0, 0, 0.28),
-    0 0 26px color-mix(in srgb, var(--team-glow-a) 24%, transparent),
-    0 0 54px color-mix(in srgb, var(--team-glow-b) 16%, transparent);
-}
+
 
 .player-premium-card.is-admin {
   border-color: rgba(52, 211, 153, 0.28);
@@ -5663,20 +5649,7 @@ body.login-locked {
     linear-gradient(145deg, rgba(24, 48, 54, 0.96), rgba(11, 20, 26, 0.98));
 }
 .player-card-glow {
-  position: absolute;
-  right: -48px;
-  top: -42px;
-  width: 180px;
-  height: 180px;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    color-mix(in srgb, var(--team-glow-a) 38%, transparent) 0%,
-    color-mix(in srgb, var(--team-glow-b) 20%, transparent) 42%,
-    transparent 72%
-  );
-  filter: blur(8px);
-  pointer-events: none;
+  display: none !important;
 }
 .player-card-supported-team-bg {
   position: absolute;
@@ -6109,12 +6082,7 @@ body.login-locked {
 }
 
 .player-premium-card.is-online .player-card-glow {
-  background: radial-gradient(
-    circle,
-    color-mix(in srgb, var(--team-glow-a) 28%, rgba(74, 222, 128, 0.34)) 0%,
-    color-mix(in srgb, var(--team-glow-b) 18%, transparent) 45%,
-    transparent 72%
-  );
+  display: none !important;
 }
 
 .player-premium-card.is-offline {
@@ -9148,15 +9116,7 @@ body.dashboard-modal-open {
   min-width: 340px;
   min-height: 340px;
 }
-.podium-card::after {
-  content: "";
-  position: absolute;
-  inset: auto 18px 12px;
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  z-index: 1;
-}
+
 
 .podium-rank-1 {
   min-height: 330px;
@@ -11240,22 +11200,7 @@ body.player-modal-open {
   }
 
   /* alt altın çizgi */
-  #tab-standings .podium-card::after {
-    content: "";
-    position: absolute;
-    left: 18px;
-    right: 18px;
-    bottom: 14px;
-    height: 4px;
-    border-radius: 999px;
-    background: linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.12),
-      rgba(255, 214, 92, 0.45),
-      rgba(255, 255, 255, 0.12)
-    );
-    opacity: 0.72;
-  }
+
 
   /* glow */
   #tab-standings .podium-glow {
@@ -12492,4 +12437,9 @@ body.player-modal-open {
 .summary-row.rank-3 .rank-badge {
   background: linear-gradient(135deg, #d97706, #92400e);
   color: #fff;
+}
+#tab-people .user-card,
+#tab-people .player-card,
+#tab-people .firebase-admin-focus-card {
+  background-image: none !important;
 }
