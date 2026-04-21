@@ -762,16 +762,7 @@ const shareLogoImageCache = new Map();
 function getTeamLogoCandidateSources(teamName, seasonId = getActiveSeasonId()) {
   const team = getTeamMetaByName(teamName, seasonId);
   const slug = team?.slug || DEFAULT_TEAM_SLUGS[teamName] || slugify(teamName);
-  const remoteCached =
-    remoteTeamLogoUrlCache.get(normalizeTeamSearchToken(teamName)) || "";
-  return [
-    slug ? `logos/${slug}.png` : "",
-    team?.logoUrl || "",
-    team?.logo || "",
-    team?.badge || "",
-    team?.image || "",
-    remoteCached,
-  ].filter(Boolean);
+  return [slug ? `logos/${slug}.png` : ""].filter(Boolean);
 }
 
 function loadCanvasImage(src) {
@@ -797,15 +788,6 @@ async function getTeamLogoImage(teamName, seasonId = getActiveSeasonId()) {
     if (img) {
       shareLogoImageCache.set(cacheKey, img);
       return img;
-    }
-  }
-
-  const remoteUrl = await fetchRemoteTeamLogoUrl(teamName);
-  if (remoteUrl) {
-    const remoteImg = await loadCanvasImage(remoteUrl);
-    if (remoteImg) {
-      shareLogoImageCache.set(cacheKey, remoteImg);
-      return remoteImg;
     }
   }
 
@@ -976,28 +958,26 @@ async function createPredictionShareExportCanvas(
     shareView === "post" ? getWeeklyStandings(state.settings.activeWeekId) : [];
   const summaryRows =
     shareView === "post"
-      ? players.map((player) => {
-          const row = weeklyStandings.find((item) => item.id === player.id) || {
-            id: player.id,
-            total: 0,
-            exact: 0,
-            resultOnly: 0,
-          };
-          return { ...row, id: player.id, name: player.name };
-        })
+      ? players
+          .map((player) => {
+            const row = weeklyStandings.find(
+              (item) => item.id === player.id,
+            ) || {
+              id: player.id,
+              total: 0,
+              exact: 0,
+              resultOnly: 0,
+            };
+            return { ...row, id: player.id, name: player.name };
+          })
+          .sort(
+            (a, b) =>
+              Number(b.total || 0) - Number(a.total || 0) ||
+              Number(b.exact || 0) - Number(a.exact || 0) ||
+              Number(b.resultOnly || 0) - Number(a.resultOnly || 0) ||
+              String(a.name || "").localeCompare(String(b.name || ""), "tr"),
+          )
       : [];
-
-  const rankingMap = new Map(
-    [...summaryRows]
-      .sort(
-        (a, b) =>
-          Number(b.total || 0) - Number(a.total || 0) ||
-          Number(b.exact || 0) - Number(a.exact || 0) ||
-          Number(b.resultOnly || 0) - Number(a.resultOnly || 0),
-      )
-      .map((row, index) => [row.id, index + 1]),
-  );
-
   const margin = 28;
   const headerH = 106;
   const tableHeadH = 54;
@@ -1011,13 +991,20 @@ async function createPredictionShareExportCanvas(
     margin * 2 + headerH + tableHeadH + matches.length * rowH + footerH;
 
   const canvas = document.createElement("canvas");
-  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-  canvas.width = Math.round(width * dpr);
-  canvas.height = Math.round(height * dpr);
+
+  const exportScale = Math.max(
+    2,
+    Math.min(3, Math.round(window.devicePixelRatio || 2)),
+  );
+  canvas.width = width * exportScale;
+  canvas.height = height * exportScale;
   canvas.style.width = `${width}px`;
   canvas.style.height = `${height}px`;
+
   const ctx = canvas.getContext("2d");
-  ctx.scale(dpr, dpr);
+  ctx.scale(exportScale, exportScale);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
 
   const bgGradient = ctx.createLinearGradient(0, 0, width, height);
   bgGradient.addColorStop(0, "#031124");
@@ -1192,7 +1179,9 @@ async function createPredictionShareExportCanvas(
 
     players.forEach((player, colIndex) => {
       const cellX = tableX + matchColW + colIndex * playerColW;
-      const pred = getPrediction(match.id, player.id) || createEmptyPredictionRecord(match.id, player.id);
+      const pred =
+        getPrediction(match.id, player.id) ||
+        createEmptyPredictionRecord(match.id, player.id);
       const palette = getShareCellPalette(pred, match, shareView);
       fillRoundedRect(
         ctx,
@@ -1271,25 +1260,26 @@ async function createPredictionShareExportCanvas(
     ctx.fillText("Bu sayfadaki kullanıcılar", sumX + 16, tableY + 52);
 
     summaryRows.forEach((row, index) => {
-      const rank = rankingMap.get(row.id) || index + 1;
+      const rank = index + 1;
       const cardY = tableY + 68 + index * (summaryCardH + summaryGap);
       const cardX = sumX + 12;
       const cardW = sumWidth - 24;
       const rankFill =
         rank === 1
-          ? "rgba(16,185,129,0.20)"
+          ? "rgba(255,215,64,0.26)"
           : rank === 2
-            ? "rgba(245,158,11,0.18)"
+            ? "rgba(226,232,240,0.82)"
             : rank === 3
-              ? "rgba(59,130,246,0.18)"
+              ? "rgba(251,191,116,0.30)"
               : "rgba(15,23,42,0.06)";
+
       const rankStroke =
         rank === 1
-          ? "rgba(16,185,129,0.34)"
+          ? "rgba(234,179,8,0.55)"
           : rank === 2
-            ? "rgba(245,158,11,0.32)"
+            ? "rgba(148,163,184,0.40)"
             : rank === 3
-              ? "rgba(59,130,246,0.30)"
+              ? "rgba(180,83,9,0.36)"
               : "rgba(148,163,184,0.18)";
 
       fillRoundedRect(
@@ -1302,30 +1292,66 @@ async function createPredictionShareExportCanvas(
         rankFill,
         rankStroke,
       );
+      if (rank === 1) {
+        const goldGlow = ctx.createLinearGradient(
+          cardX,
+          cardY,
+          cardX + cardW,
+          cardY + summaryCardH,
+        );
+        goldGlow.addColorStop(0, "rgba(255,255,255,0.22)");
+        goldGlow.addColorStop(0.45, "rgba(255,255,255,0.06)");
+        goldGlow.addColorStop(1, "rgba(255,215,64,0.10)");
+
+        fillRoundedRect(
+          ctx,
+          cardX + 1,
+          cardY + 1,
+          cardW - 2,
+          summaryCardH - 2,
+          15,
+          goldGlow,
+          "",
+        );
+      }
       fillRoundedRect(
         ctx,
         cardX + 12,
         cardY + 12,
-        28,
-        28,
-        14,
+        30,
+        30,
+        15,
         rank === 1
-          ? "#10b981"
+          ? "#facc15"
           : rank === 2
-            ? "#f59e0b"
+            ? "#cbd5e1"
             : rank === 3
-              ? "#3b82f6"
+              ? "#d97706"
               : "#334155",
-        "",
+        rank === 1
+          ? "rgba(234,179,8,0.65)"
+          : rank === 2
+            ? "rgba(148,163,184,0.55)"
+            : rank === 3
+              ? "rgba(146,64,14,0.45)"
+              : "",
       );
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "900 14px Inter, Arial, sans-serif";
+      ctx.fillStyle = rank === 2 ? "#0f172a" : "#ffffff";
+      ctx.font = "900 15px Inter, Arial, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(String(rank), cardX + 26, cardY + 31);
+      ctx.fillText(rank === 1 ? "1" : String(rank), cardX + 27, cardY + 32);
       ctx.textAlign = "left";
 
+      if (rank === 1) {
+        ctx.font = "900 13px Inter, Arial, sans-serif";
+        ctx.fillText("👑", cardX + 19, cardY + 10);
+      }
+
       ctx.fillStyle = "#0f172a";
-      ctx.font = "900 16px Inter, Arial, sans-serif";
+      ctx.font =
+        rank === 1
+          ? "900 17px Inter, Arial, sans-serif"
+          : "900 16px Inter, Arial, sans-serif";
       const summaryName = truncateCanvasText(
         ctx,
         String(row.name || "").toUpperCase(),
@@ -1393,6 +1419,7 @@ async function createPredictionShareExportCanvas(
 
   return canvas;
 }
+
 
 async function exportPredictionShareImage() {
   const button = document.getElementById("downloadShareImageBtn");
@@ -1490,7 +1517,9 @@ function renderPredictionShareTable(container, matches, players) {
 
       const playerCols = players
         .map((player) => {
-          const pred = getPrediction(match.id, player.id) || createEmptyPredictionRecord(match.id, player.id);
+          const pred =
+            getPrediction(match.id, player.id) ||
+            createEmptyPredictionRecord(match.id, player.id);
           const outcomeClass = getPredictionOutcomeClass(pred, match);
           const ownClass =
             player.id === currentPlayerId ? " own-player-cell" : "";
@@ -1529,4 +1558,3 @@ function renderPredictionShareTable(container, matches, players) {
   container.innerHTML = `<div class="excel-predictions share-mode-table ${compactMode ? "share-mode-compact" : ""} share-view-${shareView}" style="--player-count:${players.length};"><div class="prediction-grid-head share-grid-head"><div>Maç</div>${headerPlayers}</div><div class="prediction-grid-body">${rows}</div></div>`;
   hydrateTeamLogosIn(container);
 }
-

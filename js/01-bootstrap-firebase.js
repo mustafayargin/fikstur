@@ -883,6 +883,15 @@ async function hydrateFromFirebaseRealtime(source = "manual") {
   return firebaseRealtimeHydrationPromise;
 }
 
+let firebaseRealtimeHydrationTimer = null;
+
+function scheduleFirebaseRealtimeHydration(source = "realtime") {
+  clearTimeout(firebaseRealtimeHydrationTimer);
+  firebaseRealtimeHydrationTimer = setTimeout(() => {
+    hydrateFromFirebaseRealtime(source);
+  }, 250);
+}
+
 function ensureFirebaseRealtimeBridge() {
   if (!isFirebaseReady() || firebaseRealtimeBindingsInitialized) return;
   const db = getFirebaseDb();
@@ -890,7 +899,7 @@ function ensureFirebaseRealtimeBridge() {
 
   ["users", "matches", "predictions", "settings"].forEach((path) => {
     db.ref(path).on("value", () => {
-      hydrateFromFirebaseRealtime(path);
+      scheduleFirebaseRealtimeHydration(path);
     });
   });
 
@@ -2543,7 +2552,14 @@ function createDefaultSeasonStateMap(defaultValue = true) {
 function normalizeLoginName(value) {
   return String(value || "")
     .trim()
-    .toLocaleLowerCase("tr");
+    .toLocaleLowerCase("tr")
+    .replace(/ç/g, "c")
+    .replace(/ğ/g, "g")
+    .replace(/ı/g, "i")
+    .replace(/ö/g, "o")
+    .replace(/ş/g, "s")
+    .replace(/ü/g, "u")
+    .replace(/\s+/g, " ");
 }
 
 function normalizeText(value) {
@@ -3823,23 +3839,6 @@ function bindPredictionActionElements(root = document) {
     };
   });
 
-  scope
-    .querySelectorAll('button[data-pred-role="save-btn"]')
-    .forEach((button) => {
-      button.onclick = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const target = e.currentTarget;
-        if (target.disabled) return false;
-        const { matchId, playerId } = target.dataset || {};
-        if (!matchId || !playerId) return false;
-        window.queuePredictionSave(matchId, playerId, true);
-        return false;
-      };
-      button.onpointerdown = (e) => {
-        e.stopPropagation();
-      };
-    });
 
   scope
     .querySelectorAll('button[data-pred-role="delete-btn"]')
@@ -4108,7 +4107,7 @@ function renderDashboardMatchCards(container, matches) {
 
             <div class="dashboard-avatar-row">
               <div class="dashboard-avatar-row__chips">${avatars}</div>
-              <span class="dashboard-avatar-row__more">${players.length ? `${Math.max(players.length - Math.min(players.length, 5), 0)} daha` : ""}</span>
+              <span class="dashboard-avatar-row__more"></span>
             </div>
           </div>
         </article>
@@ -4253,7 +4252,6 @@ function renderMobilePredictions(container, matches) {
                   data-match-id="${match.id}"
                   data-player-id="${player.id}"
                   ${lockedForUi || !canEdit ? "disabled" : ""}
-                  oninput="window.queuePredictionSave && window.queuePredictionSave('${match.id}','${player.id}')"
                 />
                 <span class="premium-dash">-</span>
                 <input
@@ -4266,7 +4264,6 @@ function renderMobilePredictions(container, matches) {
                   data-match-id="${match.id}"
                   data-player-id="${player.id}"
                   ${lockedForUi || !canEdit ? "disabled" : ""}
-                  oninput="window.queuePredictionSave && window.queuePredictionSave('${match.id}','${player.id}')"
                 />
               </div>
 
@@ -4283,7 +4280,6 @@ function renderMobilePredictions(container, matches) {
                       data-match-id="${match.id}"
                       data-player-id="${player.id}"
                       ${lockedForUi ? "disabled" : ""}
-                      onclick="if(!this.disabled && window.queuePredictionSave){ event.preventDefault(); event.stopPropagation(); window.queuePredictionSave('${match.id}','${player.id}', true); } return false;"
                     >${lockedForUi ? "🔒 Kilitli" : getPredictionSaveLabel(match.id, player.id)}</button>
                     <button
                       class="prediction-mobile-save-btn prediction-mobile-save-btn--compact danger prediction-delete-btn ${showDeleteAction ? "" : "is-hidden"}"
@@ -4293,7 +4289,6 @@ function renderMobilePredictions(container, matches) {
                       data-match-id="${match.id}"
                       data-player-id="${player.id}"
                       ${lockedForUi ? "disabled" : ""}
-                      onclick="if(!this.disabled && window.deletePredictionEntry){ event.preventDefault(); event.stopPropagation(); window.deletePredictionEntry('${match.id}','${player.id}'); } return false;"
                     >Sil</button>
                   </div>`
                   : `<div class="pred-btn-slot"></div>`}

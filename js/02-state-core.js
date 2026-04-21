@@ -323,142 +323,23 @@ function getTeamMetaByName(name, seasonId = getActiveSeasonId()) {
     }
   );
 }
-
-const remoteTeamLogoUrlCache = new Map();
-const remoteTeamLogoPromiseCache = new Map();
-
-const TEAM_REMOTE_SEARCH_ALIASES = {
-  Başakşehir: ["Istanbul Basaksehir", "Basaksehir"],
-  "İstanbul Başakşehir": ["Istanbul Basaksehir", "Basaksehir"],
-  Beşiktaş: ["Besiktas", "Besiktas JK"],
-  "Çaykur Rizespor": ["Rizespor", "Caykur Rizespor"],
-  Eyüpspor: ["Eyupspor"],
-  "Fatih Karagümrük": ["Fatih Karagumruk"],
-  "Fatih Karagümrük SK": ["Fatih Karagumruk"],
-  Fenerbahçe: ["Fenerbahce"],
-  Galatasaray: ["Galatasaray SK"],
-  "Gaziantep FK": ["Gaziantep", "Gaziantep FK"],
-  Gençlerbirliği: ["Genclerbirligi"],
-  Göztepe: ["Goztepe", "Goztepe Izmir"],
-  İstanbulspor: ["Istanbulspor"],
-  Kasımpaşa: ["Kasimpasa"],
-  Kocaelispor: ["Kocaelispor"],
-  Sivasspor: ["Sivasspor"],
-  Trabzonspor: ["Trabzonspor"],
-};
-
-function normalizeTeamSearchToken(value) {
-  return String(value || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9]+/g, " ")
-    .replace(/\b(sk|jk|fk|as|a s|spor kulubu|spor|kulubu|club|fc)\b/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
-}
-
-function getTeamRemoteSearchNames(teamName) {
-  const aliases = TEAM_REMOTE_SEARCH_ALIASES[teamName] || [];
-  return [
-    ...new Set(
-      [
-        teamName,
-        ...aliases,
-        String(teamName || "")
-          .replace(/İ/g, "I")
-          .replace(/ı/g, "i"),
-        String(teamName || "")
-          .replace(/FK$/i, "")
-          .trim(),
-      ]
-        .map((item) => String(item || "").trim())
-        .filter(Boolean),
-    ),
-  ];
-}
-
-async function fetchRemoteTeamLogoUrl(teamName) {
-  const cacheKey = normalizeTeamSearchToken(teamName);
-  if (!cacheKey) return "";
-  if (remoteTeamLogoUrlCache.has(cacheKey))
-    return remoteTeamLogoUrlCache.get(cacheKey) || "";
-  if (remoteTeamLogoPromiseCache.has(cacheKey))
-    return remoteTeamLogoPromiseCache.get(cacheKey);
-
-  const request = (async () => {
-    const wanted = normalizeTeamSearchToken(teamName);
-    for (const searchName of getTeamRemoteSearchNames(teamName)) {
-      try {
-        const response = await fetch(
-          `https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=${encodeURIComponent(searchName)}`,
-        );
-        if (!response.ok) continue;
-        const payload = await response.json();
-        const teams = Array.isArray(payload?.teams) ? payload.teams : [];
-        const matched =
-          teams.find((item) => {
-            const hay = [
-              item?.strTeam,
-              item?.strTeamShort,
-              item?.strAlternate,
-              item?.strLeague,
-            ]
-              .map(normalizeTeamSearchToken)
-              .join(" ");
-            return (
-              hay.includes(wanted) ||
-              wanted.includes(normalizeTeamSearchToken(item?.strTeam))
-            );
-          }) || teams[0];
-        const logoUrl =
-          matched?.strBadge || matched?.strTeamBadge || matched?.strLogo || "";
-        if (logoUrl) {
-          remoteTeamLogoUrlCache.set(cacheKey, logoUrl);
-          return logoUrl;
-        }
-      } catch (error) {
-        console.warn("Uzak logo aranamadı:", teamName, error);
-      }
-    }
-    remoteTeamLogoUrlCache.set(cacheKey, "");
-    return "";
-  })();
-
-  remoteTeamLogoPromiseCache.set(cacheKey, request);
-  try {
-    return await request;
-  } finally {
-    remoteTeamLogoPromiseCache.delete(cacheKey);
-  }
-}
-
-async function hydrateTeamLogoImage(img) {
-  if (
-    !img ||
-    img.dataset.remoteLoading === "1" ||
-    img.dataset.remoteResolved === "1"
-  )
-    return;
-  img.dataset.remoteLoading = "1";
+function handleTeamLogoError(img) {
+  if (!img) return;
+  img.style.display = "none";
+  img.dataset.logoFailed = "1";
   const fallback = img.nextElementSibling;
-  try {
-    const remoteUrl = await fetchRemoteTeamLogoUrl(
-      img.dataset.teamName || img.alt || "",
-    );
-    if (remoteUrl) {
-      img.src = remoteUrl;
-      img.style.display = "block";
-      img.dataset.remoteResolved = "1";
-      if (fallback) fallback.style.display = "none";
-      return;
+  if (fallback) fallback.style.display = "grid";
+}
+
+function hydrateTeamLogosIn(container = document) {
+  container.querySelectorAll?.(".team-logo-img").forEach((img) => {
+    if (img.complete && img.naturalWidth > 0) return;
+    if (img.dataset.logoFailed === "1") {
+      img.style.display = "none";
+      const fallback = img.nextElementSibling;
+      if (fallback) fallback.style.display = "grid";
     }
-  } catch (error) {
-    console.warn("Logo yükleme hatası:", error);
-  } finally {
-    img.dataset.remoteLoading = "0";
-  }
-  img.dataset.remoteResolved = "1";
+  });
 }
 
 function handleTeamLogoError(img) {
@@ -483,11 +364,9 @@ function teamLogoHtml(teamName, seasonId, extraClass = "") {
   const team = getTeamMetaByName(teamName, seasonId);
   const slug = team.slug || slugify(teamName);
   const localSrc = `logos/${slug}.png`;
-  const explicitRemote =
-    team.logoUrl || team.logo || team.badge || team.image || "";
   return `
     <span class="team-logo-wrap ${extraClass}">
-      <img class="team-logo-img" src="${explicitRemote || localSrc}" data-local-src="${localSrc}" data-team-name="${escapeHtml(teamName)}" alt="${escapeHtml(teamName)} logosu" onerror="window.handleTeamLogoError && window.handleTeamLogoError(this);" />
+      <img class="team-logo-img" src="${localSrc}" data-local-src="${localSrc}" data-team-name="${escapeHtml(teamName)}" alt="${escapeHtml(teamName)} logosu" onerror="window.handleTeamLogoError && window.handleTeamLogoError(this);" />
       <span class="team-logo fallback-logo" style="display:none; ${teamStyle(teamName)}">${teamInitials(teamName)}</span>
     </span>
   `;
@@ -865,6 +744,7 @@ function getChampion(seasonId = getActiveSeasonId()) {
 }
 
 function renderSeasonOptions(select, includePlaceholder = false) {
+  if (!select) return;
   const seasons = [...state.seasons].sort((a, b) =>
     a.name.localeCompare(b.name, "tr"),
   );
@@ -881,6 +761,7 @@ function renderSeasonOptions(select, includePlaceholder = false) {
 }
 
 function renderWeekOptions(select, seasonId, includePlaceholder = false) {
+  if (!select) return;
   const weeks = getWeeksBySeasonId(seasonId).sort(
     (a, b) => Number(a.number) - Number(b.number),
   );
@@ -903,6 +784,7 @@ function renderWeekOptions(select, seasonId, includePlaceholder = false) {
 }
 
 function renderTeamOptions(select, seasonId, includePlaceholder = true) {
+  if (!select) return;
   const teams = getTeamsBySeasonId(seasonId);
   select.innerHTML = includePlaceholder
     ? '<option value="">Takım seç</option>'
@@ -1392,7 +1274,31 @@ function getPlayerSupportedTeamName(player) {
     state.teams.find((team) => String(team.id) === teamId)?.name || ""
   );
 }
+function getPlayerSupportedTeamPalette(player) {
+  const supportedTeam = getPlayerSupportedTeamName(player);
+  if (!supportedTeam) {
+    return {
+      colorA: "rgba(88, 144, 255, 0.22)",
+      colorB: "rgba(56, 189, 248, 0.12)",
+      border: "rgba(98, 133, 197, 0.22)",
+    };
+  }
 
+  const teamIndex = Math.max(0, DEFAULT_TEAM_NAMES.indexOf(supportedTeam));
+  const palette = TEAM_COLORS[
+    teamIndex >= 0
+      ? teamIndex % TEAM_COLORS.length
+      : Math.abs(String(supportedTeam || "").length) % TEAM_COLORS.length
+  ] || ["#3b82f6", "#38bdf8"];
+
+  const [colorA, colorB] = palette;
+
+  return {
+    colorA,
+    colorB,
+    border: colorA,
+  };
+}
 function buildPlayerSupportedTeamOptions(player) {
   const selectedTeam = getPlayerSupportedTeamName(player);
   const teamNames = [...new Set(state.teams.map((team) => String(team.name || "").trim()).filter(Boolean))]
@@ -1441,13 +1347,31 @@ function renderPlayers() {
           const lastSeenText = presence.lastSeen
             ? formatAdminPanelDateTime(presence.lastSeen)
             : "Henüz giriş yok";
+            const supportedTeam = getPlayerSupportedTeamName(player);
+            const supportedPalette = getPlayerSupportedTeamPalette(player);
 
+            const supportedTeamBackground = supportedTeam
+              ? `
+    <div class="player-card-supported-team-bg" aria-hidden="true">
+      ${teamLogoHtml(supportedTeam, getActiveSeasonId(), "player-card-supported-team-bg__wrap")}
+    </div>
+  `
+              : "";
+
+            const teamGlowStyle = `
+  --team-glow-a: ${supportedPalette.colorA};
+  --team-glow-b: ${supportedPalette.colorB};
+  --team-border-color: ${supportedPalette.border};
+`;
           return `
-            <div
-              class="player-premium-card player-summary-card ${isAdminUser ? "is-admin" : ""} ${statusClass}"
-              onclick="openPlayerDetailModal('${player.id}')"
-            >
-              <div class="player-card-glow"></div>
+          <div
+  class="player-premium-card player-summary-card ${isAdminUser ? "is-admin" : ""} ${statusClass}"
+  onclick="openPlayerDetailModal('${player.id}')"
+  style="${teamGlowStyle}"
+>
+  <div class="player-card-glow"></div>
+  ${supportedTeamBackground}
+          ${supportedTeamBackground}
 
               <div class="player-card-top">
               <div class="player-card-title-row">

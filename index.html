@@ -13,7 +13,7 @@
         <div>
           <div class="brand-card">
             <div class="brand-logo-wrap">
-              <img src="favicon.png" alt="Logo" class="logo-img">
+              <img src="favicon.png" alt="Logo" class="logo-img" />
             </div>
           </div>
 
@@ -36,13 +36,13 @@
               Yedekleme
             </button>
           </nav>
-                  </div>
+        </div>
       </aside>
 
       <main class="content">
         <div class="desktop-topbar">
           <div class="desktop-topbar__spacer"></div>
-<div
+          <div
             class="role-switch-card session-card compact-account-card"
             id="sessionCard"
           >
@@ -51,12 +51,14 @@
               type="button"
               id="desktopAccountBtn"
             >
-              <span class="account-trigger-avatar" id="desktopAccountAvatar"></span>
+              <span
+                class="account-trigger-avatar"
+                id="desktopAccountAvatar"
+              ></span>
               <span class="account-trigger-copy">
                 <strong id="desktopAccountBtnName">Hesap</strong>
                 <small id="desktopAccountBtnRole">Misafir</small>
-                <small >Çıkış Yapmak için tıklayınız</small>
-              
+                <small>Çıkış Yapmak için tıklayınız</small>
               </span>
             </button>
             <div class="account-menu" id="desktopAccountMenu" hidden>
@@ -93,59 +95,82 @@
               </div>
             </div>
           </div>
-
         </div>
 
         <div class="mobile-top-brand">
           <div class="mobile-top-brand__main">
             <div class="mobile-top-brand__logo">
-              <img src="favicon.png" alt="Logo" class="logo-img">
+              <img src="favicon.png" alt="Logo" class="logo-img" />
             </div>
             <div class="mobile-top-brand__copy">
               <strong>Fikstür Tahmin</strong>
               <span>Pro Panel</span>
             </div>
           </div>
-          <button class="mobile-top-profile-btn" type="button" id="mobileTopProfileBtn" aria-label="Profil menüsünü aç">
-            <span class="mobile-top-profile-avatar" id="mobileTopProfileAvatar"></span>
+          <button
+            class="mobile-top-profile-btn"
+            type="button"
+            id="mobileTopProfileBtn"
+            aria-label="Profil menüsünü aç"
+          >
+            <span
+              class="mobile-top-profile-avatar"
+              id="mobileTopProfileAvatar"
+            ></span>
           </button>
         </div>
 
         <section class="tab-panel active" id="tab-dashboard">
-          <div class="page-header dashboard-page-header dashboard-page-header--compact">
-            <div>
-              <div class="dashboard-eyebrow">Canlı hafta merkezi</div>
-              <h2>Genel Bakış</h2>
-              <p>Önce maçlar ve skorlar, altında mini özetler ve haftanın nabzı.</p>
-            </div>
-
-            <div class="header-actions double-selects dashboard-top-actions">
-              <select id="dashboardSeasonSelect"></select>
-              <select id="dashboardWeekSelect"></select>
-            </div>
-          </div>
-
           <section class="dashboard-hero-strip" id="dashboardHeroStrip">
             <div class="dashboard-hero-main">
               <div class="dashboard-hero-main__top">
                 <div>
-                  <div class="dashboard-hero-main__eyebrow">Seçili hafta özeti</div>
+                  <div class="dashboard-hero-main__eyebrow">
+                    Seçili hafta özeti
+                  </div>
                   <h3 id="dashboardHeroTitle">Hafta yükleniyor</h3>
                 </div>
-                <div class="dashboard-hero-live" id="dashboardHeroLiveBadge">Beklemede</div>
+
+                <div class="dashboard-hero-live" id="dashboardHeroLiveBadge">
+                  Beklemede
+                </div>
               </div>
-              <p class="dashboard-hero-main__text" id="dashboardHeroText">Aktif hafta bilgileri hazırlanıyor.</p>
+              <div class="dashboard-hero-controls">
+                <select id="dashboardSeasonSelect"></select>
+                <select id="dashboardWeekSelect"></select>
+                <button
+                  type="button"
+                  class="secondary dashboard-mobile-sync-btn admin-only"
+                  id="dashboardMobileWeekScoreUpdateBtn"
+                  aria-label="Skorları Güncelle"
+                  title="Skorları Güncelle"
+                >
+                  <span
+                    class="dashboard-mobile-sync-btn__icon"
+                    aria-hidden="true"
+                    >⟳</span
+                  >
+                </button>
+              </div>
+              <p class="dashboard-hero-main__text" id="dashboardHeroText">
+                Aktif hafta bilgileri hazırlanıyor.
+              </p>
               <div class="dashboard-hero-chips" id="dashboardHeroChips"></div>
             </div>
             <div class="dashboard-hero-side" id="dashboardHeroSide"></div>
           </section>
 
           <div class="dashboard-main-layout">
-            <section class="card dashboard-score-card dashboard-score-card--compact">
+            <section
+              class="card dashboard-score-card dashboard-score-card--compact"
+            >
               <div class="card-header dashboard-score-card__header">
                 <div>
                   <h3>Haftanın Maç Merkezi</h3>
-                  <p class="small-meta">Skoru gör, kartı aç ve herkesin tahminini tek bakışta incele.</p>
+                  <p class="small-meta">
+                    Skoru gör, kartı aç ve herkesin tahminini tek bakışta
+                    incele.
+                  </p>
                 </div>
               </div>
               <div id="dashboardMatches"></div>
@@ -171,17 +196,24 @@
                 </div>
                 <div id="dashboardLeaderboardPreview"></div>
               </section>
+
+              <div id="dashboardSidebarExtraDesktop"></div>
             </div>
           </div>
 
-          <div class="stats-grid dashboard-stats-grid--compact" id="statsGrid"></div>
+          <div id="dashboardPostMainAnchor"></div>
+          <div
+            class="stats-grid dashboard-stats-grid--compact"
+            id="statsGrid"
+          ></div>
 
           <section class="card dashboard-api-card dashboard-api-card--compact">
             <div class="card-header dashboard-api-header">
               <div>
                 <h3>Hafta Skor Güncelleme</h3>
                 <p class="small-meta">
-                  Seçili haftanın skorlarını API'den çek ve sonucu anlık çubuktan takip et.
+                  Seçili haftanın skorlarını API'den çek ve sonucu anlık
+                  çubuktan takip et.
                 </p>
               </div>
               <button class="secondary" id="dashboardWeekScoreUpdateBtn">
@@ -190,8 +222,12 @@
             </div>
 
             <div class="dashboard-api-meta">
-              <span class="badge gray" id="dashboardActiveSeasonBadge">Aktif sezon: -</span>
-              <span class="badge gray" id="dashboardActiveWeekBadge">Aktif hafta: -</span>
+              <span class="badge gray" id="dashboardActiveSeasonBadge"
+                >Aktif sezon: -</span
+              >
+              <span class="badge gray" id="dashboardActiveWeekBadge"
+                >Aktif hafta: -</span
+              >
             </div>
 
             <div class="dashboard-progress-wrap" aria-live="polite">
@@ -200,7 +236,10 @@
                 <span id="dashboardApiProgressValue">0%</span>
               </div>
               <div class="dashboard-progress-track">
-                <div class="dashboard-progress-fill" id="dashboardApiProgressFill"></div>
+                <div
+                  class="dashboard-progress-fill"
+                  id="dashboardApiProgressFill"
+                ></div>
               </div>
             </div>
 
@@ -208,28 +247,39 @@
           </section>
 
           <div class="dashboard-detail-modal hidden" id="dashboardMatchModal">
-            <div class="dashboard-detail-backdrop" onclick="closeDashboardMatchModal()"></div>
+            <div
+              class="dashboard-detail-backdrop"
+              onclick="closeDashboardMatchModal()"
+            ></div>
             <div class="dashboard-detail-sheet">
               <div class="dashboard-detail-sheet__head">
                 <div>
-                  <div class="dashboard-detail-sheet__eyebrow">Maç detayları</div>
+                  <div class="dashboard-detail-sheet__eyebrow">
+                    Maç detayları
+                  </div>
                   <h3 id="dashboardMatchModalTitle">Maç Tahminleri</h3>
                   <p id="dashboardMatchModalMeta">-</p>
                 </div>
-                <button class="secondary small" type="button" onclick="closeDashboardMatchModal()">Kapat</button>
+                <button
+                  class="secondary small"
+                  type="button"
+                  onclick="closeDashboardMatchModal()"
+                >
+                  Kapat
+                </button>
               </div>
               <div id="dashboardMatchModalBody"></div>
             </div>
           </div>
         </section>
 
-<section class="tab-panel seasons-page" id="tab-seasons">
+        <section class="tab-panel seasons-page" id="tab-seasons">
           <div class="page-header seasons-header">
             <div>
               <h2>Sezonlar & Takımlar</h2>
               <p>
-                Sezon oluştur, takım listesini yönet ve seçili sezon için API ile
-                fikstür ya da sonuç güncellemesi çek.
+                Sezon oluştur, takım listesini yönet ve seçili sezon için API
+                ile fikstür ya da sonuç güncellemesi çek.
               </p>
             </div>
             <div class="header-actions">
@@ -336,7 +386,10 @@
             <div id="playersList"></div>
           </div>
           <div id="playerDetailModal" class="player-detail-modal hidden">
-            <div class="player-detail-modal__backdrop" onclick="closePlayerDetailModal()"></div>
+            <div
+              class="player-detail-modal__backdrop"
+              onclick="closePlayerDetailModal()"
+            ></div>
             <div class="player-detail-modal__dialog">
               <button
                 type="button"
@@ -550,11 +603,16 @@
           </div>
         </section>
 
-        <section class="tab-panel" id="tab-standings"> 
-          <div class="page-header standings-page-header standings-page-header--luxury"> 
+        <section class="tab-panel" id="tab-standings">
+          <div
+            class="page-header standings-page-header standings-page-header--luxury"
+          >
             <div>
               <h2>Puan Durumu</h2>
-              <p>Sezon liderliği, haftalık yarış ve oyuncu performansı tek ekranda.</p>
+              <p>
+                Sezon liderliği, haftalık yarış ve oyuncu performansı tek
+                ekranda.
+              </p>
             </div>
             <div class="header-actions double-selects">
               <select id="standingsSeasonSelect"></select>
@@ -562,14 +620,25 @@
             </div>
           </div>
 
-          <div class="standings-summary-strip standings-summary-strip--compact" id="standingsSummaryStrip" hidden></div>
+          <div
+            class="standings-summary-strip standings-summary-strip--compact"
+            id="standingsSummaryStrip"
+            hidden
+          ></div>
 
-          <section class="standings-hero-shell standings-hero-shell--immersive card">
+          <section
+            class="standings-hero-shell standings-hero-shell--immersive card"
+          >
             <div class="standings-stage-head">
               <div class="standings-stage-copy">
-                <span class="standings-hero-kicker">Sezon Liderlik Sahnesi</span>
+                <span class="standings-hero-kicker"
+                  >Sezon Liderlik Sahnesi</span
+                >
                 <h3>İlk 3 yarışta kim önde?</h3>
-                <p>Tahtada ilk 3 burada, geri kalan sıralama ve haftalık yarış hemen aşağıda.</p>
+                <p>
+                  Tahtada ilk 3 burada, geri kalan sıralama ve haftalık yarış
+                  hemen aşağıda.
+                </p>
               </div>
             </div>
             <div id="standingsHero"></div>
@@ -580,27 +649,39 @@
               <div class="card-header standings-card-head standings-list-head">
                 <div>
                   <h3>Genel Sıralama</h3>
-                  <p class="card-subtitle">Toplam puan, tam skor ve yakın tahmin başarısı.</p>
+                  <p class="card-subtitle">
+                    Toplam puan, tam skor ve yakın tahmin başarısı.
+                  </p>
                 </div>
-                <span class="badge gray" id="generalLeaderBadge">Sezon lideri bekleniyor</span>
+                <span class="badge gray" id="generalLeaderBadge"
+                  >Sezon lideri bekleniyor</span
+                >
               </div>
               <div id="standingsTable"></div>
             </section>
 
             <aside class="standings-side-stack standings-side-stack--luxury">
               <section class="card standings-week-card">
-                <div class="card-header standings-card-head standings-list-head">
+                <div
+                  class="card-header standings-card-head standings-list-head"
+                >
                   <div>
                     <h3>Haftalık Yarış</h3>
                     <p class="card-subtitle">Seçili haftada kim daha formda?</p>
                   </div>
-                  <span class="badge info" id="weeklyLeaderBadge">Hafta lideri bekleniyor</span>
+                  <span class="badge info" id="weeklyLeaderBadge"
+                    >Hafta lideri bekleniyor</span
+                  >
                 </div>
                 <div id="weeklyStandings"></div>
               </section>
 
-              <section class="card standings-insight-card standings-insight-card--luxury">
-                <div class="card-header standings-card-head standings-list-head">
+              <section
+                class="card standings-insight-card standings-insight-card--luxury"
+              >
+                <div
+                  class="card-header standings-card-head standings-list-head"
+                >
                   <div>
                     <h3>Hafta Özeti</h3>
                     <p class="card-subtitle">Yarışın nabzı ve anlık özet.</p>
@@ -628,10 +709,9 @@
 
           <div class="stats-grid" id="advancedStatsGrid"></div>
           <div class="dashboard-grid standings-layout">
-            
             <section class="card champion-card" id="championCard"></section>
           </div>
-          <br>
+          <br />
           <section class="card">
             <div class="card-header"><h3>Oyuncu İstatistik Kartları</h3></div>
             <div id="insightsList"></div>
@@ -654,7 +734,8 @@
               <div>
                 <h3>Sistem Yönetimi</h3>
                 <p class="small-meta">
-                  Genel bakış ekranındaki yoğun alanlar buraya taşındı. Senkron, Firebase özeti ve akıllı güncelleme artık tek yerde.
+                  Genel bakış ekranındaki yoğun alanlar buraya taşındı. Senkron,
+                  Firebase özeti ve akıllı güncelleme artık tek yerde.
                 </p>
               </div>
             </div>
@@ -681,12 +762,17 @@
                   <div class="dashboard-sync-grid">
                     <div>
                       <div class="small-meta">
-                        Sistem sadece aktif sezon ve aktif hafta üzerinden çalışır.
-                        Yanlış hafta ya da yanlış sezon seçme riski olmaz.
+                        Sistem sadece aktif sezon ve aktif hafta üzerinden
+                        çalışır. Yanlış hafta ya da yanlış sezon seçme riski
+                        olmaz.
                       </div>
                       <div class="dashboard-sync-meta">
-                        <span class="badge gray" id="dashboardAdminSeasonBadge">Aktif sezon: -</span>
-                        <span class="badge gray" id="dashboardAdminWeekBadge">Aktif hafta: -</span>
+                        <span class="badge gray" id="dashboardAdminSeasonBadge"
+                          >Aktif sezon: -</span
+                        >
+                        <span class="badge gray" id="dashboardAdminWeekBadge"
+                          >Aktif hafta: -</span
+                        >
                       </div>
                     </div>
                     <div class="inline-actions dashboard-sync-actions">
@@ -698,7 +784,9 @@
                       </button>
                     </div>
                   </div>
-                  <div class="status-note" id="dashboardSyncAdminStatus">Hazır.</div>
+                  <div class="status-note" id="dashboardSyncAdminStatus">
+                    Hazır.
+                  </div>
                 </div>
               </section>
 
@@ -709,7 +797,9 @@
                 <div class="card-header admin-sync-header-row">
                   <div>
                     <h3>Senkron Durumu</h3>
-                    <span class="small-meta">Admin tarafında son durum özeti</span>
+                    <span class="small-meta"
+                      >Admin tarafında son durum özeti</span
+                    >
                   </div>
                   <button
                     type="button"
@@ -721,7 +811,10 @@
                     <span class="collapse-arrow" aria-hidden="true">⌄</span>
                   </button>
                 </div>
-                <div class="admin-sync-overview-body" id="adminSyncOverviewBody">
+                <div
+                  class="admin-sync-overview-body"
+                  id="adminSyncOverviewBody"
+                >
                   <div class="admin-sync-overview-grid">
                     <div class="admin-sync-stat">
                       <span class="admin-sync-label">Son işlem</span>
@@ -736,7 +829,9 @@
                       <strong id="adminSyncQueueCount">0</strong>
                     </div>
                     <div class="admin-sync-stat">
-                      <span class="admin-sync-label">Son işlemde etkilenen maç</span>
+                      <span class="admin-sync-label"
+                        >Son işlemde etkilenen maç</span
+                      >
                       <strong id="adminSyncUpdatedMatches">0</strong>
                     </div>
                   </div>
@@ -751,7 +846,10 @@
               </section>
             </div>
 
-            <div id="firebaseAdminPanel" class="firebase-admin-panel hidden"></div>
+            <div
+              id="firebaseAdminPanel"
+              class="firebase-admin-panel hidden"
+            ></div>
           </section>
 
           <div class="dashboard-grid backup-layout backup-layout-redesign">
@@ -817,28 +915,83 @@
       <button class="mobile-nav-btn" type="button" data-tab="stats">
         İstatistikler
       </button>
-      <button class="mobile-nav-btn admin-only" type="button" id="mobileAdminMenuBtn">
+      <button
+        class="mobile-nav-btn admin-only"
+        type="button"
+        id="mobileAdminMenuBtn"
+      >
         Menü
       </button>
     </nav>
 
     <div class="mobile-admin-menu-sheet" id="mobileAdminMenuSheet" hidden>
-      <div class="mobile-admin-menu-backdrop" id="mobileAdminMenuBackdrop"></div>
+      <div
+        class="mobile-admin-menu-backdrop"
+        id="mobileAdminMenuBackdrop"
+      ></div>
       <div class="mobile-admin-menu-panel">
         <div class="mobile-admin-menu-header">
           <h3>Admin Menü</h3>
-          <button class="secondary" type="button" id="mobileAdminMenuCloseBtn">Kapat</button>
+          <button class="secondary" type="button" id="mobileAdminMenuCloseBtn">
+            Kapat
+          </button>
         </div>
         <div class="mobile-admin-menu-grid">
-          <button class="mobile-admin-menu-item" type="button" data-tab="dashboard">Genel Bakış</button>
-          <button class="mobile-admin-menu-item" type="button" data-tab="seasons">Sezonlar</button>
-          <button class="mobile-admin-menu-item" type="button" data-tab="players">Kişiler</button>
-          <button class="mobile-admin-menu-item" type="button" data-tab="weeks">Haftalar</button>
-          <button class="mobile-admin-menu-item" type="button" data-tab="matches">Maçlar</button>
-          <button class="mobile-admin-menu-item" type="button" data-tab="predictions">Tahminler</button>
-          <button class="mobile-admin-menu-item" type="button" data-tab="standings">Puan Durumu</button>
-          <button class="mobile-admin-menu-item" type="button" data-tab="stats">İstatistikler</button>
-          <button class="mobile-admin-menu-item" type="button" data-tab="backup">Yedekleme</button>
+          <button
+            class="mobile-admin-menu-item"
+            type="button"
+            data-tab="dashboard"
+          >
+            Genel Bakış
+          </button>
+          <button
+            class="mobile-admin-menu-item"
+            type="button"
+            data-tab="seasons"
+          >
+            Sezonlar
+          </button>
+          <button
+            class="mobile-admin-menu-item"
+            type="button"
+            data-tab="players"
+          >
+            Kişiler
+          </button>
+          <button class="mobile-admin-menu-item" type="button" data-tab="weeks">
+            Haftalar
+          </button>
+          <button
+            class="mobile-admin-menu-item"
+            type="button"
+            data-tab="matches"
+          >
+            Maçlar
+          </button>
+          <button
+            class="mobile-admin-menu-item"
+            type="button"
+            data-tab="predictions"
+          >
+            Tahminler
+          </button>
+          <button
+            class="mobile-admin-menu-item"
+            type="button"
+            data-tab="standings"
+          >
+            Puan Durumu
+          </button>
+          <button class="mobile-admin-menu-item" type="button" data-tab="stats">
+            İstatistikler
+          </button>
+          <button
+            class="mobile-admin-menu-item"
+            type="button"
+            data-tab="backup"
+          >
+            Yedekleme
+          </button>
         </div>
       </div>
     </div>
@@ -878,7 +1031,7 @@
       <div class="login-card">
         <div class="brand-card-login">
           <div class="brand-logo-login-wrap">
-            <img src="favicon.png" alt="Logo" class="logo-img">
+            <img src="favicon.png" alt="Logo" class="logo-img" />
           </div>
         </div>
         <h2>Panele Giriş Yap</h2>
@@ -906,14 +1059,15 @@
       </div>
     </div>
 
-
     <div class="welcome-overlay hidden" id="welcomeOverlay" aria-hidden="true">
       <div class="welcome-overlay__backdrop"></div>
       <div class="welcome-card" id="welcomeCard">
         <div class="welcome-card__glow"></div>
         <div class="welcome-card__avatar" id="welcomeAvatar"></div>
         <h2 class="welcome-card__title" id="welcomeTitle">Hoş geldin!</h2>
-        <p class="welcome-card__message" id="welcomeMessage">İyi haftalar, bol şans! ✨</p>
+        <p class="welcome-card__message" id="welcomeMessage">
+          İyi haftalar, bol şans! ✨
+        </p>
       </div>
     </div>
 
@@ -1072,26 +1226,68 @@
         }
       }
     </style>
+    <script>
+      (function () {
+        function moveDashboardDesktopBlocks() {
+          var sidebarExtra = document.getElementById(
+            "dashboardSidebarExtraDesktop",
+          );
+          var postMainAnchor = document.getElementById(
+            "dashboardPostMainAnchor",
+          );
+          var statsGrid = document.getElementById("statsGrid");
+          var apiCard = document.querySelector(".dashboard-api-card");
+          if (!sidebarExtra || !postMainAnchor || !statsGrid || !apiCard)
+            return;
+
+          var isDesktop = window.matchMedia("(min-width: 769px)").matches;
+
+          if (isDesktop) {
+            if (statsGrid.parentElement !== sidebarExtra)
+              sidebarExtra.appendChild(statsGrid);
+            if (apiCard.parentElement !== sidebarExtra)
+              sidebarExtra.appendChild(apiCard);
+          } else {
+            if (statsGrid.parentElement !== postMainAnchor.parentElement) {
+              postMainAnchor.insertAdjacentElement("afterend", statsGrid);
+            } else if (postMainAnchor.nextElementSibling !== statsGrid) {
+              postMainAnchor.insertAdjacentElement("afterend", statsGrid);
+            }
+            if (
+              apiCard.parentElement !== postMainAnchor.parentElement ||
+              statsGrid.nextElementSibling !== apiCard
+            ) {
+              statsGrid.insertAdjacentElement("afterend", apiCard);
+            }
+          }
+        }
+
+        window.addEventListener("DOMContentLoaded", moveDashboardDesktopBlocks);
+        window.addEventListener("resize", moveDashboardDesktopBlocks);
+      })();
+    </script>
+
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
     <script>
       window.FIKSTUR_FIREBASE_CONFIG = {
-  apiKey: "AIzaSyDNBlZiB--PvK2QGJbumfvrt16mkD-fPQ0",
-  authDomain: "superlig-tahmin-panel.firebaseapp.com",
-  databaseURL: "https://superlig-tahmin-panel-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "superlig-tahmin-panel",
-  storageBucket: "superlig-tahmin-panel.firebasestorage.app",
-  messagingSenderId: "89142067230",
-  appId: "1:89142067230:web:96a69696dc1dbcac16ee0f",
-  measurementId: "G-9E1VX0KTQH",
+        apiKey: "AIzaSyDNBlZiB--PvK2QGJbumfvrt16mkD-fPQ0",
+        authDomain: "superlig-tahmin-panel.firebaseapp.com",
+        databaseURL:
+          "https://superlig-tahmin-panel-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "superlig-tahmin-panel",
+        storageBucket: "superlig-tahmin-panel.firebasestorage.app",
+        messagingSenderId: "89142067230",
+        appId: "1:89142067230:web:96a69696dc1dbcac16ee0f",
+        measurementId: "G-9E1VX0KTQH",
       };
     </script>
 
     <script src="js/01-bootstrap-firebase.js"></script>
     <script src="js/02-state-core.js"></script>
     <script src="js/03-management-ui.js"></script>
-    
+
     <script src="js/04-predictions-avatar.js"></script>
     <script src="js/05-actions-init.js"></script>
   </body>

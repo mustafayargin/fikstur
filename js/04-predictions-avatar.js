@@ -90,8 +90,8 @@ function renderPredictions() {
                   : "linear-gradient(135deg,#475569,#334155)";
 
           return `
-        <div class="prediction-cell ${pointLabel(pred.points)} ${outcomeClass} ${locked || !canEdit ? "locked-cell" : ""}${ownClass}${showPointBadge ? " has-point-badge" : ""}" style="position:relative; padding-top:${showPointBadge ? "16px" : "8px"};">
-        ${showPointBadge ? `<div class="points-badge-inline" style="position:absolute; top:6px; left:6px; z-index:3; min-width:34px; height:20px; padding:0 7px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; line-height:1; color:#fff; background:${badgeBg}; box-shadow:0 4px 14px rgba(0,0,0,.18);">${badgeText}</div>` : ""}
+        <div class="prediction-cell ${pointLabel(pred.points)} ${outcomeClass} ${locked || !canEdit ? "locked-cell" : ""}${ownClass}${showPointBadge ? " has-point-badge" : ""}">
+        ${showPointBadge ? `<div class="points-badge-inline" style="background:${badgeBg};">${badgeText}</div>` : ""}
         <div class="score-inputs compact-inputs center-mode pred-score-row">
             <input
               type="number"
@@ -102,7 +102,6 @@ function renderPredictions() {
               data-match-id="${match.id}"
               data-player-id="${player.id}"
               ${locked || !canEdit ? "disabled" : ""}
-              oninput="window.queuePredictionSave && window.queuePredictionSave('${match.id}','${player.id}')"
             />
             <span>-</span>
             <input
@@ -114,7 +113,6 @@ function renderPredictions() {
               data-match-id="${match.id}"
               data-player-id="${player.id}"
               ${locked || !canEdit ? "disabled" : ""}
-              oninput="window.queuePredictionSave && window.queuePredictionSave('${match.id}','${player.id}')"
             />
           </div>
 
@@ -131,7 +129,6 @@ function renderPredictions() {
                       data-pred-role="save-btn"
                       data-match-id="${match.id}"
                       data-player-id="${player.id}"
-                      onclick="if(!this.disabled && window.queuePredictionSave){ event.preventDefault(); event.stopPropagation(); window.queuePredictionSave('${match.id}','${player.id}', true); } return false;"
                     >
                       ${getPredictionSaveLabel(match.id, player.id)}
                     </button>
@@ -142,7 +139,6 @@ function renderPredictions() {
                       data-pred-role="delete-btn"
                       data-match-id="${match.id}"
                       data-player-id="${player.id}"
-                      onclick="if(!this.disabled && window.deletePredictionEntry){ event.preventDefault(); event.stopPropagation(); window.deletePredictionEntry('${match.id}','${player.id}'); } return false;"
                     >
                       Sil
                     </button>
@@ -574,8 +570,22 @@ window.deletePredictionEntry = async function (matchId, playerId) {
   if (!btn) return;
 
   const pred = getPrediction(matchId, playerId);
-
   if (!pred) return;
+
+  const confirmed = await showConfirm(
+    "Bu tahmini silmek istediğinizden emin misiniz?",
+    {
+      title: "Tahmin silinsin mi?",
+      type: "danger",
+      confirmText: "Sil",
+      cancelText: "Vazgeç",
+    },
+  );
+
+  if (!confirmed) {
+    schedulePredictionViewportRestore(viewportSnapshot);
+    return;
+  }
 
   btn.innerText = "Siliniyor...";
   btn.disabled = true;
@@ -585,11 +595,8 @@ window.deletePredictionEntry = async function (matchId, playerId) {
       matchId: matchId,
       playerId: playerId,
       kullaniciAdi: getCurrentUsername(),
-
-      // 🔥 EN KRİTİK
       predictionId: pred.remoteId || pred.id || "",
       recordKey: `${matchId}_${playerId}`,
-
       sezon: getActiveSeasonLabel(),
       haftaNo: getWeekNumberById(state.settings.activeWeekId),
     };
@@ -598,15 +605,11 @@ window.deletePredictionEntry = async function (matchId, playerId) {
 
     console.log("DELETE RESULT:", result);
 
-    // 🔥 HER DURUMDA UI RESET
     btn.innerText = "Sil";
     btn.disabled = false;
 
     if (result?.success) {
-      // local temizle
       clearLocalPredictionRecord(matchId, playerId);
-
-      // UI yenile
       renderAll();
     } else {
       console.warn("Sheet silme başarısız:", result?.message);
@@ -614,7 +617,6 @@ window.deletePredictionEntry = async function (matchId, playerId) {
     }
   } catch (err) {
     console.error("Silme hatası:", err);
-
     btn.innerText = "Sil";
     btn.disabled = false;
   } finally {
@@ -890,7 +892,15 @@ function normalizeAvatarKey(value) {
 let avatarDirectoryMap = null;
 let avatarDirectoryPromise = null;
 let avatarDirectoryLoadedOnce = false;
+const avatarResolvedPathCache = new Map();
+let avatarDirectoryInitStarted = false;
 
+function isSystemGeneratedAvatarKey(value) {
+  const key = normalizeAvatarKey(value);
+  if (!key) return false;
+
+  return /^(player|pred|match|team|week|season|session)[a-z0-9]*/i.test(key);
+}
 function getAvatarCandidateKeys(row) {
   const keys = [];
   const pushKey = (value) => {
@@ -1040,7 +1050,42 @@ function findAvatarFromDirectory(candidateKeys = []) {
 
   return "";
 }
+function buildAvatarPathCandidates(candidateKeys = []) {
+  const extensions = ["png", "jpg", "jpeg", "webp", "gif"];
+  const output = [];
 
+  candidateKeys.forEach((key) => {
+    const normalizedKey = normalizeAvatarKey(key);
+    if (!normalizedKey) return;
+    extensions.forEach((ext) => {
+      output.push(`avatars/${normalizedKey}.${ext}`);
+    });
+  });
+
+  return [...new Set(output)];
+}
+
+function resolveAvatarPathFromCandidates(candidateKeys = []) {
+  const fileCandidates = buildAvatarPathCandidates(candidateKeys);
+  if (!fileCandidates.length) return Promise.resolve("");
+
+  return new Promise((resolve) => {
+    const tryNext = (index) => {
+      if (index >= fileCandidates.length) {
+        resolve("");
+        return;
+      }
+
+      const src = fileCandidates[index];
+      const probe = new Image();
+      probe.onload = () => resolve(src);
+      probe.onerror = () => tryNext(index + 1);
+      probe.src = `${src}?v=${Date.now()}`;
+    };
+
+    tryNext(0);
+  });
+}
 function getExplicitAvatarSource(row) {
   const directCandidates = [
     row?.avatar,
@@ -1158,7 +1203,32 @@ function createGenericAvatarMarkup(row, extraClass = "") {
 function createAvatarMarkup(row) {
   return createGenericAvatarMarkup(row, "leaderboard-avatar");
 }
+function getLeaderboardSupportedTeamName(row) {
+  const player = getPlayerById?.(row?.id) || {};
 
+  return (
+    row?.supportedTeam ||
+    row?.supportedTeamName ||
+    row?.teamName ||
+    row?.team ||
+    player?.supportedTeam ||
+    player?.supportedTeamName ||
+    player?.teamName ||
+    player?.team ||
+    ""
+  );
+}
+
+function createLeaderboardSupportedTeamLogo(row) {
+  const teamName = getLeaderboardSupportedTeamName(row);
+  if (!teamName) return "";
+
+  return `
+    <div class="leaderboard-supported-team-logo" aria-hidden="true">
+      ${teamLogoHtml(teamName, getActiveSeasonId(), "leaderboard-supported-team-logo__wrap")}
+    </div>
+  `;
+}
 function handleAvatarImageError(img) {
   markAvatarFallback(img);
 }
@@ -1168,45 +1238,86 @@ function standingsRows(rows, showPredictionCount = true, options = {}) {
   const currentPlayerId = normalizeEntityId(getCurrentPlayerId?.() || "");
   const maxTotal = Math.max(...rows.map((row) => Number(row.total || 0)), 1);
 
-  return `<div class="leaderboard-list">${rows
+  return `<div class="leaderboard-list ${options.weeklyMode ? "leaderboard-list-weekly" : "leaderboard-list-general"}">${rows
     .map((row, i) => {
       const tone = getStandingTone(i);
-      const leaderChip = row.id === options.leaderId
-        ? `<span class="leaderboard-chip ${options.weeklyMode ? "chip-week" : "chip-leader"}">${options.weeklyMode ? "Hafta lideri" : "Lider"}</span>`
-        : "";
-      const isCurrentUser = currentPlayerId && normalizeEntityId(row.id) === currentPlayerId;
-      const currentUserChip = isCurrentUser ? `<span class="leaderboard-chip chip-self">Sen</span>` : "";
-      const rightLabel = showPredictionCount ? `${row.predictionCount} tahmin` : `${row.total} hafta`;
-      const progressWidth = Math.max(8, Math.round((Number(row.total || 0) / maxTotal) * 100));
-      const rankDelta = Number((options.rankDeltaMap && options.rankDeltaMap[row.id]) || 0);
-      const movementChip = rankDelta > 0
-        ? `<span class="leaderboard-move move-up">↑ +${rankDelta}</span>`
-        : rankDelta < 0
-          ? `<span class="leaderboard-move move-down">↓ ${Math.abs(rankDelta)}</span>`
-          : `<span class="leaderboard-move move-flat">• 0</span>`;
+      const leaderChip =
+        row.id === options.leaderId
+          ? `<span class="leaderboard-chip ${options.weeklyMode ? "chip-week" : "chip-leader"}">${options.weeklyMode ? "Hafta lideri" : "Lider"}</span>`
+          : "";
 
-      return `
+      const isCurrentUser =
+        currentPlayerId && normalizeEntityId(row.id) === currentPlayerId;
+
+      const currentUserChip = isCurrentUser
+        ? `<span class="leaderboard-chip chip-self">Sen</span>`
+        : "";
+
+      const rightLabel = showPredictionCount
+        ? `${row.predictionCount} tahmin`
+        : `${row.total} hafta`;
+
+      const progressWidth = Math.max(
+        8,
+        Math.round((Number(row.total || 0) / maxTotal) * 100),
+      );
+
+      const rankDelta = Number(
+        (options.rankDeltaMap && options.rankDeltaMap[row.id]) || 0,
+      );
+
+      const movementChip =
+        rankDelta > 0
+          ? `<span class="leaderboard-move move-up">↑ +${rankDelta}</span>`
+          : rankDelta < 0
+            ? `<span class="leaderboard-move move-down">↓ ${Math.abs(rankDelta)}</span>`
+            : `<span class="leaderboard-move move-flat">• 0</span>`;
+
+      const player = getPlayerById(row.id);
+      const supportedTeamName = getPlayerSupportedTeamName(player);
+      const supportedTeamLogo = supportedTeamName
+        ? `
+          <div class="leaderboard-supported-team-logo" aria-hidden="true">
+            ${teamLogoHtml(
+              supportedTeamName,
+              getActiveSeasonId(),
+              "leaderboard-supported-team-logo-inner",
+            )}
+          </div>
+        `
+        : "";
+
+        return `
         <article class="leaderboard-row tone-${tone} ${i < 3 ? "top-rank-row" : ""} ${isCurrentUser ? "is-current-user" : ""}">
+          ${createLeaderboardSupportedTeamLogo(row)}
+      
           <div class="leaderboard-row-left">
             <span class="leaderboard-rank">${i < 3 ? `<span class="rank-medal">${i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉"}</span>` : `#${i + 1}`}</span>
-            ${createAvatarMarkup(row)}
-            <div class="leaderboard-person">
-              <div class="leaderboard-name-line">
-                <strong>${escapeHtml(row.name)}</strong>
-                ${leaderChip}
-                ${currentUserChip}
-                ${movementChip}
-              </div>
-              <div class="leaderboard-subline">
-                <span>${row.exact} tam skor</span>
-                <span>${row.resultOnly} yakın</span>
-                <span>${rightLabel}</span>
-              </div>
-              <div class="leaderboard-progress" aria-hidden="true">
-                <span style="width:${progressWidth}%"></span>
+      
+            <div class="leaderboard-main-content">
+              ${createAvatarMarkup(row)}
+      
+              <div class="leaderboard-person">
+                <div class="leaderboard-name-line">
+                  <strong>${escapeHtml(row.name)}</strong>
+                  ${leaderChip}
+                  ${currentUserChip}
+                  ${movementChip}
+                </div>
+      
+                <div class="leaderboard-subline">
+                  <span>${row.exact} tam skor</span>
+                  <span>${row.resultOnly} yakın</span>
+                  <span>${rightLabel}</span>
+                </div>
+      
+                <div class="leaderboard-progress" aria-hidden="true">
+                  <span style="width:${progressWidth}%"></span>
+                </div>
               </div>
             </div>
           </div>
+      
           <div class="leaderboard-score-block">
             <strong>${row.total}</strong>
             <span>${options.weeklyMode ? "hafta puanı" : "puan"}</span>
@@ -1269,6 +1380,7 @@ function renderStandingsSummary(summary, generalLeader, weeklyLeader) {
 function renderStandingsInsights(summary, generalLeader, weeklyLeader) {
   const wrap = document.getElementById("standingsInsights");
   if (!wrap) return;
+
   wrap.innerHTML = `
     <div class="standings-insights-grid standings-insights-grid--luxury">
       <div class="standings-insight-box tone-violet">
@@ -1292,14 +1404,16 @@ function renderStandingsInsights(summary, generalLeader, weeklyLeader) {
         <small>${summary.leaderGap ? "puanlık fark var" : "liderlik yarışı başa baş"}</small>
       </div>
     </div>
+
     <div class="standings-highlight-panel standings-highlight-panel--luxury">
-      <div class="standings-highlight-block">
+      <div class="standings-highlight-block standings-highlight-general">
         <span>Sezon lideri</span>
         <strong>${generalLeader ? escapeHtml(generalLeader.name) : "-"}</strong>
         <small>${generalLeader ? `${generalLeader.total} puan • ${generalLeader.exact} tam skor` : "Henüz puan oluşmadı"}</small>
       </div>
-      <div class="standings-highlight-block">
-        <span>Hafta lideri</span>
+
+      <div class="standings-highlight-block standings-highlight-weekly">
+        <span>Haftalık yarış lideri</span>
         <strong>${weeklyLeader ? escapeHtml(weeklyLeader.name) : "-"}</strong>
         <small>${weeklyLeader ? `${weeklyLeader.total} puan • ${weeklyLeader.exact} tam skor` : "Seçili hafta için veri yok"}</small>
       </div>

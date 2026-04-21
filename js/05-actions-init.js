@@ -1,40 +1,101 @@
 /* 05-actions-init.js */
 
+function renderCurrentTabOnly(tabName = state.settings.currentTab || "dashboard") {
+  switch (tabName) {
+    case "dashboard":
+      renderDashboardOverview();
+      renderDashboardSyncCard();
+      renderMatches("dashboardMatches", state.settings.activeWeekId);
+      renderStats();
+      break;
+
+    case "seasons":
+      renderSeasons();
+      break;
+
+    case "players":
+      renderPlayers();
+      renderFirebaseAdminPanel();
+      bindAdminPanelTableScroll();
+      updateAdminSyncPanel();
+      break;
+
+    case "weeks":
+      renderWeeks();
+      break;
+
+    case "matches":
+      renderMatches(
+        "matchesList",
+        document.getElementById("matchesFilterWeek").value ||
+          state.settings.activeWeekId,
+      );
+      break;
+
+    case "predictions":
+      renderPredictions();
+      break;
+
+    case "standings":
+      renderStandings();
+      break;
+
+    case "stats":
+      renderAdvancedStats();
+      renderStats();
+      break;
+
+    case "backup":
+      renderBackupPanel();
+      break;
+
+    default:
+      renderDashboardOverview();
+      renderMatches("dashboardMatches", state.settings.activeWeekId);
+      renderStats();
+      break;
+  }
+}
+
 function renderAll() {
   const viewportSnapshot = capturePredictionViewport();
   const pageViewportSnapshot = capturePageViewport();
-  ensureActiveSelections();
-  recalculateAllPoints();
-  renderSelects();
-  renderStats();
-  renderDashboardOverview();
-  renderDashboardSyncCard();
-  renderFirebaseAdminPanel();
-  bindAdminPanelTableScroll();
-  updateAdminSyncPanel();
-  renderSeasons();
-  renderPlayers();
-  renderWeeks();
-  renderMatches(
-    "matchesList",
-    document.getElementById("matchesFilterWeek").value ||
-      state.settings.activeWeekId,
-  );
-  renderPredictions();
-  renderStandings();
+  const runSafe = (label, fn) => {
+    try {
+      return fn();
+    } catch (error) {
+      console.error(`[renderAll:${label}]`, error);
+      return null;
+    }
+  };
 
-  renderMatches("dashboardMatches", state.settings.activeWeekId);
-  renderAdvancedStats();
-  renderBackupPanel();
-  updateLoginOverlay();
-  updateAdminSyncToggleButton();
-  applyRolePermissions();
-  ensureHeaderSyncButtons();
-  updateNavSelection(state.settings.currentTab || "dashboard");
-  schedulePredictionViewportRestore(viewportSnapshot);
-  restorePageViewport(pageViewportSnapshot);
+  runSafe("ensureActiveSelections", () => ensureActiveSelections());
+  runSafe("recalculateAllPoints", () => recalculateAllPoints());
+  runSafe("renderSelects", () => renderSelects());
+
+  runSafe("updateLoginOverlay", () => updateLoginOverlay());
+  runSafe("updateAdminSyncToggleButton", () => updateAdminSyncToggleButton());
+  runSafe("applyRolePermissions", () => applyRolePermissions());
+  runSafe("ensureHeaderSyncButtons", () => ensureHeaderSyncButtons());
+  runSafe("updateNavSelection", () =>
+    updateNavSelection(state.settings.currentTab || "dashboard"),
+  );
+
+  runSafe("renderCurrentTabOnly", () =>
+    renderCurrentTabOnly(state.settings.currentTab || "dashboard"),
+  );
+
+  if (typeof refreshAvatarImages === "function") {
+    runSafe("refreshAvatarImages", () => refreshAvatarImages(document));
+  }
+
+  runSafe("schedulePredictionViewportRestore", () =>
+    schedulePredictionViewportRestore(viewportSnapshot),
+  );
+  runSafe("restorePageViewport", () => restorePageViewport(pageViewportSnapshot));
+
   if (window.refreshPlayerDetailModal) {
-    refreshPlayerDetailModal();
+    runSafe("refreshPlayerDetailModal", () => refreshPlayerDetailModal());
   }
 }
 
@@ -147,15 +208,22 @@ function addSeasonTeam() {
   saveState();
   renderAll();
 }
-
+const MOBILE_SYNC_SUCCESS_ICON_DURATION = 180000; // 3 dakika
 function setAsyncButtonState(button, state = "idle", labels = {}) {
   if (!button) return;
-  if (!button.dataset.originalText) {
+
+  const isIconButton = button.classList.contains("dashboard-mobile-sync-btn");
+  const iconEl = isIconButton
+    ? button.querySelector(".dashboard-mobile-sync-btn__icon")
+    : null;
+
+  if (!isIconButton && !button.dataset.originalText) {
     button.dataset.originalText = (button.textContent || "").trim();
   }
 
   const original =
     button.dataset.originalText || (button.textContent || "").trim();
+
   const loadingText = labels.loading || labels.pending || "Bekleniyor...";
   const successText = labels.success || "Tamam";
   const errorText = labels.error || "Tekrar dene";
@@ -164,19 +232,78 @@ function setAsyncButtonState(button, state = "idle", labels = {}) {
   button.disabled = false;
   button.removeAttribute("aria-busy");
 
+  if (isIconButton && iconEl) {
+    if (state === "loading") {
+      button.classList.add("btn-loading");
+      button.disabled = true;
+      button.setAttribute("aria-busy", "true");
+      button.setAttribute("aria-label", "Skorlar güncelleniyor");
+      button.setAttribute("title", "Skorlar güncelleniyor");
+      iconEl.textContent = "⟳";
+      return;
+    }
+
+    if (state === "success") {
+      button.classList.add("btn-success");
+      button.disabled = false;
+      button.setAttribute("aria-label", "Skorlar güncellendi");
+      button.setAttribute("title", "Skorlar güncellendi");
+      iconEl.textContent = "✓";
+
+      window.setTimeout(() => {
+        button.classList.remove("btn-success");
+        button.disabled = false;
+        button.setAttribute("aria-label", "Skorları Güncelle");
+        button.setAttribute("title", "Skorları Güncelle");
+        iconEl.textContent = "⟳";
+      }, 1200);
+      return;
+    }
+
+    if (state === "error") {
+      button.classList.add("btn-error");
+      button.disabled = false;
+      button.setAttribute("aria-label", "Skor güncelleme hatası");
+      button.setAttribute("title", "Skor güncelleme hatası");
+      iconEl.textContent = "!";
+
+      window.setTimeout(() => {
+        button.classList.remove("btn-error");
+        button.setAttribute("aria-label", "Skorları Güncelle");
+        button.setAttribute("title", "Skorları Güncelle");
+        iconEl.textContent = "⟳";
+      }, 1600);
+      return;
+    }
+
+    button.setAttribute("aria-label", "Skorları Güncelle");
+    button.setAttribute("title", "Skorları Güncelle");
+    iconEl.textContent = "⟳";
+    return;
+  }
+
   if (state === "loading") {
     button.classList.add("btn-loading");
     button.disabled = true;
     button.setAttribute("aria-busy", "true");
+    button.setAttribute("aria-label", loadingText);
+    button.setAttribute("title", loadingText);
     button.textContent = loadingText;
     return;
   }
 
   if (state === "success") {
     button.classList.add("btn-success");
+    button.disabled = false;
+    button.setAttribute("aria-label", successText);
+    button.setAttribute("title", successText);
     button.textContent = successText;
+
     window.setTimeout(() => {
       button.classList.remove("btn-success");
+      button.disabled = false;
+      button.setAttribute("aria-label", original || successText);
+      button.setAttribute("title", original || successText);
       button.textContent = original;
     }, 1200);
     return;
@@ -184,14 +311,24 @@ function setAsyncButtonState(button, state = "idle", labels = {}) {
 
   if (state === "error") {
     button.classList.add("btn-error");
+    button.disabled = false;
+    button.setAttribute("aria-label", errorText);
+    button.setAttribute("title", errorText);
     button.textContent = errorText;
+
     window.setTimeout(() => {
       button.classList.remove("btn-error");
+      button.disabled = false;
+      button.setAttribute("aria-label", original || errorText);
+      button.setAttribute("title", original || errorText);
       button.textContent = original;
     }, 1600);
     return;
   }
 
+  button.disabled = false;
+  button.setAttribute("aria-label", original || "İşlem");
+  button.setAttribute("title", original || "İşlem");
   button.textContent = original;
 }
 
@@ -237,6 +374,7 @@ function addPlayer(buttonOrEvent) {
       password,
       panelAdmin: false,
       seasonStates: createDefaultSeasonStateMap(true),
+      supportedTeam,
       avatar: "",
     };
 
@@ -393,20 +531,31 @@ function switchTab(tabName) {
   if (
     getCurrentRole() !== "admin" &&
     ["players", "backup", "seasons", "weeks", "matches"].includes(tabName)
-  )
+  ) {
     tabName = "dashboard";
+  }
+
   state.settings.currentTab = tabName;
   closeMobileAdminMenu();
   updateNavSelection(tabName);
   ensureHeaderSyncButtons();
+
   document
     .querySelectorAll(".tab-panel")
     .forEach((panel) =>
       panel.classList.toggle("active", panel.id === `tab-${tabName}`),
     );
+
+  renderCurrentTabOnly(tabName);
+
+  if (typeof refreshAvatarImages === "function") {
+    refreshAvatarImages(document);
+  }
+
   if (tabName === "stats") {
     triggerStatsCelebration();
   }
+
   closeLandscapeSidebar();
   saveState(true);
 }
@@ -1707,6 +1856,11 @@ function bindEvents() {
   on("dashboardSyncWeekBtn", "click", syncDashboardWeek);
   on("dashboardSyncSeasonBtn", "click", syncDashboardSeason);
   on("dashboardWeekScoreUpdateBtn", "click", runDashboardWeekScoreUpdate);
+  on(
+    "dashboardMobileWeekScoreUpdateBtn",
+    "click",
+    runDashboardWeekScoreUpdate,
+  );
   on("dashboardSyncToggleBtn", "click", toggleDashboardSyncCard);
   on("adminSyncToggleBtn", "click", toggleAdminSyncOverview);
   on("firebaseAdminRefreshBtn", "click", refreshFirebaseAdminPanel);
@@ -1781,19 +1935,34 @@ function bindEvents() {
     if (!clickedDesktop && !clickedMobile) closeAccountMenus();
   });
 
-  let lastWindowWidth = window.innerWidth;
+  let resizeRenderTimer = null;
+  let lastViewportBucket = getViewportRenderBucket();
+
+  function getViewportRenderBucket() {
+    const width = window.innerWidth;
+    const isLandscapeMobile = window.matchMedia(
+      "(max-width: 950px) and (orientation: landscape)",
+    ).matches;
+
+    if (isLandscapeMobile) return "mobile-landscape";
+    if (width <= 768) return "mobile";
+    if (width <= 1100) return "tablet";
+    return "desktop";
+  }
+
   window.addEventListener("resize", () => {
-    if (
-      !window.matchMedia("(max-width: 950px) and (orientation: landscape)")
-        .matches
-    ) {
-    }
-    const currentWidth = window.innerWidth;
-    if (currentWidth !== lastWindowWidth) {
-      lastWindowWidth = currentWidth;
-      renderAll();
+    clearTimeout(resizeRenderTimer);
+
+    resizeRenderTimer = setTimeout(() => {
+      const nextBucket = getViewportRenderBucket();
+
+      if (nextBucket !== lastViewportBucket) {
+        lastViewportBucket = nextBucket;
+        renderAll();
+      }
+
       updateAdminSyncToggleButton();
-    }
+    }, 180);
   });
 
   [
@@ -1880,3 +2049,11 @@ window.toggleFirebaseAdminCard = toggleFirebaseAdminCard;
 window.toggleDashboardSyncCard = toggleDashboardSyncCard;
 window.toggleAdminSyncOverview = toggleAdminSyncOverview;
 window.handleTeamLogoError = handleTeamLogoError;
+document.addEventListener("keydown", (e) => {
+  if (e.key.toLowerCase() !== "c") return;
+
+  const standingsTab = document.getElementById("tab-standings");
+  if (!standingsTab || !standingsTab.classList.contains("active")) return;
+
+  document.body.classList.toggle("standings-shot-mode");
+});

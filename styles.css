@@ -334,7 +334,32 @@ option {
 }
 
 .standings-layout {
-  grid-template-columns: 1.1fr 0.9fr;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.standings-layout > .card {
+  min-width: 0;
+  height: 100%;
+}
+
+#standingsTable,
+#weeklyStandings {
+  display: grid;
+  gap: 14px;
+}
+
+#standingsTable .leaderboard-row,
+#weeklyStandings .leaderboard-row {
+  width: 100%;
+  min-height: 110px;
+  box-sizing: border-box;
+}
+
+#tab-standings .card {
+  height: 100%;
 }
 
 .backup-layout {
@@ -1296,7 +1321,7 @@ option {
   display: grid;
   place-items: center;
   padding: 20px;
-  z-index: 1200;
+  z-index: 40000;
 }
 
 .app-modal.hidden {
@@ -5585,26 +5610,32 @@ body.login-locked {
 
 .players-premium-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 300px));
   gap: 18px;
+  justify-content: start;
 }
 
 .player-premium-card {
+  --team-glow-a: rgba(88, 144, 255, 0.22);
+  --team-glow-b: rgba(56, 189, 248, 0.12);
+  --team-border-color: rgba(98, 133, 197, 0.22);
+
   position: relative;
   overflow: hidden;
   padding: 18px;
   border-radius: 24px;
-  border: 1px solid rgba(98, 133, 197, 0.22);
+  border: 1px solid var(--team-border-color);
   background:
     radial-gradient(
-      circle at top right,
-      rgba(62, 116, 255, 0.14),
+      circle at 88% 18%,
+      color-mix(in srgb, var(--team-glow-a) 34%, transparent),
       transparent 34%
     ),
     linear-gradient(145deg, rgba(27, 41, 74, 0.96), rgba(13, 19, 35, 0.98));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 14px 32px rgba(0, 0, 0, 0.24);
+    0 14px 32px rgba(0, 0, 0, 0.24),
+    0 0 0 1px color-mix(in srgb, var(--team-glow-a) 18%, transparent);
   transition:
     transform 0.18s ease,
     border-color 0.18s ease,
@@ -5613,10 +5644,12 @@ body.login-locked {
 
 .player-premium-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(106, 168, 255, 0.34);
+  border-color: color-mix(in srgb, var(--team-border-color) 82%, white 18%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 18px 40px rgba(0, 0, 0, 0.28);
+    0 18px 40px rgba(0, 0, 0, 0.28),
+    0 0 26px color-mix(in srgb, var(--team-glow-a) 24%, transparent),
+    0 0 54px color-mix(in srgb, var(--team-glow-b) 16%, transparent);
 }
 
 .player-premium-card.is-admin {
@@ -5629,18 +5662,78 @@ body.login-locked {
     ),
     linear-gradient(145deg, rgba(24, 48, 54, 0.96), rgba(11, 20, 26, 0.98));
 }
-
 .player-card-glow {
   position: absolute;
-  right: -35px;
-  top: -35px;
-  width: 140px;
-  height: 140px;
+  right: -48px;
+  top: -42px;
+  width: 180px;
+  height: 180px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(88, 144, 255, 0.2), transparent 68%);
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--team-glow-a) 38%, transparent) 0%,
+    color-mix(in srgb, var(--team-glow-b) 20%, transparent) 42%,
+    transparent 72%
+  );
+  filter: blur(8px);
   pointer-events: none;
 }
+.player-card-supported-team-bg {
+  position: absolute;
+  top: 50%;
+  right: -62px;
+  transform: translateY(-50%);
+  width: 270px;
+  height: 270px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.05
+  ;}
 
+.player-card-supported-team-bg .team-logo-wrap,
+.player-card-supported-team-bg .team-logo-img,
+.player-card-supported-team-bg .team-logo,
+.player-card-supported-team-bg__wrap .team-logo-wrap,
+.player-card-supported-team-bg__wrap .team-logo-img,
+.player-card-supported-team-bg__wrap .team-logo {
+  width: 270px;
+  height: 270px;
+  min-width: 170px;
+  min-height: 170px;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+}
+
+.player-card-supported-team-bg img,
+.player-card-supported-team-bg .team-logo-img img,
+.player-card-supported-team-bg__wrap img,
+.player-card-supported-team-bg__wrap .team-logo-img img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: blur(1.4px);
+  opacity: 0.95;
+}
+
+.player-premium-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(5, 10, 24, 0.02) 0%,
+    rgba(5, 10, 24, 0.08) 52%,
+    rgba(5, 10, 24, 0.36) 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
 .player-premium-card.is-admin .player-card-glow {
   background: radial-gradient(circle, rgba(16, 185, 129, 0.2), transparent 68%);
 }
@@ -5816,7 +5909,24 @@ body.login-locked {
     grid-template-columns: 1fr;
     gap: 14px;
   }
+  .player-card-supported-team-bg {
+    right: -40px;
+    width: 200px;
+    height: 200px;
+    opacity: 0.05;  
+  }
 
+  .player-card-supported-team-bg .team-logo-wrap,
+  .player-card-supported-team-bg .team-logo-img,
+  .player-card-supported-team-bg .team-logo,
+  .player-card-supported-team-bg__wrap .team-logo-wrap,
+  .player-card-supported-team-bg__wrap .team-logo-img,
+  .player-card-supported-team-bg__wrap .team-logo {
+    width: 200px;
+    height: 200px;
+    min-width: 170px;
+    min-height: 170px;
+  }
   .player-premium-card {
     padding: 15px;
     border-radius: 20px;
@@ -5852,6 +5962,13 @@ body.login-locked {
   .season-member-chip span {
     font-size: 13px;
   }
+}
+.player-card-top,
+.player-card-stats,
+.player-card-seasons,
+.player-card-actions {
+  position: relative;
+  z-index: 2;
 }
 /* =========================
    Kişiler sayfası presence iyileştirme + dashboard sadeleştirme
@@ -5994,8 +6111,9 @@ body.login-locked {
 .player-premium-card.is-online .player-card-glow {
   background: radial-gradient(
     circle,
-    rgba(74, 222, 128, 0.24),
-    transparent 70%
+    color-mix(in srgb, var(--team-glow-a) 28%, rgba(74, 222, 128, 0.34)) 0%,
+    color-mix(in srgb, var(--team-glow-b) 18%, transparent) 45%,
+    transparent 72%
   );
 }
 
@@ -7121,10 +7239,11 @@ body.dashboard-modal-open {
   min-width: 150px;
   height: 42px;
 }
+
 .dashboard-hero-strip {
-  display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.72fr);
-  gap: 12px;
+  grid-template-columns: minmax(0, 1.45fr) minmax(420px, 0.95fr) !important;
+  gap: 10px;
+  align-items: stretch;
 }
 .dashboard-hero-main,
 .dashboard-hero-side,
@@ -8853,7 +8972,7 @@ body.dashboard-modal-open {
 .standings-hero-shell--immersive {
   position: relative;
   overflow: hidden;
-  padding: 24px;
+  padding: 50px;
   background:
     radial-gradient(
       circle at 22% 18%,
@@ -9537,6 +9656,9 @@ body.dashboard-modal-open {
   .leaderboard-row {
     padding: 14px 14px 14px 15px;
     align-items: flex-start;
+    position: relative;
+    overflow: hidden;
+    border-radius: 16px; /* sende kaçsa aynısı */
   }
 
   .leaderboard-row-left {
@@ -10924,4 +11046,1450 @@ body.player-modal-open {
   height: 240px;
   min-width: 240px;
   min-height: 240px;
+}
+/* SADECE PC: yazı + podyum yan yana */
+@media (min-width: 1025px) {
+  .standings-hero-shell--immersive {
+    grid-template-columns: minmax(320px, 0.95fr) minmax(720px, 0.45fr);
+  }
+}
+/* =========================================================
+   PUAN DURUMU – ULTRA PREMIUM / FIFA ULTIMATE TEAM PC MODU
+   sadece PC
+========================================================= */
+@media (min-width: 1025px) {
+  #tab-standings {
+    padding-bottom: 72px;
+  }
+
+  /* ana üst sahne */
+  #tab-standings .standings-hero-shell--immersive {
+    position: relative;
+    overflow: hidden;
+    padding: 50px 30px;
+    border-radius: 50px;
+    border: 1px solid rgba(124, 146, 255, 0.2);
+    background:
+      radial-gradient(
+        circle at 16% 18%,
+        rgba(168, 85, 247, 0.24),
+        transparent 26%
+      ),
+      radial-gradient(
+        circle at 82% 14%,
+        rgba(59, 130, 246, 0.2),
+        transparent 24%
+      ),
+      radial-gradient(
+        circle at 50% 100%,
+        rgba(34, 197, 94, 0.08),
+        transparent 32%
+      ),
+      linear-gradient(135deg, #24124a 0%, #09152f 44%, #0a1d49 100%);
+    box-shadow:
+      0 28px 70px rgba(0, 0, 0, 0.38),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 -30px 60px rgba(3, 7, 18, 0.28);
+  }
+
+  /* hafif FUT parlama katmanı */
+  #tab-standings .standings-hero-shell--immersive::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(
+        115deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.06) 18%,
+        transparent 34%
+      ),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 24%);
+    opacity: 0.9;
+  }
+
+  /* sol yazı + sağ podium yan yana */
+  #tab-standings .standings-stage-head {
+    display: grid;
+    grid-template-columns: minmax(320px, 0.9fr) minmax(760px, 1.4fr);
+    align-items: center;
+    gap: 26px;
+    margin-bottom: 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  #tab-standings .standings-stage-copy {
+    max-width: 460px;
+    padding-left: 2px;
+  }
+
+  #tab-standings .standings-stage-copy .standings-hero-kicker {
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.22em;
+    color: #e4c7ff;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    text-shadow: 0 0 18px rgba(196, 128, 255, 0.28);
+  }
+
+  #tab-standings .standings-stage-copy h3 {
+    margin: 0;
+    font-size: clamp(46px, 4vw, 60px);
+    line-height: 0.94;
+    letter-spacing: -0.04em;
+    color: #f8fbff;
+    text-shadow:
+      0 10px 26px rgba(0, 0, 0, 0.22),
+      0 0 26px rgba(255, 255, 255, 0.05);
+  }
+
+  #tab-standings .standings-stage-copy p {
+    margin-top: 16px;
+    max-width: 430px;
+    font-size: 16px;
+    line-height: 1.5;
+    color: #c1cde4;
+  }
+
+  /* podium alanı */
+  #tab-standings .leaderboard-podium {
+    display: flex;
+    justify-content: flex-end;
+    align-items: end;
+    gap: 22px;
+    min-height: 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* genel kart */
+  #tab-standings .podium-card {
+    position: relative;
+    overflow: hidden;
+    width: 210px;
+    min-height: 335px;
+    padding: 16px 16px 18px;
+    border-radius: 50px;
+    border: 1px solid rgba(255, 255, 255, 0.11);
+    backdrop-filter: blur(14px);
+    box-shadow:
+      0 22px 40px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    transition:
+      transform 0.18s ease,
+      box-shadow 0.18s ease,
+      border-color 0.18s ease;
+  }
+
+  #tab-standings .podium-card:hover {
+    transform: translateY(-6px);
+    box-shadow:
+      0 32px 54px rgba(0, 0, 0, 0.34),
+      0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+  }
+
+  /* 1. kart */
+  #tab-standings .podium-rank-1 {
+    width: 238px;
+    min-height: 392px;
+    transform: translateY(-26px) scale(1.02);
+    background:
+      radial-gradient(
+        circle at 50% 0%,
+        rgba(255, 215, 92, 0.22),
+        transparent 32%
+      ),
+      radial-gradient(
+        circle at 88% 74%,
+        rgba(255, 214, 10, 0.13),
+        transparent 22%
+      ),
+      linear-gradient(180deg, rgba(46, 27, 77, 0.92), rgba(9, 12, 31, 0.96));
+    border-color: rgba(246, 196, 83, 0.28);
+    box-shadow:
+      0 26px 56px rgba(0, 0, 0, 0.36),
+      0 0 40px rgba(246, 196, 83, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  /* 2. kart */
+  #tab-standings .podium-rank-2 {
+    background:
+      radial-gradient(
+        circle at 50% 0%,
+        rgba(111, 188, 255, 0.18),
+        transparent 30%
+      ),
+      linear-gradient(180deg, rgba(25, 53, 93, 0.94), rgba(8, 18, 43, 0.96));
+    border-color: rgba(147, 180, 255, 0.24);
+  }
+
+  /* 3. kart */
+  #tab-standings .podium-rank-3 {
+    background:
+      radial-gradient(
+        circle at 50% 0%,
+        rgba(255, 146, 60, 0.16),
+        transparent 30%
+      ),
+      linear-gradient(180deg, rgba(76, 28, 56, 0.94), rgba(18, 10, 30, 0.96));
+    border-color: rgba(255, 138, 91, 0.22);
+  }
+
+  /* alt altın çizgi */
+  #tab-standings .podium-card::after {
+    content: "";
+    position: absolute;
+    left: 18px;
+    right: 18px;
+    bottom: 14px;
+    height: 4px;
+    border-radius: 999px;
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.12),
+      rgba(255, 214, 92, 0.45),
+      rgba(255, 255, 255, 0.12)
+    );
+    opacity: 0.72;
+  }
+
+  /* glow */
+  #tab-standings .podium-glow {
+    filter: blur(34px);
+    opacity: 0.95;
+  }
+
+  /* rank badge */
+  #tab-standings .podium-rank-badge {
+    font-size: 30px;
+    filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.25));
+  }
+
+  /* avatar */
+  #tab-standings .podium-avatar {
+    width: 94px;
+    height: 94px;
+    min-width: 94px;
+    min-height: 94px;
+    border-radius: 50% !important;
+    overflow: hidden !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid rgba(255, 255, 255, 0.18);
+    box-shadow:
+      0 0 0 12px rgba(255, 255, 255, 0.035),
+      0 20px 32px rgba(8, 12, 24, 0.26),
+      0 0 24px rgba(255, 255, 255, 0.06);
+    aspect-ratio: 1 / 1;
+  }
+
+  #tab-standings .podium-avatar img,
+  #tab-standings .podium-avatar-image,
+  #tab-standings .podium-avatar img.podium-avatar-image {
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 100% !important;
+    min-height: 100% !important;
+    object-fit: cover !important;
+    object-position: center center !important;
+    border-radius: 50% !important;
+    display: block;
+    aspect-ratio: 1 / 1;
+  }
+
+  #tab-standings .podium-rank-1 .podium-avatar {
+    width: 112px;
+    height: 112px;
+    min-width: 112px;
+    min-height: 112px;
+    border-radius: 50% !important;
+    aspect-ratio: 1 / 1;
+    box-shadow:
+      0 0 0 14px rgba(255, 255, 255, 0.04),
+      0 24px 40px rgba(25, 15, 52, 0.34),
+      0 0 30px rgba(255, 215, 92, 0.16);
+  }
+
+  #tab-standings .podium-rank-1 .podium-avatar img,
+  #tab-standings .podium-rank-1 .podium-avatar-image {
+    border-radius: 50% !important;
+    object-fit: cover !important;
+    object-position: center center !important;
+  }
+
+  /* isim ve puan */
+  #tab-standings .podium-name {
+    margin-top: 2px;
+    font-size: 18px;
+    letter-spacing: -0.01em;
+    font-weight: 900;
+    color: #f8fbff;
+    text-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+  }
+
+  #tab-standings .podium-rank-1 .podium-name {
+    font-size: 20px;
+  }
+
+  #tab-standings .podium-points {
+    font-size: 64px;
+    font-weight: 900;
+    letter-spacing: -0.05em;
+    line-height: 0.92;
+    color: #f8fbff;
+    text-shadow:
+      0 12px 30px rgba(0, 0, 0, 0.28),
+      0 0 22px rgba(255, 255, 255, 0.05);
+  }
+
+  #tab-standings .podium-rank-1 .podium-points {
+    font-size: 72px;
+  }
+
+  #tab-standings .podium-points-label {
+    margin-top: 2px;
+    font-size: 12px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: #b7c5df;
+  }
+
+  /* meta chipler */
+  #tab-standings .podium-meta-row {
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  #tab-standings .podium-meta-row span {
+    padding: 7px 12px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #e7eefc;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  /* alt liste kartları da daha premium olsun */
+  #tab-standings .standings-luxury-layout {
+    margin-top: 18px;
+    gap: 18px;
+  }
+
+  #tab-standings .standings-board-card,
+  #tab-standings .standings-week-card,
+  #tab-standings .standings-insight-card--luxury {
+    border-radius: 50px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background:
+      radial-gradient(
+        circle at top right,
+        rgba(56, 189, 248, 0.06),
+        transparent 24%
+      ),
+      linear-gradient(180deg, rgba(10, 18, 34, 0.96), rgba(5, 11, 22, 0.98));
+    box-shadow:
+      0 18px 38px rgba(0, 0, 0, 0.24),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  #tab-standings .leaderboard-row {
+    border-radius: 50px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(8px);
+  }
+
+  #tab-standings .leaderboard-row.podium-1 {
+    box-shadow: 0 10px 24px rgba(250, 204, 21, 0.08);
+  }
+
+  #tab-standings .leaderboard-row.podium-2 {
+    box-shadow: 0 10px 24px rgba(147, 180, 255, 0.06);
+  }
+
+  #tab-standings .leaderboard-row.podium-3 {
+    box-shadow: 0 10px 24px rgba(255, 138, 91, 0.06);
+  }
+}
+/* ===== MOBIL AVATAR PREMIUM HALKA EFEKTI ===== */
+@media (max-width: 720px) {
+  .app-avatar,
+  .leaderboard-avatar,
+  .leaderboard-mobile-avatar-wrap .leaderboard-avatar,
+  .user-avatar.app-avatar,
+  .player-avatar.app-avatar,
+  .member-avatar.app-avatar {
+    position: relative;
+    overflow: hidden;
+    border-radius: 50% !important;
+    border: 1.5px solid rgba(255, 255, 255, 0.16) !important;
+    background: radial-gradient(
+      circle at 30% 30%,
+      rgba(255, 255, 255, 0.22),
+      rgba(255, 255, 255, 0.05) 42%,
+      rgba(7, 17, 31, 0.9) 100%
+    ) !important;
+    box-shadow:
+      0 0 0 3px rgba(255, 255, 255, 0.04),
+      0 8px 18px rgba(0, 0, 0, 0.26),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  }
+
+  .app-avatar::before,
+  .leaderboard-avatar::before,
+  .leaderboard-mobile-avatar-wrap .leaderboard-avatar::before,
+  .user-avatar.app-avatar::before,
+  .player-avatar.app-avatar::before,
+  .member-avatar.app-avatar::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: 50%;
+    padding: 1px;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.28),
+      rgba(56, 189, 248, 0.2),
+      rgba(34, 197, 94, 0.16)
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0.9;
+  }
+
+  .app-avatar-image,
+  .leaderboard-avatar-image,
+  .podium-avatar img,
+  .app-avatar img,
+  .leaderboard-avatar img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    object-position: center center !important;
+    border-radius: 50% !important;
+    display: block;
+  }
+
+  /* mobil podium avatarı */
+  .podium-avatar.app-avatar {
+    border: 2px solid rgba(255, 255, 255, 0.18) !important;
+    box-shadow:
+      0 0 0 6px rgba(255, 255, 255, 0.04),
+      0 14px 28px rgba(0, 0, 0, 0.3),
+      0 0 20px rgba(255, 255, 255, 0.06) !important;
+  }
+
+  .podium-rank-1 .podium-avatar.app-avatar {
+    box-shadow:
+      0 0 0 8px rgba(255, 255, 255, 0.05),
+      0 16px 32px rgba(46, 27, 77, 0.34),
+      0 0 24px rgba(255, 211, 92, 0.18) !important;
+  }
+
+  .podium-rank-2 .podium-avatar.app-avatar {
+    box-shadow:
+      0 0 0 7px rgba(255, 255, 255, 0.04),
+      0 14px 26px rgba(15, 32, 64, 0.3),
+      0 0 18px rgba(111, 188, 255, 0.16) !important;
+  }
+
+  .podium-rank-3 .podium-avatar.app-avatar {
+    box-shadow:
+      0 0 0 7px rgba(255, 255, 255, 0.04),
+      0 14px 26px rgba(52, 18, 30, 0.3),
+      0 0 18px rgba(255, 146, 60, 0.14) !important;
+  }
+}
+
+.prediction-cell {
+  position: relative;
+  padding-top: 8px;
+}
+
+.prediction-cell.has-point-badge {
+  padding-top: 16px;
+}
+
+.points-badge-inline {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 3;
+  min-width: 34px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+/* =========================
+   PREMIUM LEADERBOARD
+========================= */
+
+.leaderboard-row {
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  transition: 0.25s ease;
+  backdrop-filter: blur(6px);
+}
+
+/* SOL RENK BAR (RADIUS FIX) */
+.leaderboard-row::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  border-radius: inherit;
+  z-index: 1;
+}
+
+/* GOLD */
+.leaderboard-row.tone-gold::before {
+  background: linear-gradient(180deg, #ffd86b, #ff9f1a);
+  box-shadow: 0 0 14px rgba(255, 200, 80, 0.6);
+}
+
+/* SILVER */
+.leaderboard-row.tone-silver::before {
+  background: linear-gradient(180deg, #8fd3ff, #6c7cff);
+}
+
+/* BRONZE */
+.leaderboard-row.tone-bronze::before {
+  background: linear-gradient(180deg, #ff9b69, #d85f3f);
+}
+
+/* HOVER */
+.leaderboard-row:hover {
+  transform: translateY(-3px) scale(1.01);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* SAĞ LOGO (ARKA PLAN) */
+.leaderboard-row::after {
+  content: "";
+  position: absolute;
+  right: -20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 120px;
+  height: 120px;
+  opacity: 0.08;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  filter: blur(1px);
+  pointer-events: none;
+}
+
+/* LİDER ÖZEL */
+.leaderboard-row.tone-gold {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 200, 80, 0.15),
+    rgba(255, 255, 255, 0.03)
+  );
+  box-shadow: 0 10px 30px rgba(255, 200, 80, 0.2);
+}
+
+/* PROGRESS BAR PREMIUM */
+.leaderboard-progress-fill {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #22c55e, #38bdf8);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+}
+/* =========================
+   LEADERBOARD ROW - RIGHT TEAM LOGO STYLE
+========================= */
+
+#tab-standings .leaderboard-row {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  isolation: isolate;
+}
+
+#tab-standings .leaderboard-row-left {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+#tab-standings .leaderboard-main-content {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+#tab-standings .leaderboard-avatar {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  position: relative;
+  z-index: 3;
+}
+
+#tab-standings .leaderboard-person {
+  min-width: 0;
+  max-width: 100%;
+  position: relative;
+  z-index: 3;
+}
+
+#tab-standings .leaderboard-name-line {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+#tab-standings .leaderboard-name-line strong {
+  font-size: 16px;
+  font-weight: 900;
+  text-align: left;
+}
+
+#tab-standings .leaderboard-subline {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+#tab-standings .leaderboard-progress {
+  max-width: 230px;
+}
+
+#tab-standings .leaderboard-score-block {
+  position: relative;
+  z-index: 3;
+  flex: 0 0 auto;
+  text-align: right;
+  min-width: 74px;
+}
+
+/* Sağdaki büyük takım logosu */
+#tab-standings .leaderboard-supported-team-logo {
+  position: absolute;
+  top: 50%;
+  right: -70px;
+  transform: translateY(-50%);
+  width: 220px;
+  height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.1;
+}
+
+#tab-standings .leaderboard-supported-team-logo .team-logo-wrap,
+#tab-standings .leaderboard-supported-team-logo .team-logo-img,
+#tab-standings .leaderboard-supported-team-logo .team-logo {
+  width: 220px;
+  height: 220px;
+  min-width: 220px;
+  min-height: 220px;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+}
+
+#tab-standings .leaderboard-supported-team-logo img,
+#tab-standings .leaderboard-supported-team-logo .team-logo-img img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: blur(1.2px);
+  opacity: 0.92;
+}
+
+/* Sağ logonun üstüne hafif koyu fade */
+#tab-standings .leaderboard-row::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(4, 10, 24, 0.02) 0%,
+    rgba(4, 10, 24, 0.08) 55%,
+    rgba(4, 10, 24, 0.42) 100%
+  );
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Sol renk bar */
+#tab-standings .leaderboard-row::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 22px;
+  bottom: 22px;
+  width: 4px;
+  border-radius: 999px;
+  z-index: 4;
+}
+
+#tab-standings .leaderboard-row.tone-gold::before {
+  background: linear-gradient(180deg, #ffcf54, #ff9a3d);
+  box-shadow: 0 0 14px rgba(255, 207, 84, 0.45);
+}
+
+#tab-standings .leaderboard-row.tone-silver::before {
+  background: linear-gradient(180deg, #76d2ff, #7f88ff);
+  box-shadow: 0 0 14px rgba(118, 210, 255, 0.32);
+}
+
+#tab-standings .leaderboard-row.tone-bronze::before {
+  background: linear-gradient(180deg, #ff9b69, #d85f3f);
+  box-shadow: 0 0 14px rgba(255, 155, 105, 0.3);
+}
+
+/* Haftalık yarış biraz daha mavi olsun */
+#tab-standings #weeklyStandings .leaderboard-row {
+  border-color: rgba(88, 160, 255, 0.18);
+  background:
+    radial-gradient(circle at 0% 50%, rgba(56, 189, 248, 0.1), transparent 24%),
+    linear-gradient(180deg, rgba(10, 20, 40, 0.96), rgba(6, 12, 26, 0.98));
+}
+
+#tab-standings #standingsTable .leaderboard-row {
+  background:
+    radial-gradient(circle at 0% 50%, rgba(34, 197, 94, 0.08), transparent 24%),
+    linear-gradient(180deg, rgba(10, 20, 40, 0.96), rgba(6, 12, 26, 0.98));
+}
+
+/* Mobilde arka logo daha küçük olsun */
+@media (max-width: 720px) {
+  #tab-standings .leaderboard-row {
+    gap: 12px;
+    border-radius: 22px;
+  }
+
+  #tab-standings .leaderboard-main-content {
+    gap: 10px;
+  }
+
+  #tab-standings .leaderboard-supported-team-logo {
+    right: -42px;
+    width: 140px;
+    height: 140px;
+    opacity: 0.08;
+  }
+
+  #tab-standings .leaderboard-supported-team-logo .team-logo-wrap,
+  #tab-standings .leaderboard-supported-team-logo .team-logo-img,
+  #tab-standings .leaderboard-supported-team-logo .team-logo {
+    width: 140px;
+    height: 140px;
+    min-width: 140px;
+    min-height: 140px;
+  }
+
+  #tab-standings .leaderboard-progress {
+    max-width: 170px;
+  }
+}
+/* =========================================
+   STANDINGS - LEFT / RIGHT EQUAL WIDTH FIX
+   bunu styles.css dosyasının EN ALTINA ekle
+========================================= */
+
+#tab-standings .standings-layout,
+#tab-standings .standings-luxury-layout,
+#tab-standings .standings-hero-shell {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  gap: 18px !important;
+  align-items: stretch !important;
+}
+
+#tab-standings .standings-layout > *,
+#tab-standings .standings-luxury-layout > *,
+#tab-standings .standings-hero-shell > * {
+  min-width: 0 !important;
+  width: 100% !important;
+}
+
+#tab-standings .standings-layout > .card,
+#tab-standings .standings-luxury-layout > .card,
+#tab-standings .standings-hero-shell > .card {
+  height: 100% !important;
+}
+
+#tab-standings #standingsTable,
+#tab-standings #weeklyStandings {
+  display: grid !important;
+  gap: 14px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+#tab-standings #standingsTable .leaderboard-row,
+#tab-standings #weeklyStandings .leaderboard-row {
+  width: 100% !important;
+  min-height: 110px !important;
+  box-sizing: border-box !important;
+}
+
+#tab-standings .leaderboard-row-left,
+#tab-standings .leaderboard-main-content,
+#tab-standings .leaderboard-person {
+  min-width: 0 !important;
+}
+
+#tab-standings .leaderboard-progress {
+  width: 100% !important;
+  max-width: 240px !important;
+}
+
+#tab-standings .leaderboard-score-block {
+  flex: 0 0 86px !important;
+  min-width: 86px !important;
+  text-align: right !important;
+}
+
+@media (max-width: 1180px) {
+  #tab-standings .standings-layout,
+  #tab-standings .standings-luxury-layout,
+  #tab-standings .standings-hero-shell {
+    grid-template-columns: 1fr !important;
+  }
+}
+#tab-standings .leaderboard-row:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.35),
+    0 0 12px rgba(56, 189, 248, 0.15);
+}
+#tab-standings .leaderboard-row.tone-gold {
+  box-shadow:
+    0 12px 40px rgba(255, 200, 80, 0.25),
+    inset 0 0 0 1px rgba(255, 200, 80, 0.2);
+}
+/* =========================================
+   STANDINGS - PREMIUM PLUS EFFECTS
+   styles.css dosyasının EN ALTINA ekle
+========================================= */
+
+/* Kart geçişleri daha yumuşak */
+#tab-standings .leaderboard-row {
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease,
+    filter 0.22s ease;
+}
+
+/* Hover premium hissi */
+#tab-standings .leaderboard-row:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.34),
+    0 0 18px rgba(56, 189, 248, 0.12);
+}
+
+/* Lider kart ekstra güçlü */
+#tab-standings .leaderboard-row.tone-gold {
+  box-shadow:
+    0 14px 42px rgba(255, 200, 80, 0.18),
+    inset 0 0 0 1px rgba(255, 207, 84, 0.16);
+}
+
+/* Sağdaki büyük logo daha sinematik */
+#tab-standings .leaderboard-supported-team-logo {
+  opacity: 0.11;
+}
+
+#tab-standings .leaderboard-supported-team-logo img,
+#tab-standings .leaderboard-supported-team-logo .team-logo-img img {
+  filter: blur(1.4px) saturate(0.95);
+  opacity: 0.85;
+}
+
+/* Logonun üstüne hafif mask */
+#tab-standings .leaderboard-row::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(4, 10, 24, 0.02) 0%,
+    rgba(4, 10, 24, 0.1) 52%,
+    rgba(4, 10, 24, 0.42) 76%,
+    rgba(4, 10, 24, 0.62) 100%
+  );
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Sol renk çizgisi daha premium */
+#tab-standings .leaderboard-row::before {
+  width: 4px;
+  top: 22px;
+  bottom: 22px;
+  border-radius: 999px;
+}
+
+#tab-standings .leaderboard-row.tone-gold::before {
+  background: linear-gradient(180deg, #ffd86b, #ff9f1a);
+  box-shadow:
+    0 0 14px rgba(255, 216, 107, 0.42),
+    0 0 24px rgba(255, 159, 26, 0.18);
+}
+
+#tab-standings .leaderboard-row.tone-silver::before {
+  background: linear-gradient(180deg, #8fd3ff, #6c7cff);
+  box-shadow:
+    0 0 14px rgba(143, 211, 255, 0.36),
+    0 0 24px rgba(108, 124, 255, 0.16);
+}
+
+#tab-standings .leaderboard-row.tone-bronze::before {
+  background: linear-gradient(180deg, #ffb07a, #e06b45);
+  box-shadow:
+    0 0 14px rgba(255, 176, 122, 0.34),
+    0 0 24px rgba(224, 107, 69, 0.15);
+}
+
+/* İsim biraz daha premium */
+#tab-standings .leaderboard-name-line strong {
+  letter-spacing: -0.02em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+/* Chipler daha temiz */
+#tab-standings .leaderboard-subline span,
+#tab-standings .leaderboard-name-line .badge,
+#tab-standings .leaderboard-name-line .weekly-leader-pill,
+#tab-standings .leaderboard-name-line .own-pill {
+  backdrop-filter: blur(8px);
+}
+
+/* Progress alanı */
+#tab-standings .leaderboard-progress {
+  position: relative;
+  overflow: hidden;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Progress dolumu */
+#tab-standings .leaderboard-progress > span {
+  position: relative;
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+/* Progress bar parlama akışı */
+#tab-standings .leaderboard-progress > span::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -30%;
+  width: 30%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.42) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: standingsProgressShine 3.2s ease-in-out infinite;
+}
+
+/* Lider kartta üstten hafif altın parlama */
+
+/* Kendi kartın çok hafif öne çıksın */
+#tab-standings .leaderboard-row.is-current-user {
+  box-shadow:
+    0 0 0 1px rgba(56, 189, 248, 0.12),
+    0 12px 30px rgba(0, 0, 0, 0.22);
+}
+
+/* Kendi kartında hafif nefes efekti */
+
+/* Haftalık yarış tarafı biraz daha neon */
+#tab-standings #weeklyStandings .leaderboard-row {
+  box-shadow:
+    inset 0 0 0 1px rgba(88, 160, 255, 0.08),
+    0 8px 24px rgba(0, 0, 0, 0.16);
+}
+
+#tab-standings #weeklyStandings .leaderboard-row:hover {
+  box-shadow:
+    0 16px 36px rgba(0, 0, 0, 0.28),
+    0 0 18px rgba(88, 160, 255, 0.16);
+}
+
+/* Hafta lideri biraz daha güçlü */
+#tab-standings #weeklyStandings .leaderboard-row.tone-gold,
+#tab-standings #weeklyStandings .weekly-leader-row {
+  box-shadow:
+    0 14px 32px rgba(56, 189, 248, 0.14),
+    inset 0 0 0 1px rgba(56, 189, 248, 0.16);
+}
+
+/* Puan rakamı daha vurucu */
+#tab-standings .leaderboard-score-block strong {
+  letter-spacing: -0.03em;
+  text-shadow:
+    0 0 14px rgba(255, 255, 255, 0.05),
+    0 2px 10px rgba(0, 0, 0, 0.22);
+}
+
+/* Mobilde efektleri biraz yumuşat */
+@media (max-width: 720px) {
+  #tab-standings .leaderboard-row:hover {
+    transform: none;
+    box-shadow:
+      0 10px 24px rgba(0, 0, 0, 0.24),
+      0 0 10px rgba(56, 189, 248, 0.08);
+  }
+
+  #tab-standings .leaderboard-supported-team-logo {
+    opacity: 0.08;
+  }
+
+  #tab-standings .leaderboard-supported-team-logo img,
+  #tab-standings .leaderboard-supported-team-logo .team-logo-img img {
+    filter: blur(1px);
+  }
+
+  #tab-standings .leaderboard-progress > span::after {
+    animation-duration: 4.2s;
+  }
+}
+
+@keyframes standingsProgressShine {
+  0% {
+    left: -35%;
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.9;
+  }
+  55% {
+    left: 105%;
+    opacity: 0.45;
+  }
+  100% {
+    left: 105%;
+    opacity: 0;
+  }
+}
+
+@keyframes currentUserPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 rgba(56, 189, 248, 0));
+  }
+  50% {
+    transform: scale(1.035);
+    filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.22));
+  }
+}
+#tab-standings .leaderboard-progress > span::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -30%;
+  width: 30%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.42) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: standingsProgressShine 3.2s ease-in-out infinite;
+}
+
+/* ===== GENEL BAKIŞ ÜST ALAN GÜVENLİ SIKILAŞTIRMA ===== */
+@media (min-width: 769px) {
+  .desktop-topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 250px;
+    gap: 14px;
+    align-items: stretch;
+    margin-bottom: 14px;
+  }
+
+  .desktop-topbar__spacer {
+    min-height: 112px;
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background:
+      radial-gradient(
+        circle at top left,
+        rgba(34, 197, 94, 0.1),
+        transparent 28%
+      ),
+      radial-gradient(
+        circle at right center,
+        rgba(56, 189, 248, 0.12),
+        transparent 30%
+      ),
+      linear-gradient(180deg, rgba(7, 15, 28, 0.97), rgba(7, 13, 24, 0.94));
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
+    position: relative;
+  }
+
+  .desktop-topbar__spacer::before {
+    content: "CANLI HAFTA MERKEZİ";
+    position: absolute;
+    left: 22px;
+    top: 18px;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #9fc2e7;
+  }
+
+  .desktop-topbar__spacer::after {
+    content: "Genel Bakış\aÖnce maçlar ve skorlar, yanında hafta kontrolü, altında mini özetler ve haftanın nabzı.";
+    white-space: pre-line;
+    position: absolute;
+    left: 22px;
+    top: 42px;
+    right: 22px;
+    color: #fff;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .desktop-topbar__spacer {
+    font-size: 0;
+  }
+
+  .desktop-topbar .compact-account-card {
+    width: 250px;
+    min-width: 250px;
+    align-self: start;
+  }
+}
+
+/* ===== Dashboard sağ kolon masaüstü entegrasyon fix ===== */
+@media (min-width: 769px) {
+  .dashboard-main-layout {
+    align-items: start !important;
+  }
+
+  .dashboard-main-layout > * {
+    align-self: start;
+  }
+
+  .dashboard-side-stack {
+    display: flex !important;
+    flex-direction: column;
+    gap: 12px;
+    align-self: start;
+  }
+
+  .dashboard-side-card {
+    height: auto !important;
+  }
+
+  #dashboardPulseList,
+  #dashboardLeaderboardPreview {
+    display: grid;
+    gap: 0;
+  }
+
+  #dashboardSidebarExtraDesktop {
+    display: grid;
+    gap: 12px;
+  }
+
+  #dashboardSidebarExtraDesktop #statsGrid,
+  #dashboardSidebarExtraDesktop .dashboard-stats-grid--compact {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px;
+    margin: 0;
+  }
+
+  #dashboardSidebarExtraDesktop .stat-card {
+    min-height: 74px;
+    padding: 12px;
+  }
+
+  #dashboardSidebarExtraDesktop .stat-card__value,
+  #dashboardSidebarExtraDesktop .stat-value,
+  #dashboardSidebarExtraDesktop .stat-card strong {
+    font-size: 16px;
+    line-height: 1.1;
+  }
+
+  #dashboardSidebarExtraDesktop .dashboard-api-card {
+    margin: 0;
+    padding: 14px;
+    border-radius: 22px;
+  }
+
+  #dashboardSidebarExtraDesktop .dashboard-api-header {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    align-items: start;
+  }
+
+  #dashboardSidebarExtraDesktop #dashboardWeekScoreUpdateBtn {
+    width: fit-content;
+  }
+
+  #dashboardSidebarExtraDesktop .dashboard-api-meta {
+    margin-top: 10px;
+    gap: 8px;
+  }
+
+  #dashboardSidebarExtraDesktop .dashboard-progress-wrap {
+    margin-top: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  #dashboardSidebarExtraDesktop {
+    display: contents;
+  }
+}
+/* ===== Sezon / Hafta seçimini hafta özetine gömme ===== */
+
+/* ===== PC'de Seçili Hafta Özeti + sağ istatistikleri yan yana al ===== */
+@media (min-width: 769px) {
+  .dashboard-hero-strip {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1.75fr) minmax(360px, 0.85fr) !important;
+    gap: 12px !important;
+    align-items: stretch !important;
+  }
+
+  .dashboard-hero-main {
+    min-width: 0;
+    height: 100%;
+  }
+
+  .dashboard-hero-side {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+    align-content: stretch !important;
+    min-width: 0;
+    height: 100%;
+  }
+
+  .dashboard-hero-side__stat {
+    min-height: 100%;
+    height: 100%;
+  }
+}
+@media (min-width: 769px) {
+  .dashboard-hero-side__stat {
+    min-height: 182px;
+    padding: 20px 18px;
+  }
+
+  .dashboard-hero-side__stat strong {
+    font-size: 40px;
+    line-height: 1;
+  }
+}
+@media (min-width: 769px) {
+  .dashboard-hero-side {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .dashboard-hero-side__stat {
+    min-height: 90px;
+    padding: 16px 18px;
+  }
+
+  .dashboard-hero-side__stat strong {
+    font-size: 28px;
+  }
+}
+@media (min-width: 769px) {
+  .dashboard-hero-main {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .dashboard-hero-main__text {
+    margin-top: 6px;
+  }
+
+  .dashboard-hero-chips {
+    margin-top: auto;
+  }
+}
+/* ===== Sezon / Hafta seçimini hafta özetine gömme ===== */
+.dashboard-hero-controls {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.dashboard-hero-controls select {
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 10px;
+  background: rgba(20, 30, 50, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 12px;
+}
+
+@media (max-width: 768px) {
+  .dashboard-hero-main .dashboard-hero-controls {
+    margin-top: 12px;
+    margin-bottom: 12px;
+  }
+  .dashboard-hero-strip {
+    order: -2;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-mobile-sync-btn {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    padding: 0;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    position: relative;
+  }
+
+  .dashboard-mobile-sync-btn__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    line-height: 1;
+    transition:
+      transform 0.2s ease,
+      opacity 0.2s ease;
+  }
+
+  .dashboard-mobile-sync-btn.btn-loading::after {
+    display: none !important;
+  }
+
+  .dashboard-mobile-sync-btn.btn-loading .dashboard-mobile-sync-btn__icon {
+    animation: dashboardMobileSyncSpin 0.8s linear infinite;
+  }
+
+  .dashboard-mobile-sync-btn.btn-success .dashboard-mobile-sync-btn__icon,
+  .dashboard-mobile-sync-btn.btn-error .dashboard-mobile-sync-btn__icon {
+    animation: none;
+  }
+
+  @keyframes dashboardMobileSyncSpin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+}
+/* 🥇 1. sıra - ALTIN */
+.summary-row.rank-1 {
+  background: linear-gradient(135deg, #fff7d6, #ffe08a);
+  border: 1px solid rgba(255, 193, 7, 0.5);
+  box-shadow: 0 0 20px rgba(255, 193, 7, 0.25);
+  position: relative;
+  overflow: hidden;
+}
+
+.summary-row.rank-1::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    120deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.4),
+    transparent 80%
+  );
+  opacity: 0.6;
+  animation: shine 3s infinite linear;
+}
+
+@keyframes shine {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* 🥈 2. sıra - GÜMÜŞ */
+.summary-row.rank-2 {
+  background: linear-gradient(135deg, #f1f5f9, #dbe2ea);
+  border: 1px solid rgba(148, 163, 184, 0.5);
+}
+
+/* 🥉 3. sıra - BRONZ */
+.summary-row.rank-3 {
+  background: linear-gradient(135deg, #fbe4d3, #e8b79a);
+  border: 1px solid rgba(180, 100, 60, 0.4);
+}
+
+/* rozetleri de güzelleştirelim */
+.summary-row.rank-1 .rank-badge {
+  background: linear-gradient(135deg, #ffcc00, #ff9800);
+  color: #000;
+}
+
+.summary-row.rank-2 .rank-badge {
+  background: linear-gradient(135deg, #cbd5e1, #94a3b8);
+  color: #000;
+}
+
+.summary-row.rank-3 .rank-badge {
+  background: linear-gradient(135deg, #d97706, #92400e);
+  color: #fff;
 }
