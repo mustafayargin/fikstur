@@ -6819,8 +6819,9 @@ body.login-locked {
   border-color: rgba(255, 255, 255, 0.08);
 }
 .dashboard-avatar-chip.is-filled {
-  background: rgba(56, 189, 248, 0.16);
-  border-color: rgba(56, 189, 248, 0.3);
+  background: rgba(34, 197, 94, 0.18);
+  border: 2px solid rgba(34, 197, 94, 0.95);
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.16), 0 0 10px rgba(34, 197, 94, 0.28);
 }
 
 .dashboard-detail-modal.hidden {
@@ -7907,6 +7908,7 @@ body.dashboard-modal-open {
   flex-wrap: wrap;
   gap: 6px;
 }
+
 .dashboard-meta-pill {
   display: inline-flex;
   align-items: center;
@@ -8158,20 +8160,7 @@ body.dashboard-modal-open {
   border-color: rgba(34, 197, 94, 0.28);
 }
 
-.dashboard-match-card.coverage-low::after {
-  content: "Tahmin eksik";
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: rgba(239, 68, 68, 0.16);
-  border: 1px solid rgba(239, 68, 68, 0.28);
-  color: #ffd4d4;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
+
 
 .dashboard-match-card__top {
   align-items: flex-start;
@@ -8184,15 +8173,22 @@ body.dashboard-modal-open {
   gap: 6px;
 }
 
-.dashboard-card-kickoff {
-  font-size: 11px;
-  color: #b9cae6;
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
+.badge-time {
+  font-size: 11px;
+  color: #f8fafc;
+  opacity: 0.88;
+  font-weight: 600;
+}
+
+.dashboard-card-kickoff,
 .dashboard-match-card__date {
-  text-align: right;
-  max-width: 110px;
-  line-height: 1.35;
+  display: none;
 }
 
 .dashboard-match-card__body {
@@ -8385,7 +8381,6 @@ body.dashboard-modal-open {
   }
 
   .dashboard-match-insight span,
-  .dashboard-avatar-row,
   .dashboard-avatar-row__more {
     display: none;
   }
@@ -8403,6 +8398,64 @@ body.dashboard-modal-open {
   .dashboard-side-stack {
     grid-template-columns: 1fr;
     gap: 10px;
+  }
+  .dashboard-match-card {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .dashboard-match-card__footer {
+    position: relative;
+  }
+
+  .dashboard-avatar-row {
+    position: absolute !important;
+    top: -126px;
+    right: 10px;
+    left: auto;
+    bottom: auto;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    width: auto;
+    margin: 0 !important;
+    z-index: 6;
+    pointer-events: none;
+  }
+
+  .dashboard-avatar-row__chips {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    gap: 4px;
+  }
+
+  .dashboard-avatar-chip {
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    min-height: 22px;
+  }
+
+  .dashboard-avatar-row__more {
+    display: none !important;
+  }
+
+  .dashboard-coverage-badge {
+    margin: 0 !important;
+    padding: 4px 8px !important;
+    font-size: 11px !important;
+    line-height: 1 !important;
+    white-space: nowrap;
+    border-radius: 999px;
+  }
+  .dashboard-match-card .dashboard-coverage-badge,
+  .dashboard-match-card .coverage-badge,
+  .dashboard-match-card .prediction-missing-badge {
+    position: static !important;
+    display: inline-flex !important;
+    align-items: center;
+    align-self: center;
   }
 }
 
@@ -10278,6 +10331,10 @@ body.dashboard-modal-open {
   overflow: visible;
   padding: 0;
 }
+.dashboard-avatar-chip.is-filled .dashboard-inline-avatar.app-avatar {
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.95);
+}
+
 
 .dashboard-inline-avatar.app-avatar {
   width: 26px;
@@ -12707,3 +12764,7 @@ body.player-modal-open {
 .dashboard-inline-status.is-idle {
   border-color: rgba(56, 189, 248, 0.18);
 }
+
+  .dashboard-card-kickoff {
+    display: none;
+  }

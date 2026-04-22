@@ -4080,10 +4080,8 @@ function renderDashboardMatchCards(container, matches) {
 
           <div class="dashboard-match-card__top">
             <div class="dashboard-card-topline">
-              <span class="badge ${badge.cls}">${badge.text}</span>
-              <span class="dashboard-card-kickoff">${timeText}</span>
+              <span class="badge ${badge.cls}">${badge.text}<span class="badge-time">• ${timeText}</span></span>
             </div>
-            <span class="dashboard-match-card__date">${formatDate(match.date)}</span>
           </div>
 
           <div class="dashboard-match-card__body">

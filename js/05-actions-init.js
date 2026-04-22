@@ -2258,12 +2258,7 @@ let appWasHiddenAt = 0;
 let appLastResumeRefreshAt = 0;
 
 function logAppResumeRefresh(step, details = {}) {
-  try {
-    console.log(APP_RESUME_REFRESH_LOG_TAG, step, {
-      time: new Date().toLocaleTimeString("tr-TR"),
-      ...details,
-    });
-  } catch (_) {}
+  return; // 🔕 loglar kapalı
 }
 
 async function runAppResumeRefresh(reason = "visible") {
