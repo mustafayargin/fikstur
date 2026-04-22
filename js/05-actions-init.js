@@ -58,6 +58,11 @@ function renderCurrentTabOnly(tabName = state.settings.currentTab || "dashboard"
 }
 
 function renderAll() {
+  if (typeof logAutoSyncDebug === "function") {
+    logAutoSyncDebug("renderAll:start", {
+      currentTab: state.settings.currentTab || "dashboard",
+    });
+  }
   const viewportSnapshot = capturePredictionViewport();
   const pageViewportSnapshot = capturePageViewport();
   const runSafe = (label, fn) => {
@@ -96,6 +101,12 @@ function renderAll() {
 
   if (window.refreshPlayerDetailModal) {
     runSafe("refreshPlayerDetailModal", () => refreshPlayerDetailModal());
+  }
+
+  if (typeof logAutoSyncDebug === "function") {
+    logAutoSyncDebug("renderAll:end", {
+      currentTab: state.settings.currentTab || "dashboard",
+    });
   }
 }
 
@@ -546,7 +557,19 @@ function switchTab(tabName) {
       panel.classList.toggle("active", panel.id === `tab-${tabName}`),
     );
 
+  const activePanel = document.getElementById(`tab-${tabName}`);
+  if (activePanel) {
+    requestAnimationFrame(() => {
+      activePanel.scrollIntoView({ block: "start", behavior: "auto" });
+      window.scrollTo({ top: 0, behavior: "auto" });
+    });
+  }
+
   renderCurrentTabOnly(tabName);
+
+  if (tabName === "dashboard") {
+    maybeAutoSyncResults();
+  }
 
   if (typeof refreshAvatarImages === "function") {
     refreshAvatarImages(document);
@@ -825,7 +848,6 @@ async function syncBackupStateToFirebase(stateObj) {
         .filter((season) => season.id && season.name),
     }),
   ]);
-
   return true;
 }
 
@@ -1295,28 +1317,191 @@ function relocateMatchToApiWeek(match, seasonId, apiWeekNumber) {
   return nextWeek;
 }
 
-async function syncSelectedWeekFromApi() {
+const AUTO_RESULTS_SYNC_INTERVAL =  5 * 1000;
+const AUTO_RESULTS_SYNC_LOCK_TTL = 90 * 1000;
+let autoResultsSyncPromise = null;
+
+function getAutoSyncActorLabel() {
+  const user = getAuthUser?.() || state.settings?.auth?.user || null;
+  return String(user?.name || user?.username || user?.kullaniciAdi || getCurrentRole?.() || "kullanici").trim();
+}
+
+async function maybeAutoSyncResults(options = {}) {
+  const { force = false } = options;
+  if (typeof logAutoSyncDebug === "function") {
+    logAutoSyncDebug("maybeAutoSyncResults:entered", { force });
+  }
+  if (!isAuthenticated() || !isFirebaseReady()) return false;
+  if (!force && (state.settings.currentTab || "dashboard") !== "dashboard") return false;
+  if (autoResultsSyncPromise) return autoResultsSyncPromise;
+
+  const seasonId = getActiveSeasonId();
+  const weekId = state.settings.activeWeekId;
+  const week = getWeekById(weekId);
+  if (!seasonId || !weekId || !week) return false;
+
+  autoResultsSyncPromise = (async () => {
+    const now = Date.now();
+    let remoteSettings = {};
+
+    try {
+      remoteSettings = (await firebaseRead("settings")) || {};
+      if (typeof logAutoSyncDebug === "function") {
+        logAutoSyncDebug("maybeAutoSyncResults:remoteSettingsRead", {
+          remoteLastSyncAt: Number(remoteSettings.resultsLastAutoSyncAt || 0),
+          remoteLockAt: Number(remoteSettings.resultsAutoSyncInProgressAt || 0),
+        });
+      }
+    } catch (error) {
+      console.warn("Otomatik sync ayarları okunamadı:", error);
+    }
+
+    const remoteLastSyncAt = Number(remoteSettings.resultsLastAutoSyncAt || 0);
+    const remoteLockAt = Number(remoteSettings.resultsAutoSyncInProgressAt || 0);
+
+
+    state.settings.resultsLastAutoSyncAt = remoteLastSyncAt;
+    state.settings.resultsAutoSyncInProgressAt = remoteLockAt;
+    saveState(true);
+    renderDashboardAutoSyncStatus();
+    renderDashboardSyncCard();
+
+    if (!force && remoteLastSyncAt && now - remoteLastSyncAt < AUTO_RESULTS_SYNC_INTERVAL) {
+      if (typeof logAutoSyncDebug === "function") {
+        logAutoSyncDebug("maybeAutoSyncResults:skippedByInterval", {
+          remoteLastSyncAt,
+          now,
+          interval: AUTO_RESULTS_SYNC_INTERVAL,
+        });
+      }
+      return false;
+    }
+
+    if (remoteLockAt && now - remoteLockAt < AUTO_RESULTS_SYNC_LOCK_TTL) {
+      if (typeof logAutoSyncDebug === "function") {
+        logAutoSyncDebug("maybeAutoSyncResults:skippedByLock", {
+          remoteLockAt,
+          now,
+          ttl: AUTO_RESULTS_SYNC_LOCK_TTL,
+        });
+      }
+      renderDashboardAutoSyncStatus("⏳ Başka bir cihaz şu anda sonuçları kontrol ediyor");return false;
+    }
+
+    const lockStamp = Date.now();
+    state.settings.resultsAutoSyncInProgressAt = lockStamp;
+    saveState(true);
+    renderDashboardAutoSyncStatus();
+
+    try {
+      await firebaseUpdate("settings", {
+        resultsAutoSyncInProgressAt: lockStamp,
+        resultsAutoSyncRequestedBy: getAutoSyncActorLabel(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      renderDashboardAutoSyncStatus("⏳ Sonuçlar otomatik kontrol ediliyor");
+      await syncSelectedWeekFromApi({ silentAuto: true });
+
+      if (typeof logAutoSyncDebug === "function") {
+        logAutoSyncDebug("maybeAutoSyncResults:syncSelectedWeekFromApi:done");
+      }
+
+      const finishedAt = Date.now();
+      state.settings.resultsLastAutoSyncAt = finishedAt;
+      state.settings.resultsAutoSyncInProgressAt = 0;
+      saveState();
+
+      await firebaseUpdate("settings", {
+        resultsLastAutoSyncAt: finishedAt,
+        resultsAutoSyncInProgressAt: 0,
+        resultsAutoSyncRequestedBy: getAutoSyncActorLabel(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      if (typeof logAutoSyncDebug === "function") {
+        logAutoSyncDebug("maybeAutoSyncResults:firebaseUpdateDone", {
+          finishedAt,
+          finishedText: formatDashboardAutoSyncTime(finishedAt),
+        });
+      }
+
+      renderDashboardSyncCard();
+      renderDashboardAutoSyncStatus(
+        "✅ Sonuçlar gerektiği için otomatik güncellendi",
+        finishedAt,
+      );
+
+      setTimeout(() => {
+        renderDashboardSyncCard();
+        renderDashboardAutoSyncStatus("", finishedAt);
+      }, 150);
+
+      if (typeof logAutoSyncDebug === "function") {
+        logAutoSyncDebug("maybeAutoSyncResults:success:returningTrue", {
+          stateLastSyncAt: Number(state.settings.resultsLastAutoSyncAt || 0),
+        });
+      }
+      return true;
+    } catch (error) {
+      state.settings.resultsAutoSyncInProgressAt = 0;
+      saveState(true);
+      try {
+        await firebaseUpdate("settings", {
+          resultsAutoSyncInProgressAt: 0,
+          updatedAt: new Date().toISOString(),
+        });
+      } catch {}
+      console.warn("Otomatik sonuç güncelleme uyarısı:", error);
+      renderDashboardAutoSyncStatus("⚠️ Otomatik kontrol denendi ama bu tur güncellenemedi");return false;
+    } finally {
+      if (typeof logAutoSyncDebug === "function") {
+        logAutoSyncDebug("maybeAutoSyncResults:finally", {
+          stateLastSyncAt: Number(state.settings.resultsLastAutoSyncAt || 0),
+          stateLockAt: Number(state.settings.resultsAutoSyncInProgressAt || 0),
+        });
+      }
+      autoResultsSyncPromise = null;
+    }
+  })();
+
+  return autoResultsSyncPromise;
+}
+
+async function syncSelectedWeekFromApi(options = {}) {
   const seasonId = getActiveSeasonId();
   const weekId = state.settings.activeWeekId;
   const week = getWeekById(weekId);
   const seasonLabel = getApiSeasonLabel();
   const status = document.getElementById("weekApiStatus");
-  if (!seasonId || !weekId || !week)
+
+  const setWeekApiStatus = (message) => {
+    if (status) status.textContent = message;
+  };
+
+  if (!seasonId || !weekId || !week) {
     return showAlert("Önce sezon ve hafta seç.", {
       title: "Eksik seçim",
       type: "warning",
     });
-  if (!seasonLabel)
+  }
+
+  if (!seasonLabel) {
     return showAlert("API sezon etiketi boş olamaz.", {
       title: "Eksik bilgi",
       type: "warning",
     });
-  status.textContent = `${week.number}. hafta API'den kontrol ediliyor...`;
+  }
+
+  setWeekApiStatus(`${week.number}. hafta API'den kontrol ediliyor...`);
+
   try {
     let roundEvents = [];
+
     try {
       roundEvents = await fetchRoundEvents(seasonLabel, week.number);
     } catch {}
+
     const seasonEvents = await fetchSeasonEvents(seasonLabel);
     const fallbackWeekEvents = seasonEvents.filter(
       (event) => Number(event.weekNumber) === Number(week.number),
@@ -1325,11 +1510,14 @@ async function syncSelectedWeekFromApi() {
 
     const selectedWeekMatches = getMatchesByWeekId(weekId);
     let movedCount = 0;
+
     selectedWeekMatches.forEach((match) => {
       if (!match.apiId) return;
+
       const seasonEvent = seasonEvents.find(
         (event) => event.apiId === match.apiId,
       );
+
       if (
         seasonEvent?.weekNumber &&
         Number(seasonEvent.weekNumber) !== Number(week.number)
@@ -1340,8 +1528,9 @@ async function syncSelectedWeekFromApi() {
       }
     });
 
-    if (!weekEvents.length && !movedCount)
+    if (!weekEvents.length && !movedCount) {
       throw new Error(`${week.number}. hafta için API verisi bulunamadı.`);
+    }
 
     let updatedCount = 0;
     let scoreCount = 0;
@@ -1356,6 +1545,7 @@ async function syncSelectedWeekFromApi() {
             : match.homeTeam === event.homeTeam &&
               match.awayTeam === event.awayTeam),
       );
+
       if (!existing) {
         existing = {
           id: uid("match"),
@@ -1371,17 +1561,23 @@ async function syncSelectedWeekFromApi() {
           postponed: false,
           wasPostponed: false,
         };
+
         state.matches.push(existing);
         createdCount += 1;
       }
-      if (event.weekNumber)
+
+      if (event.weekNumber) {
         relocateMatchToApiWeek(existing, seasonId, event.weekNumber);
+      }
+
       const beforeDate = existing.date || "";
       const beforePlayed = !!existing.played;
       const beforeScore = `${existing.homeScore ?? ""}-${existing.awayScore ?? ""}`;
       const beforeWeek = existing.weekId;
       const beforePostponed = !!existing.postponed;
+
       applyApiEventToMatch(existing, event);
+
       if (
         beforeDate !== (existing.date || "") ||
         beforePlayed !== existing.played ||
@@ -1392,35 +1588,95 @@ async function syncSelectedWeekFromApi() {
       ) {
         updatedCount += 1;
       }
+
       if (existing.played) scoreCount += 1;
     });
 
     getWeeksBySeasonId(seasonId).forEach((item) => syncWeekStatus(item.id));
+
     recalculateAllPoints();
     saveState();
     renderAll();
+
     let sheetSyncResult = null;
+
     try {
       sheetSyncResult = await syncWeekMatchesToSheet(week.id);
     } catch (sheetError) {
       console.warn("Hafta Sheets senkron uyarısı:", sheetError);
     }
-    status.textContent = `${week.number}. hafta güncellendi. ${updatedCount} maç işlendi, ${scoreCount} maçta skor var${createdCount ? `, ${createdCount} eksik maç eklendi` : ""}${movedCount ? `, ${movedCount} maç başka haftaya taşındı` : ""}${sheetSyncResult?.success ? `, Sheets senkronu tamamlandı` : ", Sheets yanıtı gecikti ama yerel güncelleme tamamlandı"}.`;
+
+    const finishedAt = Date.now();
+
+    if (typeof logAutoSyncDebug === "function") {
+      logAutoSyncDebug("syncSelectedWeekFromApi:finishedAtCreated", {
+        finishedAt,
+        updatedCount,
+        scoreCount,
+        createdCount,
+        movedCount,
+      });
+    }
+
+    setWeekApiStatus(
+      `${week.number}. hafta güncellendi. ${updatedCount} maç işlendi, ${scoreCount} maçta skor var${createdCount ? `, ${createdCount} eksik maç eklendi` : ""}${movedCount ? `, ${movedCount} maç başka haftaya taşındı` : ""}${sheetSyncResult?.success ? `, Sheets senkronu tamamlandı` : ", Sheets yanıtı gecikti ama yerel güncelleme tamamlandı"}.`,
+    );
+
+    state.settings.resultsLastAutoSyncAt = finishedAt;
+    state.settings.resultsAutoSyncInProgressAt = 0;
+    saveState();
+
+    if (typeof renderDashboardAutoSyncStatus === "function") {
+      renderDashboardAutoSyncStatus("", finishedAt);
+    }
+
+    if (typeof renderDashboardSyncCard === "function") {
+      renderDashboardSyncCard();
+    }
+
+    setTimeout(() => {
+      if (typeof logAutoSyncDebug === "function") {
+        logAutoSyncDebug("syncSelectedWeekFromApi:setTimeout150", {
+          finishedAt,
+        });
+      }
+      if (typeof renderDashboardAutoSyncStatus === "function") {
+        renderDashboardAutoSyncStatus("", finishedAt);
+      }
+
+      if (typeof renderDashboardSyncCard === "function") {
+        renderDashboardSyncCard();
+      }
+    }, 150);
+
     recordAdminSyncActivity({
       lastAction: `${week.number}. hafta API ile güncellendi.`,
       success: true,
       updatedMatchCount: updatedCount + createdCount,
     });
   } catch (error) {
-    status.textContent = `Hafta API hatası: ${error.message}`;
+    setWeekApiStatus(`Hafta API hatası: ${error.message}`);
+
+    state.settings.resultsAutoSyncInProgressAt = 0;
+    saveState();
+    if (typeof renderDashboardAutoSyncStatus === "function") {
+      renderDashboardAutoSyncStatus("⚠️ API kontrolünde hata oluştu");
+    }
+
+    if (typeof renderDashboardSyncCard === "function") {
+      renderDashboardSyncCard();
+    }
+
     recordAdminSyncActivity({
       lastAction: `${week?.number || "Seçili"}. hafta API güncellemesi başarısız oldu.`,
       lastError: error.message,
     });
+
     showAlert(`Seçili hafta API ile güncellenemedi: ${error.message}`, {
       title: "API hatası",
       type: "danger",
     });
+
     throw error;
   }
 }
@@ -1994,6 +2250,124 @@ function bindEvents() {
     renderBackupPanel();
   });
 }
+
+
+const APP_RESUME_REFRESH_LOG_TAG = "[APP_RESUME_REFRESH]";
+let appResumeRefreshPromise = null;
+let appWasHiddenAt = 0;
+let appLastResumeRefreshAt = 0;
+
+function logAppResumeRefresh(step, details = {}) {
+  try {
+    console.log(APP_RESUME_REFRESH_LOG_TAG, step, {
+      time: new Date().toLocaleTimeString("tr-TR"),
+      ...details,
+    });
+  } catch (_) {}
+}
+
+async function runAppResumeRefresh(reason = "visible") {
+  if (!isAuthenticated()) {
+    logAppResumeRefresh("skip:not-authenticated", { reason });
+    return false;
+  }
+
+  if (appResumeRefreshPromise) {
+    logAppResumeRefresh("skip:already-running", { reason });
+    return appResumeRefreshPromise;
+  }
+
+  const now = Date.now();
+  const hiddenForMs = appWasHiddenAt ? now - appWasHiddenAt : 0;
+  const sinceLastResumeMs = appLastResumeRefreshAt ? now - appLastResumeRefreshAt : 0;
+
+  if (sinceLastResumeMs && sinceLastResumeMs < 1500) {
+    logAppResumeRefresh("skip:cooldown", {
+      reason,
+      sinceLastResumeMs,
+    });
+    return false;
+  }
+
+  appResumeRefreshPromise = (async () => {
+    logAppResumeRefresh("start", { reason, hiddenForMs });
+
+    try {
+      if (typeof hydrateFromFirebaseRealtime === "function" && isFirebaseReady()) {
+        const hydrateOk = await hydrateFromFirebaseRealtime(`app-resume:${reason}`);
+        logAppResumeRefresh("hydrate:done", { hydrateOk });
+      } else {
+        logAppResumeRefresh("hydrate:skipped", {
+          hasHydrate: typeof hydrateFromFirebaseRealtime === "function",
+          firebaseReady: isFirebaseReady(),
+        });
+      }
+
+      renderAll();
+      logAppResumeRefresh("renderAll:done", {
+        currentTab: state.settings?.currentTab || "dashboard",
+      });
+
+      if ((state.settings?.currentTab || "dashboard") === "dashboard") {
+        const syncResult = await maybeAutoSyncResults({ force: false });
+        logAppResumeRefresh("maybeAutoSyncResults:done", { syncResult });
+        renderDashboardSyncCard();
+        renderDashboardAutoSyncStatus();
+      } else {
+        logAppResumeRefresh("maybeAutoSyncResults:skipped-tab", {
+          currentTab: state.settings?.currentTab || "dashboard",
+        });
+      }
+
+      renderAll();
+      logAppResumeRefresh("renderAll:after-sync");
+      appLastResumeRefreshAt = Date.now();
+      return true;
+    } catch (error) {
+      console.warn(APP_RESUME_REFRESH_LOG_TAG, "error", error);
+      return false;
+    } finally {
+      appResumeRefreshPromise = null;
+    }
+  })();
+
+  return appResumeRefreshPromise;
+}
+
+function bindAppResumeRefreshHooks() {
+  if (window.__appResumeRefreshHooksBound) return;
+  window.__appResumeRefreshHooksBound = true;
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      appWasHiddenAt = Date.now();
+      logAppResumeRefresh("app:hidden", { hiddenAt: appWasHiddenAt });
+      return;
+    }
+
+    if (document.visibilityState === "visible") {
+      logAppResumeRefresh("app:visible", {
+        hiddenForMs: appWasHiddenAt ? Date.now() - appWasHiddenAt : 0,
+      });
+      runAppResumeRefresh("visibilitychange");
+    }
+  });
+
+  window.addEventListener("pageshow", (event) => {
+    logAppResumeRefresh("app:pageshow", {
+      persisted: !!event.persisted,
+    });
+    runAppResumeRefresh(event.persisted ? "pageshow-persisted" : "pageshow");
+  });
+
+  window.addEventListener("focus", () => {
+    logAppResumeRefresh("app:focus", {
+      hiddenForMs: appWasHiddenAt ? Date.now() - appWasHiddenAt : 0,
+    });
+    runAppResumeRefresh("focus");
+  });
+}
+
 window.addEventListener("online", () => {
   flushPendingPredictionQueue({ renderAfterFlush: true }).then((result) => {
     if (result.flushed) {
@@ -2020,6 +2394,7 @@ ensureAvatarDirectoryReady();
 switchTab(state.settings.currentTab || "dashboard");
 updateLoginOverlay();
 updateAdminSyncToggleButton();
+bindAppResumeRefreshHooks();
 
 if (isFirebaseReady()) {
   ensureFirebaseDefaults().catch((error) =>
@@ -2036,9 +2411,17 @@ if (isAuthenticated()) {
       "Kayıtlı veriler açılıyor, güncel bilgiler arka planda senkronlanıyor...",
     sessionRestore: true,
     suppressOverlay: true,
-  }).catch((error) =>
-    console.warn("Başlangıç maç/tahmin senkron uyarısı:", error),
-  );
+  })
+    .then(async () => {
+      if ((state.settings.currentTab || "dashboard") === "dashboard") {
+        await maybeAutoSyncResults();
+        renderDashboardSyncCard();
+        renderDashboardAutoSyncStatus();
+      }
+    })
+    .catch((error) =>
+      console.warn("Başlangıç maç/tahmin senkron uyarısı:", error),
+    );
 } else {
   renderAll();
 }

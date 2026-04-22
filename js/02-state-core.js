@@ -17,6 +17,8 @@ function createInitialState() {
       predictionShareView: "pre",
       predictionShareCompact: true,
       predictionShareFadeEmpty: false,
+      resultsLastAutoSyncAt: 0,
+      resultsAutoSyncInProgressAt: 0,
     },
   };
 }
@@ -957,6 +959,68 @@ function finishDashboardApiProgress(success = true, message = "Hazır.") {
   if (status && message) status.textContent = message;
 }
 
+function formatDashboardAutoSyncTime(timestamp) {
+  const value = Number(timestamp || 0);
+  if (!value) return "Henüz yapılmadı";
+  try {
+    return new Date(value).toLocaleString("tr-TR", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit"
+    });
+  } catch {
+    return "Henüz yapılmadı";
+  }
+}
+
+
+function ensureAutoSyncDebugStore() {
+  if (!Array.isArray(window.__autoSyncDebugLog)) {
+    window.__autoSyncDebugLog = [];
+  }
+  return window.__autoSyncDebugLog;
+}
+
+function logAutoSyncDebug() {}
+
+function ensureAutoSyncDebugPanel() {
+  return null;
+}
+
+function renderAutoSyncDebugPanel() {}
+
+function ensureAutoSyncStatusObserver() {}
+
+function renderDashboardAutoSyncStatus(message = "", forcedTimestamp = null) {
+  const el = document.getElementById("dashboardAutoSyncStatus");
+  if (!el) return;
+
+  const lastSyncAt =
+    forcedTimestamp != null
+      ? Number(forcedTimestamp || 0)
+      : Number(state.settings?.resultsLastAutoSyncAt || 0);
+
+  const lockAt = Number(state.settings?.resultsAutoSyncInProgressAt || 0);
+  const now = Date.now();
+  const isRunning = lockAt && now - lockAt < 90 * 1000;
+
+  let text = `🔄 Son API sonuç güncellemesi: ${formatDashboardAutoSyncTime(lastSyncAt)}`;
+  let className = "dashboard-inline-status is-idle";
+
+  if (isRunning) {
+    text = "⏳ Sonuçlar arka planda kontrol ediliyor...";
+    className = "dashboard-inline-status is-running";
+  } else if (message) {
+    text = `${message} • Son başarılı güncelleme: ${formatDashboardAutoSyncTime(lastSyncAt)}`;
+    className = "dashboard-inline-status is-success";
+  }
+
+  el.className = className;
+  el.textContent = text;
+}
+
 function renderDashboardSyncCard() {
   const season = getSeasonById(getActiveSeasonId());
   const week = getWeekById(state.settings.activeWeekId);
@@ -968,6 +1032,7 @@ function renderDashboardSyncCard() {
   const adminWeekBadge = document.getElementById("dashboardAdminWeekBadge");
   const compactStatus = document.getElementById("dashboardSyncStatus");
   const adminStatus = document.getElementById("dashboardSyncAdminStatus");
+
   const statusText = isFirebaseReady()
     ? `Veri kaynağı: ${getOnlineSourceLabel()} • ${getSyncSummaryText()}`
     : "Veri kaynağı hazırlanıyor...";
@@ -981,6 +1046,8 @@ function renderDashboardSyncCard() {
   });
   if (compactStatus) compactStatus.textContent = statusText;
   if (adminStatus) adminStatus.textContent = statusText;
+
+  renderDashboardAutoSyncStatus();
   setDashboardApiProgress(
     dashboardApiProgressState.value,
     dashboardApiProgressState.label,

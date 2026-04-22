@@ -1501,6 +1501,11 @@ function getSortedSeasonMatches(seasonId = getActiveSeasonId()) {
 function getPlayerSeasonStats(seasonId = getActiveSeasonId()) {
   const seasonMatches = getSortedSeasonMatches(seasonId);
   const matchIdSet = new Set(seasonMatches.map((match) => String(match.id)));
+  const totalMatches = seasonMatches.length;
+  const playedMatches = seasonMatches.filter((match) => match.played).length;
+  const seasonWeeks = state.weeks.filter(
+    (week) => String(week.seasonId) === String(seasonId),
+  );
   const players = state.players.filter(
     (player) => getPlayerRole(player) !== "admin",
   );
@@ -1518,17 +1523,140 @@ function getPlayerSeasonStats(seasonId = getActiveSeasonId()) {
       const total = preds.reduce((sum, pred) => sum + (pred.points || 0), 0);
       const exact = preds.filter((pred) => pred.points === 3).length;
       const resultOnly = preds.filter((pred) => pred.points === 1).length;
-      const average = filledPreds.length
-        ? (total / filledPreds.length).toFixed(2)
-        : "0.00";
-      const recentForm = seasonMatches
-        .map((match) =>
-          preds.find((pred) => String(pred.matchId) === String(match.id)),
-        )
-        .filter(Boolean)
-        .filter((pred) => pred.homePred !== "" && pred.awayPred !== "")
-        .slice(-5)
-        .map((pred) => Number(pred.points || 0));
+      const averageValue = filledPreds.length ? total / filledPreds.length : 0;
+      const accuracyValue = playedMatches
+        ? ((exact + resultOnly) / playedMatches) * 100
+        : 0;
+      const exactRateValue = filledPreds.length ? (exact / filledPreds.length) * 100 : 0;
+      const participationRateValue = totalMatches
+        ? (filledPreds.length / totalMatches) * 100
+        : 0;
+      const missed = Math.max(totalMatches - filledPreds.length, 0);
+
+      const weeklyPlayedSummaries = seasonWeeks
+        .map((week) => {
+          const playedWeekMatches = getMatchesByWeekId(week.id).filter((match) => {
+            if (match?.played) return true;
+            return (
+              match?.homeScore !== "" &&
+              match?.awayScore !== "" &&
+              match?.homeScore != null &&
+              match?.awayScore != null
+            );
+          });
+          const playedWeekMatchIds = new Set(
+            playedWeekMatches.map((match) => String(match.id)),
+          );
+          if (!playedWeekMatchIds.size) return null;
+
+          const filledWeekPreds = preds.filter(
+            (pred) =>
+              playedWeekMatchIds.has(String(pred.matchId)) &&
+              pred.homePred !== "" &&
+              pred.awayPred !== "",
+          );
+          if (!filledWeekPreds.length) {
+            return {
+              weekId: week.id,
+              total: null,
+            };
+          }
+
+          return {
+            weekId: week.id,
+            total: filledWeekPreds.reduce(
+              (sum, pred) => sum + Number(pred.points || 0),
+              0,
+            ),
+          };
+        })
+        .filter(Boolean);
+
+      const weeklyTotals = weeklyPlayedSummaries
+        .map((item) => item.total)
+        .filter((value) => value !== null);
+
+      const bestWeekScore = weeklyTotals.length ? Math.max(...weeklyTotals) : 0;
+      const worstWeekScore = weeklyTotals.length ? Math.min(...weeklyTotals) : 0;
+      const weekWins = seasonWeeks.reduce((count, week) => {
+        const playedWeekMatches = getMatchesByWeekId(week.id).filter((match) => {
+          if (match?.played) return true;
+          return (
+            match?.homeScore !== "" &&
+            match?.awayScore !== "" &&
+            match?.homeScore != null &&
+            match?.awayScore != null
+          );
+        });
+        const playedWeekMatchIds = new Set(
+          playedWeekMatches.map((match) => String(match.id)),
+        );
+        if (!playedWeekMatchIds.size) return count;
+
+        const weeklyStandings = state.players
+          .filter((candidate) => getPlayerRole(candidate) !== "admin")
+          .map((candidate) => {
+            const weekPreds = state.predictions.filter(
+              (pred) =>
+                String(pred.playerId) === String(candidate.id) &&
+                playedWeekMatchIds.has(String(pred.matchId)) &&
+                pred.homePred !== "" &&
+                pred.awayPred !== "",
+            );
+            return {
+              playerId: candidate.id,
+              total: weekPreds.reduce((sum, pred) => sum + Number(pred.points || 0), 0),
+              exact: weekPreds.filter((pred) => Number(pred.points || 0) === 3).length,
+              resultOnly: weekPreds.filter((pred) => Number(pred.points || 0) === 1).length,
+              predictionCount: weekPreds.length,
+            };
+          })
+          .filter((row) => row.predictionCount > 0)
+          .sort(
+            (a, b) =>
+              b.total - a.total ||
+              b.exact - a.exact ||
+              b.resultOnly - a.resultOnly ||
+              String(a.playerId).localeCompare(String(b.playerId), "tr"),
+          );
+
+        if (!weeklyStandings.length) return count;
+
+        const top = weeklyStandings[0];
+        const isLeader = weeklyStandings.some(
+          (row) =>
+            String(row.playerId) === String(player.id) &&
+            row.total === top.total &&
+            row.exact === top.exact &&
+            row.resultOnly === top.resultOnly,
+        );
+
+        return isLeader ? count + 1 : count;
+      }, 0);
+
+      const recentPlayedMatches = seasonMatches
+        .filter((match) => {
+          if (match?.played) return true;
+          return match?.homeScore !== "" && match?.awayScore !== "" && match?.homeScore != null && match?.awayScore != null;
+        })
+        .slice(-5);
+
+      const recentForm = recentPlayedMatches.map((match) => {
+        const pred = preds.find((item) => String(item.matchId) === String(match.id));
+        if (!pred || pred.homePred === "" || pred.awayPred === "") {
+          return { label: "-", value: 0, type: "missing" };
+        }
+        const points = Number(pred.points || 0);
+        return {
+          label: `${points}p`,
+          value: points,
+          type: points === 3 ? "exact" : points === 1 ? "result" : "zero",
+        };
+      });
+      const recentFormPoints = recentForm.reduce(
+        (sum, item) => sum + Number(item.value || 0),
+        0,
+      );
 
       return {
         id: player.id,
@@ -1537,13 +1665,23 @@ function getPlayerSeasonStats(seasonId = getActiveSeasonId()) {
         exact,
         resultOnly,
         predictionCount: filledPreds.length,
-        average,
+        average: averageValue.toFixed(2),
+        averageValue,
+        accuracyValue,
+        exactRateValue,
+        participationRateValue,
+        missed,
         recentForm,
+        recentFormPoints,
+        bestWeekScore,
+        worstWeekScore,
+        weekWins,
       };
     })
     .sort(
       (a, b) =>
         b.total - a.total ||
+        b.accuracyValue - a.accuracyValue ||
         b.exact - a.exact ||
         b.resultOnly - a.resultOnly ||
         a.name.localeCompare(b.name, "tr"),
@@ -1555,123 +1693,308 @@ function getPlayerSeasonStats(seasonId = getActiveSeasonId()) {
     }));
 }
 
+function getStatMoodLabel(player) {
+  if (!player) return "Henüz veri yok";
+  if (player.rank === 1) return "Sezon lideri";
+  if (player.recentFormPoints >= 7) return "Formda";
+  if (player.exact >= 3) return "Keskin";
+  if (player.accuracyValue >= 45) return "İsabetli";
+  if (player.participationRateValue >= 95) return "Disiplinli";
+  return "Takipte";
+}
+
+function safePercent(value) {
+  return `${Number(value || 0).toFixed(1)}%`;
+}
+
 function renderAdvancedStats() {
   const seasonId = getActiveSeasonId();
+  const season = getSeasonById(seasonId);
   const info = getSeasonInsights(seasonId);
   const champion = getChampion(seasonId);
   const playerStats = getPlayerSeasonStats(seasonId);
   const liveLeader = playerStats[0] || null;
-  const risingStar =
+  const mostAccurate =
     [...playerStats].sort(
       (a, b) =>
-        b.recentForm.reduce((sum, point) => sum + point, 0) -
-          a.recentForm.reduce((sum, point) => sum + point, 0) ||
-        b.average - a.average,
+        b.accuracyValue - a.accuracyValue ||
+        b.total - a.total ||
+        a.name.localeCompare(b.name, "tr"),
     )[0] || null;
   const sharpShooter =
     [...playerStats].sort(
       (a, b) => b.exact - a.exact || b.total - a.total,
     )[0] || null;
-  const safePredictor =
+  const reliable =
     [...playerStats].sort(
-      (a, b) => b.resultOnly - a.resultOnly || b.total - a.total,
+      (a, b) =>
+        b.participationRateValue - a.participationRateValue ||
+        b.total - a.total,
+    )[0] || null;
+  const risingStar =
+    [...playerStats].sort(
+      (a, b) =>
+        b.recentFormPoints - a.recentFormPoints ||
+        b.averageValue - a.averageValue,
+    )[0] || null;
+  const bestAverage =
+    [...playerStats].sort(
+      (a, b) => b.averageValue - a.averageValue || b.total - a.total,
     )[0] || null;
 
-  document.getElementById("advancedStatsGrid").innerHTML = [
-    ["Sezon Maçı", info.totalMatches],
-    ["Oynanan", info.playedMatches],
-    ["Maç Başına Ortalama Puan", info.averagePoints],
-    [
-      "En Çok Tam Skor",
-      info.bestExact ? `${info.bestExact.name} (${info.bestExact.exact})` : "-",
-    ],
-    [
-      "En Çok Doğru Sonuç",
-      info.bestResult
-        ? `${info.bestResult.name} (${info.bestResult.resultOnly})`
-        : "-",
-    ],
+  const totalPlayers = getVisiblePlayersOrdered().length;
+  const allSeasonMatches = getMatchesBySeasonId(seasonId);
+  const filledPredictions = playerStats.reduce(
+    (sum, player) => sum + Number(player.predictionCount || 0),
+    0,
+  );
+  const totalPossiblePredictions = allSeasonMatches.length * totalPlayers;
+  const globalParticipation = totalPossiblePredictions
+    ? (filledPredictions / totalPossiblePredictions) * 100
+    : 0;
+  const totalExact = playerStats.reduce((sum, player) => sum + player.exact, 0);
+  const totalResult = playerStats.reduce(
+    (sum, player) => sum + player.resultOnly,
+    0,
+  );
+  const bestWeekPlayer =
+    [...playerStats].sort(
+      (a, b) => b.bestWeekScore - a.bestWeekScore || b.total - a.total,
+    )[0] || null;
+  const worstWeekPlayer =
+    [...playerStats].sort(
+      (a, b) => a.worstWeekScore - b.worstWeekScore || a.rank - b.rank,
+    )[0] || null;
+
+  const heroTarget = document.getElementById("statsHeroCard");
+  const overviewTarget = document.getElementById("advancedStatsGrid");
+  const leadersTarget = document.getElementById("statsLeadersGrid");
+  const playerCardsTarget = document.getElementById("insightsList");
+  const deepTarget = document.getElementById("statsDeepGrid");
+
+  if (!heroTarget || !overviewTarget || !leadersTarget || !playerCardsTarget || !deepTarget) {
+    return;
+  }
+
+  const championLabel = champion
+    ? `${champion.name}, ${season?.name || "sezonu"} ${champion.total} puanla şampiyon tamamladı.`
+    : liveLeader
+      ? `${liveLeader.name}, sezon bugün bitse ${liveLeader.total} puanla zirvede yer alıyor.`
+      : "Henüz canlı lider oluşmadı.";
+
+  heroTarget.innerHTML = liveLeader
+    ? `
+      <div class="stats-hero-layout">
+        <div>
+          <span class="stats-hero-kicker">İstatistik Merkezi</span>
+          <h3 class="stats-hero-title">${escapeHtml(season?.name || "Aktif sezon")} için oyun resmi burada.</h3>
+          <p class="stats-hero-summary">
+            Bu ekran artık sadece puanı değil; isabet, katılım, form ve oyuncu karakterini de gösterir. ${escapeHtml(championLabel)}
+          </p>
+          <div class="stats-hero-meta">
+            <span class="stats-hero-chip">🎯 ${safePercent(globalParticipation)} katılım</span>
+            <span class="stats-hero-chip">⚽ ${info.playedMatches}/${info.totalMatches} maç oynandı</span>
+            <span class="stats-hero-chip">🔥 ${totalExact} tam skor</span>
+            <span class="stats-hero-chip">✅ ${totalResult} doğru sonuç</span>
+          </div>
+        </div>
+        <div class="stats-hero-side">
+          <div class="stats-hero-spotlight">
+            <span class="stats-spotlight-kicker">Canlı Lider</span>
+            <div class="stats-spotlight-name">${escapeHtml(liveLeader.name)}</div>
+            <div class="stats-spotlight-score"><strong>${liveLeader.total}</strong>puan</div>
+            <div class="stats-spotlight-grid">
+              <div class="stats-spotlight-stat"><span>Başarı</span><strong>${safePercent(liveLeader.accuracyValue)}</strong></div>
+              <div class="stats-spotlight-stat"><span>Ortalama</span><strong>${liveLeader.average}</strong></div>
+              <div class="stats-spotlight-stat"><span>Tam skor</span><strong>${liveLeader.exact}</strong></div>
+              <div class="stats-spotlight-stat"><span>Hafta liderliği</span><strong>${liveLeader.weekWins}</strong></div>
+            </div>
+            ${champion ? `<button onclick="celebrateChampion('${seasonId}', true)">Şampiyonu Kutla</button>` : ""}
+          </div>
+        </div>
+      </div>`
+    : createEmptyState("İstatistik merkezi için henüz yeterli veri yok.");
+
+  overviewTarget.innerHTML = [
+    {
+      label: "Toplam maç",
+      value: info.totalMatches,
+      note: `${info.playedMatches} maç oynandı`,
+    },
+    {
+      label: "Toplam oyuncu",
+      value: totalPlayers,
+      note: "Admin hariç aktif tahminciler",
+    },
+    {
+      label: "Katılım oranı",
+      value: safePercent(globalParticipation),
+      note: `${filledPredictions}/${totalPossiblePredictions || 0} tahmin dolu`,
+    },
+    {
+      label: "Maç başı puan",
+      value: info.averagePoints,
+      note: "Sezon genel ortalaması",
+    },
+    {
+      label: "Tam skor toplamı",
+      value: totalExact,
+      note: "3 puan alınan tahminler",
+    },
+    {
+      label: "Doğru sonuç toplamı",
+      value: totalResult,
+      note: "1 puan alınan tahminler",
+    },
+    {
+      label: "En iyi ortalama",
+      value: bestAverage ? bestAverage.average : "0.00",
+      note: bestAverage ? escapeHtml(bestAverage.name) : "Henüz veri yok",
+    },
+    {
+      label: "En yüksek başarı",
+      value: mostAccurate ? safePercent(mostAccurate.accuracyValue) : "0.0%",
+      note: mostAccurate ? escapeHtml(mostAccurate.name) : "Henüz veri yok",
+    },
   ]
     .map(
-      ([label, value]) =>
-        `<div class="stat-card"><div class="stat-label">${label}</div><div class="stat-value">${value}</div></div>`,
+      (card) => `
+        <article class="stats-overview-card">
+          <span>${card.label}</span>
+          <strong>${card.value}</strong>
+          <p>${card.note}</p>
+        </article>`,
     )
     .join("");
 
-  document.getElementById("insightsList").innerHTML = playerStats.length
+  leadersTarget.innerHTML = [
+    {
+      tag: "👑 Puan lideri",
+      name: liveLeader?.name || "-",
+      value: liveLeader ? `${liveLeader.total} puan` : "Veri yok",
+      note: liveLeader ? `Başarı ${safePercent(liveLeader.accuracyValue)} • Ortalama ${liveLeader.average}` : "Henüz veri yok",
+    },
+    {
+      tag: "🎯 En isabetli",
+      name: mostAccurate?.name || "-",
+      value: mostAccurate ? safePercent(mostAccurate.accuracyValue) : "Veri yok",
+      note: mostAccurate ? `${mostAccurate.exact + mostAccurate.resultOnly} doğru tahmin` : "Henüz veri yok",
+    },
+    {
+      tag: "🔥 Tam skor kralı",
+      name: sharpShooter?.name || "-",
+      value: sharpShooter ? `${sharpShooter.exact} tam skor` : "Veri yok",
+      note: sharpShooter ? `Tam skor oranı ${safePercent(sharpShooter.exactRateValue)}` : "Henüz veri yok",
+    },
+    {
+      tag: "🛡️ En disiplinli",
+      name: reliable?.name || "-",
+      value: reliable ? safePercent(reliable.participationRateValue) : "Veri yok",
+      note: reliable ? `${reliable.predictionCount} dolu tahmin` : "Henüz veri yok",
+    },
+  ]
+    .map(
+      (item) => `
+        <article class="stats-leader-card">
+          <span class="stats-leader-tag">${item.tag}</span>
+          <div class="stats-leader-name">${escapeHtml(item.name)}</div>
+          <div class="stats-leader-value">${item.value}</div>
+          <p>${item.note}</p>
+        </article>`,
+    )
+    .join("");
+
+  playerCardsTarget.innerHTML = playerStats.length
     ? `<div class="player-stats-grid">${playerStats
         .map((player) => {
           const formMarkup = player.recentForm.length
             ? player.recentForm
-                .map((point) => `<span class="form-pill">${point}p</span>`)
+                .map(
+                  (item) => `<span class="form-pill ${item.type ? `is-${item.type}` : ""}">${item.label}</span>`,
+                )
                 .join("")
             : '<span class="small-meta">Henüz tahmin yok</span>';
           return `
-            <article class="player-stat-card ${player.rank === 1 ? "is-leader" : ""}">
+            <article class="player-stat-card ${player.rank === 1 ? "is-leader" : ""} ${risingStar && String(risingStar.id) === String(player.id) ? "is-rising" : ""}">
               <div class="player-stat-head">
-                <div>
+                <div class="player-stat-main">
+                  <div class="player-topline">
+                    <div class="player-rank-badge">#${player.rank}</div>
+                    <span class="player-card-chip">${getStatMoodLabel(player)}</span>
+                  </div>
                   <div class="player-stat-name">${escapeHtml(player.name)}</div>
-                  <div class="small-meta">Genel sıra: #${player.rank}</div>
+                  <div class="player-card-caption">${player.rank === 1 ? "Lider koltuğunda" : `Lidere fark ${player.gapToLeader}`}</div>
                 </div>
-                <div class="player-rank-badge">#${player.rank}</div>
               </div>
+
               <div class="player-stat-metrics">
                 <div class="player-mini-stat"><span>Puan</span><strong>${player.total}</strong></div>
+                <div class="player-mini-stat"><span>Başarı</span><strong>${safePercent(player.accuracyValue)}</strong></div>
+                <div class="player-mini-stat"><span>Ortalama</span><strong>${player.average}</strong></div>
                 <div class="player-mini-stat"><span>Tam skor</span><strong>${player.exact}</strong></div>
                 <div class="player-mini-stat"><span>Doğru sonuç</span><strong>${player.resultOnly}</strong></div>
-                <div class="player-mini-stat"><span>Tahmin</span><strong>${player.predictionCount}</strong></div>
-                <div class="player-mini-stat"><span>Ortalama</span><strong>${player.average}</strong></div>
-                <div class="player-mini-stat"><span>Lidere fark</span><strong>${player.rank === 1 ? "Lider" : `-${player.gapToLeader}`}</strong></div>
+                <div class="player-mini-stat"><span>Katılım</span><strong>${safePercent(player.participationRateValue)}</strong></div>
               </div>
+
               <div class="player-form-row">
-                <span class="small-meta">Son 5 maç</span>
+                <span class="player-card-caption">Son 5 maç formu</span>
                 <div class="player-form-pills">${formMarkup}</div>
+              </div>
+
+              <div class="player-footer-row">
+                <span class="player-card-caption">Kısa özet</span>
+                <div class="player-footer-pills">
+                <span class="player-footer-pill">🏆 ${player.weekWins} kez lider</span>
+                <span class="player-footer-pill">🔥 En iyi hafta: ${player.bestWeekScore} puan</span>
+                <span class="player-footer-pill">❌ Boş tahmin: ${player.missed}</span>
+              </div>
               </div>
             </article>`;
         })
         .join("")}</div>`
     : createEmptyState("Henüz oyuncu istatistiği oluşmadı.");
 
-  const championLabel = champion
-    ? `${champion.name}, sezonu ${champion.total} puanla şampiyon kapattı.`
-    : liveLeader
-      ? `${liveLeader.name}, sezon bugün bitse ${liveLeader.total} puanla şampiyon olur.`
-      : "Henüz canlı lider oluşmadı.";
-
-  document.getElementById("championCard").innerHTML = liveLeader
-    ? `
-    <div class="champion-inner live-champion-card">
-      <div class="champion-kicker">Haftalık canlı şampiyon görünümü</div>
-      <div class="champion-name">👑 ${escapeHtml(liveLeader.name)}</div>
-      <div class="champion-score">${liveLeader.total} puan</div>
-      <div class="champion-summary">Sezon bugün bitse lider bu oyuncu olur.</div>
-      <div class="champion-highlights">
-        <div class="champion-highlight"><span>Sıra</span><strong>#${liveLeader.rank}</strong></div>
-        <div class="champion-highlight"><span>Tam skor</span><strong>${liveLeader.exact}</strong></div>
-        <div class="champion-highlight"><span>Doğru sonuç</span><strong>${liveLeader.resultOnly}</strong></div>
-        <div class="champion-highlight"><span>Ortalama</span><strong>${liveLeader.average}</strong></div>
-      </div>
-      <div class="champion-side-notes">
-        <div class="champion-note-card">
-          <span>Yükselen oyuncu</span>
-          <strong>${risingStar ? escapeHtml(risingStar.name) : "-"}</strong>
-          <small>${risingStar ? `${risingStar.recentForm.reduce((sum, point) => sum + point, 0)} puan / son 5 maç` : "Veri yok"}</small>
-        </div>
-        <div class="champion-note-card">
-          <span>Keskin nişancı</span>
-          <strong>${sharpShooter ? escapeHtml(sharpShooter.name) : "-"}</strong>
-          <small>${sharpShooter ? `${sharpShooter.exact} tam skor` : "Veri yok"}</small>
-        </div>
-        <div class="champion-note-card">
-          <span>En güvenli tahminci</span>
-          <strong>${safePredictor ? escapeHtml(safePredictor.name) : "-"}</strong>
-          <small>${safePredictor ? `${safePredictor.resultOnly} doğru sonuç` : "Veri yok"}</small>
-        </div>
-      </div>
-      <div class="small-meta champion-footer-note">${escapeHtml(championLabel)}</div>
-      ${champion ? `<button onclick="celebrateChampion('${seasonId}', true)">Şampiyonu Kutla</button>` : ""}
-    </div>`
-    : createEmptyState("Şampiyon kartı için henüz yeterli veri yok.");
+  deepTarget.innerHTML = [
+    {
+      label: "Yükselen oyuncu",
+      value: risingStar ? escapeHtml(risingStar.name) : "-",
+      note: risingStar ? `Son 5 maçta ${risingStar.recentFormPoints} puan topladı.` : "Henüz veri yok.",
+    },
+    {
+      label: "En iyi tek hafta",
+      value: bestWeekPlayer ? `${bestWeekPlayer.bestWeekScore} puan` : "-",
+      note: bestWeekPlayer ? escapeHtml(bestWeekPlayer.name) : "Henüz veri yok.",
+    },
+    {
+      label: "En düşük hafta",
+      value: worstWeekPlayer ? `${worstWeekPlayer.worstWeekScore} puan` : "-",
+      note: worstWeekPlayer ? `${escapeHtml(worstWeekPlayer.name)} için sezonun en düşük dolu haftası.` : "Henüz veri yok.",
+    },
+    {
+      label: "En güvenli tahmin profili",
+      value: reliable ? escapeHtml(reliable.name) : "-",
+      note: reliable ? `${safePercent(reliable.participationRateValue)} katılım ile düzenli ilerliyor.` : "Henüz veri yok.",
+    },
+    {
+      label: "En verimli oyuncu",
+      value: bestAverage ? escapeHtml(bestAverage.name) : "-",
+      note: bestAverage ? `Tahmin başına ${bestAverage.average} puan ortalaması var.` : "Henüz veri yok.",
+    },
+    {
+      label: "Sezon kapanış notu",
+      value: champion ? escapeHtml(champion.name) : liveLeader ? escapeHtml(liveLeader.name) : "-",
+      note: champion ? `${champion.total} puanla sezon tamamlandı.` : liveLeader ? `Şimdilik zirvede ${liveLeader.total} puan var.` : "Henüz veri yok.",
+    },
+  ]
+    .map(
+      (item) => `
+        <article class="stats-deep-card">
+          <span>${item.label}</span>
+          <strong>${item.value}</strong>
+          <p>${item.note}</p>
+        </article>`,
+    )
+    .join("");
 
   if (champion && !state.settings.celebratedChampions[seasonId])
     celebrateChampion(seasonId, false);

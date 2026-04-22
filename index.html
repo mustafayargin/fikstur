@@ -160,6 +160,8 @@
             <div class="dashboard-hero-side" id="dashboardHeroSide"></div>
           </section>
 
+          <div class="dashboard-inline-status" id="dashboardAutoSyncStatus">Son API sonuç güncellemesi bekleniyor...</div>
+
           <div class="dashboard-main-layout">
             <section
               class="card dashboard-score-card dashboard-score-card--compact"
@@ -694,12 +696,12 @@
         </section>
 
         <section class="tab-panel" id="tab-stats">
-          <div class="page-header">
+          <div class="page-header stats-page-header">
             <div>
-              <h2>İstatistikler</h2>
+              <h2>İstatistik Merkezi</h2>
               <p>
-                Detaylı başarı verileri, oyuncu kartları ve canlı sezon lideri
-                burada.
+                Sezon özeti, kategori liderleri, oyuncu performansı ve gelişmiş
+                analizler burada.
               </p>
             </div>
             <div class="header-actions">
@@ -707,14 +709,54 @@
             </div>
           </div>
 
-          <div class="stats-grid" id="advancedStatsGrid"></div>
-          <div class="dashboard-grid standings-layout">
-            <section class="card champion-card" id="championCard"></section>
-          </div>
-          <br />
-          <section class="card">
-            <div class="card-header"><h3>Oyuncu İstatistik Kartları</h3></div>
+          <section class="stats-hero-card card" id="statsHeroCard"></section>
+
+          <section class="stats-section">
+            <div class="stats-section-head">
+              <div>
+                <h3>Sezon Özeti</h3>
+                <p class="small-meta">
+                  Tahmin yoğunluğu, başarı seviyesi ve genel sezon resmi.
+                </p>
+              </div>
+            </div>
+            <div class="stats-overview-grid" id="advancedStatsGrid"></div>
+          </section>
+
+          <section class="stats-section">
+            <div class="stats-section-head">
+              <div>
+                <h3>Kategori Liderleri</h3>
+                <p class="small-meta">
+                  Farklı alanlarda öne çıkan oyuncular burada toplanır.
+                </p>
+              </div>
+            </div>
+            <div class="stats-leaders-grid" id="statsLeadersGrid"></div>
+          </section>
+
+          <section class="stats-section">
+            <div class="stats-section-head">
+              <div>
+                <h3>Oyuncu Performans Kartları</h3>
+                <p class="small-meta">
+                  Puanın yanında başarı oranı, isabet ve katılım da öne çıkar.
+                </p>
+              </div>
+            </div>
             <div id="insightsList"></div>
+          </section>
+
+          <section class="stats-section">
+            <div class="stats-section-head">
+              <div>
+                <h3>Gelişmiş Analiz</h3>
+                <p class="small-meta">
+                  Sezonu tek bakışta anlatan daha detaylı özetler.
+                </p>
+              </div>
+            </div>
+            <div class="stats-deep-grid" id="statsDeepGrid"></div>
           </section>
         </section>
 

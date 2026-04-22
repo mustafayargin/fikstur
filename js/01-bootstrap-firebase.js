@@ -2260,6 +2260,12 @@ async function syncSeasonRegistryFromFirebase() {
   const rawList = Array.isArray(settings.seasonsMeta)
     ? settings.seasonsMeta
     : [];
+    state.settings.resultsLastAutoSyncAt = Number(
+      settings.resultsLastAutoSyncAt || 0,
+    );
+    state.settings.resultsAutoSyncInProgressAt = Number(
+      settings.resultsAutoSyncInProgressAt || 0,
+    );
   const seasonList = rawList.map(normalizeSeasonRegistryItem).filter(Boolean);
   const remoteIds = new Set(seasonList.map((item) => String(item.id)));
 
@@ -4031,6 +4037,12 @@ function renderDashboardOverview() {
       <div class="dashboard-leader-row__points">${Number(row.total || 0)}p</div>
     </div>
   `).join("") || createEmptyState("Sıralama oluşması için puan verisi bekleniyor.");
+  if (typeof renderDashboardAutoSyncStatus === "function") {
+    renderDashboardAutoSyncStatus();
+  }
+  if (typeof renderDashboardSyncCard === "function") {
+    renderDashboardSyncCard();
+  }
 }
 
 function renderDashboardMatchCards(container, matches) {
@@ -4093,16 +4105,13 @@ function renderDashboardMatchCards(container, matches) {
           </div>
 
           <div class="dashboard-match-card__footer">
-            <div class="dashboard-match-insight">
-              <strong>${escapeHtml(insight.title)}</strong>
-              <span>${escapeHtml(insight.text)}</span>
-            </div>
+
 
             <div class="dashboard-match-meta-pills">
               <span class="dashboard-meta-pill">${filled.length}/${players.length} tahmin</span>
               <span class="dashboard-meta-pill">${missing} eksik</span>
               <span class="dashboard-meta-pill">${exact} tam</span>
-              <span class="dashboard-meta-pill">${resultOnly} sonuç</span>
+              <span class="dashboard-meta-pill">${resultOnly} yakın</span>
             </div>
 
             <div class="dashboard-avatar-row">
