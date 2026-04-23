@@ -1420,6 +1420,23 @@ function renderStandingsInsights(summary, generalLeader, weeklyLeader) {
     </div>`;
 }
 
+function getWeeklyStandingsEmptyMessage(weekId) {
+  if (!weekId) return "Hafta seçilmedi.";
+
+  const weekMatches = getMatchesByWeekId(weekId);
+  if (!weekMatches.length) return "Seçili haftada maç bulunmuyor.";
+
+  const resolvedMatches = typeof getResolvedWeekMatches === "function"
+    ? getResolvedWeekMatches(weekId)
+    : weekMatches.filter((match) => match?.played);
+
+  if (!resolvedMatches.length) {
+    return "Haftalık yarış için henüz sonuçlanmış maç yok.";
+  }
+
+  return "Seçili hafta için puan oluşmadı.";
+}
+
 function renderStandings() {
   const seasonId = getActiveSeasonId();
   const general = getGeneralStandings(seasonId);
@@ -1484,7 +1501,7 @@ function renderStandings() {
           weeklyMode: true,
           rankDeltaMap: weeklyDeltaMap,
         })
-    : createEmptyState("Seçili hafta için puan oluşmadı.");
+    : createEmptyState(getWeeklyStandingsEmptyMessage(weekId));
 }
 
 
@@ -2078,21 +2095,7 @@ function capturePageViewport() {
   return {
     windowX: window.scrollX || window.pageXOffset || 0,
     windowY: window.scrollY || window.pageYOffset || 0,
+    capturedAt: Date.now(),
   };
-}
-
-function restorePageViewport(snapshot) {
-  if (!snapshot) return;
-  const x = Number(snapshot.windowX || 0);
-  const y = Number(snapshot.windowY || 0);
-  const restore = () => {
-    window.scrollTo(x, y);
-  };
-  requestAnimationFrame(() => {
-    restore();
-    requestAnimationFrame(restore);
-  });
-  setTimeout(restore, 60);
-  setTimeout(restore, 180);
 }
 

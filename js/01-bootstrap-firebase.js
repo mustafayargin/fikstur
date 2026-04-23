@@ -275,7 +275,10 @@ async function firebaseApiPost(action, payload = {}) {
             : "user",
         panelAdmin: payload.panelAdmin === true,
         supportedTeam: String(
-          payload.supportedTeam || payload.teamName || payload.favoriteTeam || "",
+          payload.supportedTeam ||
+            payload.teamName ||
+            payload.favoriteTeam ||
+            "",
         ).trim(),
         aktif: true,
         createdAt: new Date().toISOString(),
@@ -315,7 +318,10 @@ async function firebaseApiPost(action, payload = {}) {
         ...(Object.prototype.hasOwnProperty.call(payload, "supportedTeam")
           ? {
               supportedTeam: String(
-                payload.supportedTeam || payload.teamName || payload.favoriteTeam || "",
+                payload.supportedTeam ||
+                  payload.teamName ||
+                  payload.favoriteTeam ||
+                  "",
               ).trim(),
             }
           : {}),
@@ -2260,12 +2266,12 @@ async function syncSeasonRegistryFromFirebase() {
   const rawList = Array.isArray(settings.seasonsMeta)
     ? settings.seasonsMeta
     : [];
-    state.settings.resultsLastAutoSyncAt = Number(
-      settings.resultsLastAutoSyncAt || 0,
-    );
-    state.settings.resultsAutoSyncInProgressAt = Number(
-      settings.resultsAutoSyncInProgressAt || 0,
-    );
+  state.settings.resultsLastAutoSyncAt = Number(
+    settings.resultsLastAutoSyncAt || 0,
+  );
+  state.settings.resultsAutoSyncInProgressAt = Number(
+    settings.resultsAutoSyncInProgressAt || 0,
+  );
   const seasonList = rawList.map(normalizeSeasonRegistryItem).filter(Boolean);
   const remoteIds = new Set(seasonList.map((item) => String(item.id)));
 
@@ -3061,8 +3067,6 @@ async function hydrateOnlineStateForSession(options = {}) {
   }
 }
 
-
-
 let welcomeOverlayTimer = null;
 
 function getWelcomeDisplayName(user = getAuthUser()) {
@@ -3072,7 +3076,7 @@ function getWelcomeDisplayName(user = getAuthUser()) {
       user?.name ||
       user?.kullaniciAdi ||
       user?.username ||
-      ""
+      "",
   )
     .trim()
     .toUpperCase();
@@ -3111,7 +3115,8 @@ function showWelcomeOverlay(user = getAuthUser(), options = {}) {
     "Harika bir hafta olsun, bol puanlar! 🙌",
   ];
   const selectedMessage =
-    options.message || welcomeLines[Math.floor(Math.random() * welcomeLines.length)];
+    options.message ||
+    welcomeLines[Math.floor(Math.random() * welcomeLines.length)];
 
   const avatarSource =
     typeof createGenericAvatarMarkup === "function"
@@ -3136,7 +3141,10 @@ function showWelcomeOverlay(user = getAuthUser(), options = {}) {
   }
 
   if (welcomeOverlayTimer) window.clearTimeout(welcomeOverlayTimer);
-  welcomeOverlayTimer = window.setTimeout(() => hideWelcomeOverlay(), options.duration || 2300);
+  welcomeOverlayTimer = window.setTimeout(
+    () => hideWelcomeOverlay(),
+    options.duration || 2300,
+  );
 }
 
 function updateSessionCard() {
@@ -3184,15 +3192,19 @@ function updateSessionCard() {
     if (el) el.textContent = value;
   });
 
-
   const sessionAvatarRow = isPanelAdminUser
     ? getCurrentPlayer() || currentSessionUser || { name: currentName }
     : isAdmin
       ? currentSessionUser || { name: currentName }
       : getCurrentPlayer() || currentSessionUser || { name: currentName };
-  const avatarMarkup = typeof createGenericAvatarMarkup === "function"
-    ? createGenericAvatarMarkup(sessionAvatarRow, "topbar-account-avatar")
-    : `<span class="app-avatar topbar-account-avatar"><span class="app-avatar-fallback">${escapeHtml(String(currentName || "?").trim().charAt(0) || "?")}</span></span>`;
+  const avatarMarkup =
+    typeof createGenericAvatarMarkup === "function"
+      ? createGenericAvatarMarkup(sessionAvatarRow, "topbar-account-avatar")
+      : `<span class="app-avatar topbar-account-avatar"><span class="app-avatar-fallback">${escapeHtml(
+          String(currentName || "?")
+            .trim()
+            .charAt(0) || "?",
+        )}</span></span>`;
 
   ["desktopAccountAvatar", "mobileTopProfileAvatar"].forEach((id) => {
     const el = document.getElementById(id);
@@ -3226,7 +3238,9 @@ function closeAccountMenus() {
   const desktopMenu = document.getElementById("desktopAccountMenu");
   const mobileMenu = document.getElementById("mobileAccountMenu");
   const desktopBtn = document.getElementById("desktopAccountBtn");
-  const mobileBtn = document.getElementById("mobileTopProfileBtn") || document.getElementById("mobileAccountBtn");
+  const mobileBtn =
+    document.getElementById("mobileTopProfileBtn") ||
+    document.getElementById("mobileAccountBtn");
   if (desktopMenu) desktopMenu.hidden = true;
   if (mobileMenu) mobileMenu.hidden = true;
   desktopBtn?.classList.remove("is-open");
@@ -3239,13 +3253,21 @@ function toggleAccountMenu(type = "mobile") {
     isMobileMenu ? "mobileAccountMenu" : "desktopAccountMenu",
   );
   const btn = document.getElementById(
-    isMobileMenu ? (document.getElementById("mobileTopProfileBtn") ? "mobileTopProfileBtn" : "mobileAccountBtn") : "desktopAccountBtn",
+    isMobileMenu
+      ? document.getElementById("mobileTopProfileBtn")
+        ? "mobileTopProfileBtn"
+        : "mobileAccountBtn"
+      : "desktopAccountBtn",
   );
   const otherMenu = document.getElementById(
     isMobileMenu ? "desktopAccountMenu" : "mobileAccountMenu",
   );
   const otherBtn = document.getElementById(
-    isMobileMenu ? "desktopAccountBtn" : (document.getElementById("mobileTopProfileBtn") ? "mobileTopProfileBtn" : "mobileAccountBtn"),
+    isMobileMenu
+      ? "desktopAccountBtn"
+      : document.getElementById("mobileTopProfileBtn")
+        ? "mobileTopProfileBtn"
+        : "mobileAccountBtn",
   );
   if (!menu || !btn) return;
   const willOpen = menu.hidden;
@@ -3568,6 +3590,151 @@ function updateNavSelection(tabName) {
 }
 
 let predictionViewportRestoreToken = 0;
+let tabViewportRestoreToken = 0;
+let pageViewportRestoreToken = 0;
+let viewportPersistenceSuspendedUntil = 0;
+let isProgrammaticViewportScroll = false;
+let lastManualViewportScrollAt = 0;
+
+function suspendViewportPersistence(durationMs = 420) {
+  viewportPersistenceSuspendedUntil = Math.max(
+    viewportPersistenceSuspendedUntil,
+    Date.now() + Math.max(0, Number(durationMs) || 0),
+  );
+}
+
+function isViewportPersistenceSuspended() {
+  return Date.now() < viewportPersistenceSuspendedUntil;
+}
+
+function runProgrammaticViewportScroll(fn) {
+  if (typeof fn !== "function") return;
+  isProgrammaticViewportScroll = true;
+  try {
+    fn();
+  } finally {
+    requestAnimationFrame(() => {
+      isProgrammaticViewportScroll = false;
+    });
+  }
+}
+
+window.addEventListener(
+  "scroll",
+  () => {
+    if (isProgrammaticViewportScroll) return;
+    lastManualViewportScrollAt = Date.now();
+  },
+  { passive: true },
+);
+
+try {
+  if (
+    typeof window !== "undefined" &&
+    window.history &&
+    "scrollRestoration" in window.history
+  ) {
+    window.history.scrollRestoration = "manual";
+  }
+} catch (error) {}
+
+const TAB_VIEWPORT_STORAGE_KEY = "fikstur_tab_viewports_v1";
+let tabViewportPersistTimer = null;
+
+function getActiveTabNameForViewport() {
+  return state?.settings?.currentTab || "dashboard";
+}
+
+function readStoredTabViewports() {
+  try {
+    const raw = sessionStorage.getItem(TAB_VIEWPORT_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (error) {
+    return {};
+  }
+}
+
+function writeStoredTabViewports(viewports) {
+  try {
+    sessionStorage.setItem(
+      TAB_VIEWPORT_STORAGE_KEY,
+      JSON.stringify(viewports || {}),
+    );
+  } catch (error) {}
+}
+
+function persistViewportForTab(tabName, snapshot) {
+  if (isViewportPersistenceSuspended()) return;
+
+  const key = String(tabName || "dashboard");
+  const nextSnapshot = snapshot || {
+    windowX: window.pageXOffset || window.scrollX || 0,
+    windowY: window.pageYOffset || window.scrollY || 0,
+  };
+
+  const viewports = readStoredTabViewports();
+  viewports[key] = {
+    windowX: Number(nextSnapshot.windowX || 0),
+    windowY: Number(nextSnapshot.windowY || 0),
+    savedAt: Date.now(),
+  };
+  writeStoredTabViewports(viewports);
+}
+
+function persistCurrentViewportForActiveTab() {
+  persistViewportForTab(getActiveTabNameForViewport());
+}
+
+function getStoredViewportForTab(tabName) {
+  const key = String(tabName || "dashboard");
+  return readStoredTabViewports()[key] || null;
+}
+
+function restoreViewportForTab(tabName, options = {}) {
+  const snapshot = getStoredViewportForTab(tabName);
+  if (!snapshot) {
+    if (options.fallbackToTop) {
+      runProgrammaticViewportScroll(() => window.scrollTo(0, 0));
+    }
+    return;
+  }
+
+  const x = Number(snapshot.windowX || 0);
+  const y = Number(snapshot.windowY || 0);
+  runProgrammaticViewportScroll(() => window.scrollTo(x, y));
+}
+
+function scheduleTabViewportRestore(tabName, options = {}) {
+  suspendViewportPersistence(520);
+  tabViewportRestoreToken += 1;
+  const token = tabViewportRestoreToken;
+  let frameCount = 0;
+
+  const restoreStep = () => {
+    if (token !== tabViewportRestoreToken) return;
+    restoreViewportForTab(tabName, options);
+    frameCount += 1;
+    if (frameCount < 3) {
+      requestAnimationFrame(restoreStep);
+    }
+  };
+
+  requestAnimationFrame(restoreStep);
+  setTimeout(() => {
+    if (token !== tabViewportRestoreToken) return;
+    restoreViewportForTab(tabName, options);
+  }, 80);
+}
+
+function scheduleActiveTabViewportPersist() {
+  if (isViewportPersistenceSuspended()) return;
+  if (tabViewportPersistTimer) clearTimeout(tabViewportPersistTimer);
+  tabViewportPersistTimer = setTimeout(() => {
+    persistCurrentViewportForActiveTab();
+  }, 120);
+}
 
 function isPredictionsTabActive() {
   return (state.settings.currentTab || "dashboard") === "predictions";
@@ -3627,7 +3794,9 @@ function restorePredictionViewport(snapshot) {
   if (!snapshot || !isPredictionsTabActive()) return;
 
   const shell = getPredictionViewportShell();
-  window.scrollTo(snapshot.windowX || 0, snapshot.windowY || 0);
+  runProgrammaticViewportScroll(() =>
+    window.scrollTo(snapshot.windowX || 0, snapshot.windowY || 0),
+  );
 
   if (shell) {
     if (typeof snapshot.shellLeft === "number")
@@ -3667,6 +3836,7 @@ function restorePredictionViewport(snapshot) {
 function schedulePredictionViewportRestore(snapshot) {
   if (!snapshot || !isPredictionsTabActive()) return;
 
+  suspendViewportPersistence(420);
   predictionViewportRestoreToken += 1;
   const token = predictionViewportRestoreToken;
   let frameCount = 0;
@@ -3682,6 +3852,58 @@ function schedulePredictionViewportRestore(snapshot) {
 
   requestAnimationFrame(restoreStep);
 }
+
+function shouldCancelPageViewportRestore(snapshot) {
+  if (!snapshot) return true;
+  if (Date.now() - lastManualViewportScrollAt > 140) return false;
+
+  const targetY = Number(snapshot.windowY || 0);
+  const currentY = window.pageYOffset || window.scrollY || 0;
+  return Math.abs(currentY - targetY) > 16;
+}
+
+function restoreWindowViewport(snapshot) {
+  if (!snapshot) return;
+  const x = Number(snapshot.windowX || 0);
+  const y = Number(snapshot.windowY || 0);
+  runProgrammaticViewportScroll(() => window.scrollTo(x, y));
+}
+
+function schedulePageViewportRestore(snapshot) {
+  if (!snapshot) return;
+
+  suspendViewportPersistence(320);
+  pageViewportRestoreToken += 1;
+  const token = pageViewportRestoreToken;
+  let frameCount = 0;
+
+  const restoreStep = () => {
+    if (token !== pageViewportRestoreToken) return;
+    if (shouldCancelPageViewportRestore(snapshot)) return;
+    restoreWindowViewport(snapshot);
+    frameCount += 1;
+    if (frameCount < 2) {
+      requestAnimationFrame(restoreStep);
+    }
+  };
+
+  requestAnimationFrame(restoreStep);
+  setTimeout(() => {
+    if (token !== pageViewportRestoreToken) return;
+    if (shouldCancelPageViewportRestore(snapshot)) return;
+    restoreWindowViewport(snapshot);
+  }, 70);
+}
+window.addEventListener("scroll", scheduleActiveTabViewportPersist, {
+  passive: true,
+});
+window.addEventListener("pagehide", persistCurrentViewportForActiveTab, {
+  capture: true,
+});
+window.addEventListener("beforeunload", persistCurrentViewportForActiveTab, {
+  capture: true,
+});
+
 function simulateOutsideTapAfterPredictionSave() {
   let sink = document.getElementById("prediction-focus-sink");
 
@@ -3777,13 +3999,17 @@ function applyRolePermissions() {
         el.classList.remove("readonly-control");
         return;
       }
-      const allow = [
-        "dashboardSeasonSelect",
-        "dashboardWeekSelect",
-        "standingsSeasonSelect",
-        "standingsWeekSelect",
-        "statsSeasonSelect",
-      ].includes(el.id);
+      const insideDashboardModal = !!el.closest("#dashboardMatchModal");
+      const allow =
+        insideDashboardModal ||
+        [
+          "dashboardSeasonSelect",
+          "dashboardWeekSelect",
+          "standingsSeasonSelect",
+          "standingsWeekSelect",
+          "statsSeasonSelect",
+        ].includes(el.id);
+
       el.disabled = !allow;
       el.classList.toggle("readonly-control", !allow);
     });
@@ -3845,7 +4071,6 @@ function bindPredictionActionElements(root = document) {
     };
   });
 
-
   scope
     .querySelectorAll('button[data-pred-role="delete-btn"]')
     .forEach((button) => {
@@ -3866,9 +4091,9 @@ function bindPredictionActionElements(root = document) {
     });
 }
 
-
 function getDashboardPredictionTone(pred, match) {
-  if (!pred || pred.homePred === "" || pred.awayPred === "") return "is-missing";
+  if (!pred || pred.homePred === "" || pred.awayPred === "")
+    return "is-missing";
   const points = Number(pred.points || 0);
   if (!match.played) return "is-filled";
   if (points >= 3) return "is-exact";
@@ -3877,7 +4102,8 @@ function getDashboardPredictionTone(pred, match) {
 }
 
 function getDashboardPredictionLabel(pred, match) {
-  if (!pred || pred.homePred === "" || pred.awayPred === "") return "Tahmin yok";
+  if (!pred || pred.homePred === "" || pred.awayPred === "")
+    return "Tahmin yok";
   if (!match.played) return "Tahmin girildi";
   const points = Number(pred.points || 0);
   if (points >= 3) return "Tam skor";
@@ -3887,25 +4113,46 @@ function getDashboardPredictionLabel(pred, match) {
 
 function getDashboardMatchInsight(match) {
   const players = getVisiblePlayersOrdered();
-  const preds = players.map((player) => ({ player, pred: getPrediction(match.id, player.id) }));
-  const filled = preds.filter(({ pred }) => pred && pred.homePred !== "" && pred.awayPred !== "");
+  const preds = players.map((player) => ({
+    player,
+    pred: getPrediction(match.id, player.id),
+  }));
+  const filled = preds.filter(
+    ({ pred }) => pred && pred.homePred !== "" && pred.awayPred !== "",
+  );
   const missing = preds.length - filled.length;
   if (!filled.length) {
-    return { title: "Tahmin bekleniyor", text: "Henüz bu maç için tahmin girilmedi." };
+    return {
+      title: "Tahmin bekleniyor",
+      text: "Henüz bu maç için tahmin girilmedi.",
+    };
   }
   if (!match.played) {
     return {
       title: missing ? `${missing} kişi eksik` : "Tüm tahminler girildi",
-      text: missing ? "Kartı açıp kimlerin tahmin girdiğini görebilirsin." : "Tüm oyuncular bu maç için tahminini girdi.",
+      text: missing
+        ? "Kartı açıp kimlerin tahmin girdiğini görebilirsin."
+        : "Tüm oyuncular bu maç için tahminini girdi.",
     };
   }
-  const exact = filled.filter(({ pred }) => Number(pred.points || 0) >= 3).length;
-  const resultOnly = filled.filter(({ pred }) => Number(pred.points || 0) === 1).length;
-  if (exact) return { title: `${exact} tam skor`, text: "Maç detayında tam skoru bilenleri öne çıkarıyorum." };
-  if (resultOnly) return { title: `${resultOnly} doğru sonuç`, text: "Tam skor yok ama sonucu bilenler var." };
+  const exact = filled.filter(
+    ({ pred }) => Number(pred.points || 0) >= 3,
+  ).length;
+  const resultOnly = filled.filter(
+    ({ pred }) => Number(pred.points || 0) === 1,
+  ).length;
+  if (exact)
+    return {
+      title: `${exact} tam skor`,
+      text: "Maç detayında tam skoru bilenleri öne çıkarıyorum.",
+    };
+  if (resultOnly)
+    return {
+      title: `${resultOnly} doğru sonuç`,
+      text: "Tam skor yok ama sonucu bilenler var.",
+    };
   return { title: "Sürpriz maç", text: "Bu maçta henüz kimse puan alamadı." };
 }
-
 
 function renderDashboardOverview() {
   const titleNode = document.getElementById("dashboardHeroTitle");
@@ -3913,10 +4160,21 @@ function renderDashboardOverview() {
   const chipsNode = document.getElementById("dashboardHeroChips");
   const sideNode = document.getElementById("dashboardHeroSide");
   const pulseNode = document.getElementById("dashboardPulseList");
-  const leaderboardNode = document.getElementById("dashboardLeaderboardPreview");
+  const leaderboardNode = document.getElementById(
+    "dashboardLeaderboardPreview",
+  );
   const liveNode = document.getElementById("dashboardHeroLiveBadge");
 
-  if (!titleNode || !textNode || !chipsNode || !sideNode || !pulseNode || !leaderboardNode || !liveNode) return;
+  if (
+    !titleNode ||
+    !textNode ||
+    !chipsNode ||
+    !sideNode ||
+    !pulseNode ||
+    !leaderboardNode ||
+    !liveNode
+  )
+    return;
 
   const activeSeasonId = getActiveSeasonId();
   const activeWeekId = state.settings.activeWeekId;
@@ -3928,25 +4186,47 @@ function renderDashboardOverview() {
   const played = matches.filter((match) => match.played);
   const totalPredSlots = matches.length * players.length;
   const filledPredictions = matches.reduce((sum, match) => {
-    return sum + players.filter((player) => {
-      const pred = getPrediction(match.id, player.id);
-      return pred && pred.homePred !== "" && pred.awayPred !== "";
-    }).length;
+    return (
+      sum +
+      players.filter((player) => {
+        const pred = getPrediction(match.id, player.id);
+        return pred && pred.homePred !== "" && pred.awayPred !== "";
+      }).length
+    );
   }, 0);
-  const coverage = totalPredSlots ? Math.round((filledPredictions / totalPredSlots) * 100) : 0;
+  const coverage = totalPredSlots
+    ? Math.round((filledPredictions / totalPredSlots) * 100)
+    : 0;
   const missing = Math.max(totalPredSlots - filledPredictions, 0);
   const exact = matches.reduce((sum, match) => {
-    return sum + players.filter((player) => Number(getPrediction(match.id, player.id)?.points || 0) >= 3).length;
+    return (
+      sum +
+      players.filter(
+        (player) =>
+          Number(getPrediction(match.id, player.id)?.points || 0) >= 3,
+      ).length
+    );
   }, 0);
   const resultOnly = matches.reduce((sum, match) => {
-    return sum + players.filter((player) => Number(getPrediction(match.id, player.id)?.points || 0) === 1).length;
+    return (
+      sum +
+      players.filter(
+        (player) =>
+          Number(getPrediction(match.id, player.id)?.points || 0) === 1,
+      ).length
+    );
   }, 0);
 
   let nextMatch = null;
   const now = Date.now();
   matches.forEach((match) => {
     const ts = new Date(match.date).getTime();
-    if (!match.played && !Number.isNaN(ts) && ts >= now && (!nextMatch || ts < new Date(nextMatch.date).getTime())) {
+    if (
+      !match.played &&
+      !Number.isNaN(ts) &&
+      ts >= now &&
+      (!nextMatch || ts < new Date(nextMatch.date).getTime())
+    ) {
       nextMatch = match;
     }
   });
@@ -3957,7 +4237,8 @@ function renderDashboardOverview() {
   titleNode.textContent = titleParts.join(" • ") || "Genel Bakış";
 
   if (!matches.length) {
-    textNode.textContent = "Bu hafta için henüz maç bulunmuyor. Önce hafta veya maç eklediğinde burası otomatik dolacak.";
+    textNode.textContent =
+      "Bu hafta için henüz maç bulunmuyor. Önce hafta veya maç eklediğinde burası otomatik dolacak.";
     liveNode.textContent = "Boş hafta";
     liveNode.className = "dashboard-hero-live is-idle";
   } else if (played.length === matches.length) {
@@ -3980,7 +4261,11 @@ function renderDashboardOverview() {
     `${coverage}% doluluk`,
     `${players.length} kişi`,
   ];
-  chipsNode.innerHTML = chips.map((chip) => `<span class="dashboard-hero-chip">${escapeHtml(chip)}</span>`).join("");
+  chipsNode.innerHTML = chips
+    .map(
+      (chip) => `<span class="dashboard-hero-chip">${escapeHtml(chip)}</span>`,
+    )
+    .join("");
 
   sideNode.innerHTML = `
     <div class="dashboard-hero-side__stat">
@@ -4016,7 +4301,10 @@ function renderDashboardOverview() {
     meta: `${resultOnly} doğru sonuç`,
     tone: exact > 0 ? "good" : "soft",
   });
-  pulseNode.innerHTML = pulseItems.map((item) => `
+  pulseNode.innerHTML =
+    pulseItems
+      .map(
+        (item) => `
     <article class="dashboard-pulse-item is-${item.tone}">
       <div class="dashboard-pulse-item__dot"></div>
       <div class="dashboard-pulse-item__content">
@@ -4025,9 +4313,15 @@ function renderDashboardOverview() {
         <small>${escapeHtml(item.meta)}</small>
       </div>
     </article>
-  `).join("") || createEmptyState("Bu alan hafta verisi geldikçe dolacak.");
+  `,
+      )
+      .join("") || createEmptyState("Bu alan hafta verisi geldikçe dolacak.");
 
-  leaderboardNode.innerHTML = standings.slice(0, 4).map((row, index) => `
+  leaderboardNode.innerHTML =
+    standings
+      .slice(0, 4)
+      .map(
+        (row, index) => `
     <div class="dashboard-leader-row ${index === 0 ? "is-leader" : ""}">
       <div class="dashboard-leader-row__rank">${index + 1}</div>
       <div class="dashboard-leader-row__name">
@@ -4036,7 +4330,10 @@ function renderDashboardOverview() {
       </div>
       <div class="dashboard-leader-row__points">${Number(row.total || 0)}p</div>
     </div>
-  `).join("") || createEmptyState("Sıralama oluşması için puan verisi bekleniyor.");
+  `,
+      )
+      .join("") ||
+    createEmptyState("Sıralama oluşması için puan verisi bekleniyor.");
   if (typeof renderDashboardAutoSyncStatus === "function") {
     renderDashboardAutoSyncStatus();
   }
@@ -4056,23 +4353,43 @@ function renderDashboardMatchCards(container, matches) {
     .map((match) => {
       const badge = getMatchBadge(match);
       const visual = getMatchVisualState(match);
-      const predictions = players.map((player) => ({ player, pred: getPrediction(match.id, player.id) }));
-      const filled = predictions.filter(({ pred }) => pred && pred.homePred !== "" && pred.awayPred !== "");
-      const exact = predictions.filter(({ pred }) => pred && Number(pred.points || 0) >= 3).length;
-      const resultOnly = predictions.filter(({ pred }) => pred && Number(pred.points || 0) === 1).length;
+      const predictions = players.map((player) => ({
+        player,
+        pred: getPrediction(match.id, player.id),
+      }));
+      const filled = predictions.filter(
+        ({ pred }) => pred && pred.homePred !== "" && pred.awayPred !== "",
+      );
+      const exact = predictions.filter(
+        ({ pred }) => pred && Number(pred.points || 0) >= 3,
+      ).length;
+      const resultOnly = predictions.filter(
+        ({ pred }) => pred && Number(pred.points || 0) === 1,
+      ).length;
       const insight = getDashboardMatchInsight(match);
       const missing = Math.max(players.length - filled.length, 0);
       const fillRatio = players.length ? filled.length / players.length : 1;
-      const coverageClass = fillRatio >= 0.85 ? "coverage-full" : fillRatio >= 0.5 ? "coverage-mid" : "coverage-low";
+      const coverageClass =
+        fillRatio >= 0.85
+          ? "coverage-full"
+          : fillRatio >= 0.5
+            ? "coverage-mid"
+            : "coverage-low";
       const ts = new Date(match.date).getTime();
       const timeText = Number.isNaN(ts)
         ? "Saat yok"
-        : new Date(match.date).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+        : new Date(match.date).toLocaleTimeString("tr-TR", {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
 
-      const avatars = predictions.slice(0, 5).map(({ player, pred }) => {
-        const tone = getDashboardPredictionTone(pred, match);
-        return `<span class="dashboard-avatar-chip ${tone}" title="${escapeHtml(player.name)}">${createGenericAvatarMarkup(player, "dashboard-inline-avatar")}</span>`;
-      }).join("");
+      const avatars = predictions
+        .slice(0, 5)
+        .map(({ player, pred }) => {
+          const tone = getDashboardPredictionTone(pred, match);
+          return `<span class="dashboard-avatar-chip ${tone}" title="${escapeHtml(player.name)}">${createGenericAvatarMarkup(player, "dashboard-inline-avatar")}</span>`;
+        })
+        .join("");
 
       return `
         <article class="dashboard-match-card is-${visual} ${coverageClass} ${match.played ? "is-played" : ""} ${visual === "postponed" ? "postponed-row" : ""} ${visual === "played-postponed" ? "rescheduled-played-row" : ""}" onclick="openDashboardMatchModal('${match.id}')">
@@ -4093,7 +4410,7 @@ function renderDashboardMatchCards(container, matches) {
             <div class="dashboard-score-core">
               <div class="dashboard-score-core__label">${match.played ? "Skor" : "Maç"}</div>
               <div class="dashboard-score-core__value">${match.played ? `${match.homeScore} <span>-</span> ${match.awayScore}` : '<span class="dashboard-score-core__pending">VS</span>'}</div>
-              <div class="dashboard-score-core__sub">${match.played ? 'Sonuç işlendi' : 'Detay için dokun'}</div>
+              <div class="dashboard-score-core__sub">${match.played ? "Sonuç işlendi" : "Detay için dokun"}</div>
             </div>
 
             <div class="dashboard-team dashboard-team--away">
@@ -4102,21 +4419,19 @@ function renderDashboardMatchCards(container, matches) {
             </div>
           </div>
 
-          <div class="dashboard-match-card__footer">
+          <div class="dashboard-avatar-row">
+  <div class="dashboard-avatar-row__chips">${avatars}</div>
+  <span class="dashboard-avatar-row__more"></span>
+</div>
 
-
-            <div class="dashboard-match-meta-pills">
-              <span class="dashboard-meta-pill">${filled.length}/${players.length} tahmin</span>
-              <span class="dashboard-meta-pill">${missing} eksik</span>
-              <span class="dashboard-meta-pill">${exact} tam</span>
-              <span class="dashboard-meta-pill">${resultOnly} yakın</span>
-            </div>
-
-            <div class="dashboard-avatar-row">
-              <div class="dashboard-avatar-row__chips">${avatars}</div>
-              <span class="dashboard-avatar-row__more"></span>
-            </div>
-          </div>
+<div class="dashboard-match-card__footer">
+  <div class="dashboard-match-meta-pills">
+    <span class="dashboard-meta-pill">${filled.length}/${players.length} tahmin</span>
+    <span class="dashboard-meta-pill">${missing} eksik</span>
+    <span class="dashboard-meta-pill">${exact} tam</span>
+    <span class="dashboard-meta-pill">${resultOnly} yakın</span>
+  </div>
+</div>
         </article>
       `;
     })
@@ -4125,18 +4440,33 @@ function renderDashboardMatchCards(container, matches) {
 
 function buildDashboardMatchModalBody(match) {
   const players = getVisiblePlayersOrdered();
-  const rows = players.map((player) => {
-    const pred = getPrediction(match.id, player.id);
-    const tone = getDashboardPredictionTone(pred, match);
-    const label = getDashboardPredictionLabel(pred, match);
-    const value = pred && (pred.homePred !== "" || pred.awayPred !== "") ? `${pred.homePred !== "" ? pred.homePred : "-"} - ${pred.awayPred !== "" ? pred.awayPred : "-"}` : "--";
-    return { player, pred, tone, label, value, points: Number(pred?.points || 0) };
-  }).sort((a,b) => b.points - a.points || a.player.name.localeCompare(b.player.name, 'tr'));
+  const rows = players
+    .map((player) => {
+      const pred = getPrediction(match.id, player.id);
+      const tone = getDashboardPredictionTone(pred, match);
+      const label = getDashboardPredictionLabel(pred, match);
+      const value =
+        pred && (pred.homePred !== "" || pred.awayPred !== "")
+          ? `${pred.homePred !== "" ? pred.homePred : "-"} - ${pred.awayPred !== "" ? pred.awayPred : "-"}`
+          : "--";
+      return {
+        player,
+        pred,
+        tone,
+        label,
+        value,
+        points: Number(pred?.points || 0),
+      };
+    })
+    .sort(
+      (a, b) =>
+        b.points - a.points || a.player.name.localeCompare(b.player.name, "tr"),
+    );
 
-  const exact = rows.filter((row) => row.tone === 'is-exact').length;
-  const close = rows.filter((row) => row.tone === 'is-close').length;
-  const miss = rows.filter((row) => row.tone === 'is-miss').length;
-  const missing = rows.filter((row) => row.tone === 'is-missing').length;
+  const exact = rows.filter((row) => row.tone === "is-exact").length;
+  const close = rows.filter((row) => row.tone === "is-close").length;
+  const miss = rows.filter((row) => row.tone === "is-miss").length;
+  const missing = rows.filter((row) => row.tone === "is-missing").length;
 
   return `
     <div class="dashboard-detail-summary">
@@ -4146,7 +4476,9 @@ function buildDashboardMatchModalBody(match) {
       <div class="dashboard-detail-stat"><span>Kaçıran</span><strong>${miss}</strong></div>
     </div>
     <div class="dashboard-detail-list">
-      ${rows.map((row) => `
+      ${rows
+        .map(
+          (row) => `
         <div class="dashboard-detail-row ${row.tone}">
           <div class="dashboard-detail-row__user">
             <span class="dashboard-avatar-chip ${row.tone}">${createGenericAvatarMarkup(row.player, "dashboard-inline-avatar")}</span>
@@ -4156,32 +4488,38 @@ function buildDashboardMatchModalBody(match) {
             </div>
           </div>
           <div class="dashboard-detail-row__score">${escapeHtml(row.value)}</div>
-          <div class="dashboard-detail-row__points">${row.pred && row.pred.homePred !== "" && row.pred.awayPred !== "" ? `${row.points}p` : '--'}</div>
+          <div class="dashboard-detail-row__points">${row.pred && row.pred.homePred !== "" && row.pred.awayPred !== "" ? `${row.points}p` : "--"}</div>
         </div>
-      `).join('')}
+      `,
+        )
+        .join("")}
     </div>
   `;
 }
 
 window.openDashboardMatchModal = function (matchId) {
-  const modal = document.getElementById('dashboardMatchModal');
-  const title = document.getElementById('dashboardMatchModalTitle');
-  const meta = document.getElementById('dashboardMatchModalMeta');
-  const body = document.getElementById('dashboardMatchModalBody');
-  const match = state.matches.find((item) => String(item.id) === String(matchId));
+  const modal = document.getElementById("dashboardMatchModal");
+  const title = document.getElementById("dashboardMatchModalTitle");
+  const meta = document.getElementById("dashboardMatchModalMeta");
+  const body = document.getElementById("dashboardMatchModalBody");
+  const match = state.matches.find(
+    (item) => String(item.id) === String(matchId),
+  );
   if (!modal || !title || !meta || !body || !match) return;
   title.textContent = `${match.homeTeam} - ${match.awayTeam}`;
-  meta.textContent = match.played ? `Gerçek skor: ${match.homeScore}-${match.awayScore} • ${formatDate(match.date)}` : `${formatDate(match.date)} • Maç henüz oynanmadı`;
+  meta.textContent = match.played
+    ? `Gerçek skor: ${match.homeScore}-${match.awayScore} • ${formatDate(match.date)}`
+    : `${formatDate(match.date)} • Maç henüz oynanmadı`;
   body.innerHTML = buildDashboardMatchModalBody(match);
-  modal.classList.remove('hidden');
-  document.body.classList.add('dashboard-modal-open');
+  modal.classList.remove("hidden");
+  document.body.classList.add("dashboard-modal-open");
 };
 
 window.closeDashboardMatchModal = function () {
-  const modal = document.getElementById('dashboardMatchModal');
+  const modal = document.getElementById("dashboardMatchModal");
   if (!modal) return;
-  modal.classList.add('hidden');
-  document.body.classList.remove('dashboard-modal-open');
+  modal.classList.add("hidden");
+  document.body.classList.remove("dashboard-modal-open");
 };
 
 function renderMobilePredictions(container, matches) {
@@ -4209,12 +4547,20 @@ function renderMobilePredictions(container, matches) {
         </div>
         <div class="mobile-user-predictions compact-mobile-user-predictions">${players
           .map((player) => {
-            const pred = getPrediction(match.id, player.id) || createEmptyPredictionRecord(match.id, player.id);
+            const pred =
+              getPrediction(match.id, player.id) ||
+              createEmptyPredictionRecord(match.id, player.id);
             const hasPrediction = pred.homePred !== "" || pred.awayPred !== "";
             const canEdit = canEditPrediction(player.id, match.seasonId);
-            const statusClass = hasPrediction ? "filled-prediction" : "empty-prediction";
-            const lockedClass = lockedForUi || !canEdit ? "locked-cell locked-mobile-card" : "editable-cell";
-            const ownClass = player.id === currentPlayerId ? "own-player-card" : "";
+            const statusClass = hasPrediction
+              ? "filled-prediction"
+              : "empty-prediction";
+            const lockedClass =
+              lockedForUi || !canEdit
+                ? "locked-cell locked-mobile-card"
+                : "editable-cell";
+            const ownClass =
+              player.id === currentPlayerId ? "own-player-card" : "";
             const outcomeClass = getPredictionOutcomeClass(pred, match);
             const uiKey = getPredictionUiKey(match.id, player.id);
             const uiState = predictionUiState[uiKey] || "idle";
@@ -4222,10 +4568,12 @@ function renderMobilePredictions(container, matches) {
             const isOwnPlayer = player.id === currentPlayerId;
             const statusText = getPredictionBaseStatus(match.id, player.id);
             const showDeleteAction = hasPrediction || pred.remoteId || isSaving;
-            const scoreDisplay = pred.homePred !== "" || pred.awayPred !== ""
-              ? `${pred.homePred !== "" ? pred.homePred : "-"} - ${pred.awayPred !== "" ? pred.awayPred : "-"}`
-              : "--";
-            const showSaveAction = canEdit && shouldShowPredictionSaveAction(match.id, player.id);
+            const scoreDisplay =
+              pred.homePred !== "" || pred.awayPred !== ""
+                ? `${pred.homePred !== "" ? pred.homePred : "-"} - ${pred.awayPred !== "" ? pred.awayPred : "-"}`
+                : "--";
+            const showSaveAction =
+              canEdit && shouldShowPredictionSaveAction(match.id, player.id);
 
             if (!isOwnPlayer && !isAdmin) {
               return `
@@ -4244,7 +4592,7 @@ function renderMobilePredictions(container, matches) {
             return `
             <div class="mobile-user-prediction premium-user-card premium-user-card--compact ${pointLabel(pred.points)} ${outcomeClass} ${statusClass} ${lockedClass} ${ownClass}">
               <div class="mobile-user-head premium-user-head compact-user-head">
-                <strong>${escapeHtml(player.name)}${isOwnPlayer ? '<span class="own-pill">Sen</span>' : isAdmin ? '<span class="own-pill">Yönet</span>' : ''}</strong>
+                <strong>${escapeHtml(player.name)}${isOwnPlayer ? '<span class="own-pill">Sen</span>' : isAdmin ? '<span class="own-pill">Yönet</span>' : ""}</strong>
                 <span class="mini-points premium-points premium-points--compact">${locked ? "🔒" : `${pred.points || 0} puan`}</span>
               </div>
 
@@ -4276,8 +4624,9 @@ function renderMobilePredictions(container, matches) {
 
               ${lockedForUi ? `<div class="mobile-lock-warning">🔒 Tahmin kapandı</div>` : ""}
               <div class="pred-action-area own-pred-action-area own-pred-action-area--compact">
-                ${canEdit
-                  ? `
+                ${
+                  canEdit
+                    ? `
                   <div class="mobile-save-row pred-btn-slot prediction-button-row mobile-save-row--compact ${showSaveAction || showDeleteAction ? "" : "is-collapsed"}">
                     <button
                       class="prediction-mobile-save-btn prediction-mobile-save-btn--compact ${showSaveAction ? "" : "is-hidden"}"
@@ -4298,7 +4647,8 @@ function renderMobilePredictions(container, matches) {
                       ${lockedForUi ? "disabled" : ""}
                     >Sil</button>
                   </div>`
-                  : `<div class="pred-btn-slot"></div>`}
+                    : `<div class="pred-btn-slot"></div>`
+                }
 
                 <div class="pred-status-slot pred-status-slot--compact">
                   <div class="prediction-status-chip ${outcomeClass}" id="pred_status_${match.id}_${player.id}">${statusText}</div>
@@ -4313,7 +4663,6 @@ function renderMobilePredictions(container, matches) {
 
   bindPredictionActionElements(container);
 }
-
 
 function standingsRowsMobile(rows, showPredictionCount = true, options = {}) {
   const leaderId = options.leaderId || null;
@@ -4337,12 +4686,13 @@ function standingsRowsMobile(rows, showPredictionCount = true, options = {}) {
     .join("")}</div>`;
 }
 
-
-
 document.addEventListener("click", (event) => {
   const overlay = document.getElementById("welcomeOverlay");
   if (!overlay || overlay.classList.contains("hidden")) return;
-  if (event.target === overlay || event.target?.closest?.(".welcome-overlay__backdrop")) {
+  if (
+    event.target === overlay ||
+    event.target?.closest?.(".welcome-overlay__backdrop")
+  ) {
     hideWelcomeOverlay();
   }
 });

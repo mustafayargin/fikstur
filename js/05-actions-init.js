@@ -1,6 +1,8 @@
 /* 05-actions-init.js */
 
-function renderCurrentTabOnly(tabName = state.settings.currentTab || "dashboard") {
+function renderCurrentTabOnly(
+  tabName = state.settings.currentTab || "dashboard",
+) {
   switch (tabName) {
     case "dashboard":
       renderDashboardOverview();
@@ -58,6 +60,9 @@ function renderCurrentTabOnly(tabName = state.settings.currentTab || "dashboard"
 }
 
 function renderAll() {
+  if (typeof persistCurrentViewportForActiveTab === "function") {
+    persistCurrentViewportForActiveTab();
+  }
   if (typeof logAutoSyncDebug === "function") {
     logAutoSyncDebug("renderAll:start", {
       currentTab: state.settings.currentTab || "dashboard",
@@ -97,7 +102,9 @@ function renderAll() {
   runSafe("schedulePredictionViewportRestore", () =>
     schedulePredictionViewportRestore(viewportSnapshot),
   );
-  runSafe("restorePageViewport", () => restorePageViewport(pageViewportSnapshot));
+  runSafe("schedulePageViewportRestore", () =>
+    schedulePageViewportRestore(pageViewportSnapshot),
+  );
 
   if (window.refreshPlayerDetailModal) {
     runSafe("refreshPlayerDetailModal", () => refreshPlayerDetailModal());
@@ -379,15 +386,15 @@ function addPlayer(buttonOrEvent) {
       type: "warning",
     });
 
-    const newPlayer = {
-      id: `player-${slugify(name) || "oyuncu"}`,
-      name: name.toUpperCase(),
-      password,
-      panelAdmin: false,
-      seasonStates: createDefaultSeasonStateMap(true),
-      supportedTeam,
-      avatar: "",
-    };
+  const newPlayer = {
+    id: `player-${slugify(name) || "oyuncu"}`,
+    name: name.toUpperCase(),
+    password,
+    panelAdmin: false,
+    seasonStates: createDefaultSeasonStateMap(true),
+    supportedTeam,
+    avatar: "",
+  };
 
   if (useOnlineMode) {
     addUserOnline(newPlayer, actionButton);
@@ -538,12 +545,20 @@ function addMatch() {
   renderAll();
 }
 
-function switchTab(tabName) {
+function switchTab(tabName, options = {}) {
   if (
     getCurrentRole() !== "admin" &&
     ["players", "backup", "seasons", "weeks", "matches"].includes(tabName)
   ) {
     tabName = "dashboard";
+  }
+
+  const previousTab = state.settings.currentTab || "dashboard";
+  if (
+    typeof persistViewportForTab === "function" &&
+    !options.skipPersistPrevious
+  ) {
+    persistViewportForTab(previousTab);
   }
 
   state.settings.currentTab = tabName;
@@ -557,15 +572,16 @@ function switchTab(tabName) {
       panel.classList.toggle("active", panel.id === `tab-${tabName}`),
     );
 
+  renderCurrentTabOnly(tabName);
+
   const activePanel = document.getElementById(`tab-${tabName}`);
-  if (activePanel) {
+  if (activePanel && !options.skipViewportRestore) {
     requestAnimationFrame(() => {
-      activePanel.scrollIntoView({ block: "start", behavior: "auto" });
-      window.scrollTo({ top: 0, behavior: "auto" });
+      if (typeof scheduleTabViewportRestore === "function") {
+        scheduleTabViewportRestore(tabName, { fallbackToTop: true });
+      }
     });
   }
-
-  renderCurrentTabOnly(tabName);
 
   if (tabName === "dashboard") {
     maybeAutoSyncResults();
@@ -1317,13 +1333,19 @@ function relocateMatchToApiWeek(match, seasonId, apiWeekNumber) {
   return nextWeek;
 }
 
-const AUTO_RESULTS_SYNC_INTERVAL =  5 * 1000;
+const AUTO_RESULTS_SYNC_INTERVAL = 30 * 60 * 1000;
 const AUTO_RESULTS_SYNC_LOCK_TTL = 90 * 1000;
 let autoResultsSyncPromise = null;
 
 function getAutoSyncActorLabel() {
   const user = getAuthUser?.() || state.settings?.auth?.user || null;
-  return String(user?.name || user?.username || user?.kullaniciAdi || getCurrentRole?.() || "kullanici").trim();
+  return String(
+    user?.name ||
+      user?.username ||
+      user?.kullaniciAdi ||
+      getCurrentRole?.() ||
+      "kullanici",
+  ).trim();
 }
 
 async function maybeAutoSyncResults(options = {}) {
@@ -1332,7 +1354,8 @@ async function maybeAutoSyncResults(options = {}) {
     logAutoSyncDebug("maybeAutoSyncResults:entered", { force });
   }
   if (!isAuthenticated() || !isFirebaseReady()) return false;
-  if (!force && (state.settings.currentTab || "dashboard") !== "dashboard") return false;
+  if (!force && (state.settings.currentTab || "dashboard") !== "dashboard")
+    return false;
   if (autoResultsSyncPromise) return autoResultsSyncPromise;
 
   const seasonId = getActiveSeasonId();
@@ -1357,8 +1380,9 @@ async function maybeAutoSyncResults(options = {}) {
     }
 
     const remoteLastSyncAt = Number(remoteSettings.resultsLastAutoSyncAt || 0);
-    const remoteLockAt = Number(remoteSettings.resultsAutoSyncInProgressAt || 0);
-
+    const remoteLockAt = Number(
+      remoteSettings.resultsAutoSyncInProgressAt || 0,
+    );
 
     state.settings.resultsLastAutoSyncAt = remoteLastSyncAt;
     state.settings.resultsAutoSyncInProgressAt = remoteLockAt;
@@ -1366,7 +1390,11 @@ async function maybeAutoSyncResults(options = {}) {
     renderDashboardAutoSyncStatus();
     renderDashboardSyncCard();
 
-    if (!force && remoteLastSyncAt && now - remoteLastSyncAt < AUTO_RESULTS_SYNC_INTERVAL) {
+    if (
+      !force &&
+      remoteLastSyncAt &&
+      now - remoteLastSyncAt < AUTO_RESULTS_SYNC_INTERVAL
+    ) {
       if (typeof logAutoSyncDebug === "function") {
         logAutoSyncDebug("maybeAutoSyncResults:skippedByInterval", {
           remoteLastSyncAt,
@@ -1385,7 +1413,10 @@ async function maybeAutoSyncResults(options = {}) {
           ttl: AUTO_RESULTS_SYNC_LOCK_TTL,
         });
       }
-      renderDashboardAutoSyncStatus("⏳ Başka bir cihaz şu anda sonuçları kontrol ediyor");return false;
+      renderDashboardAutoSyncStatus(
+        "⏳ Başka bir cihaz şu anda sonuçları kontrol ediyor",
+      );
+      return false;
     }
 
     const lockStamp = Date.now();
@@ -1453,7 +1484,10 @@ async function maybeAutoSyncResults(options = {}) {
         });
       } catch {}
       console.warn("Otomatik sonuç güncelleme uyarısı:", error);
-      renderDashboardAutoSyncStatus("⚠️ Otomatik kontrol denendi ama bu tur güncellenemedi");return false;
+      renderDashboardAutoSyncStatus(
+        "⚠️ Otomatik kontrol denendi ama bu tur güncellenemedi",
+      );
+      return false;
     } finally {
       if (typeof logAutoSyncDebug === "function") {
         logAutoSyncDebug("maybeAutoSyncResults:finally", {
@@ -2112,11 +2146,7 @@ function bindEvents() {
   on("dashboardSyncWeekBtn", "click", syncDashboardWeek);
   on("dashboardSyncSeasonBtn", "click", syncDashboardSeason);
   on("dashboardWeekScoreUpdateBtn", "click", runDashboardWeekScoreUpdate);
-  on(
-    "dashboardMobileWeekScoreUpdateBtn",
-    "click",
-    runDashboardWeekScoreUpdate,
-  );
+  on("dashboardMobileWeekScoreUpdateBtn", "click", runDashboardWeekScoreUpdate);
   on("dashboardSyncToggleBtn", "click", toggleDashboardSyncCard);
   on("adminSyncToggleBtn", "click", toggleAdminSyncOverview);
   on("firebaseAdminRefreshBtn", "click", refreshFirebaseAdminPanel);
@@ -2186,8 +2216,12 @@ function bindEvents() {
   document.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
-    const clickedDesktop = target.closest("#desktopAccountBtn, #desktopAccountMenu");
-    const clickedMobile = target.closest("#mobileTopProfileBtn, #mobileAccountMenu");
+    const clickedDesktop = target.closest(
+      "#desktopAccountBtn, #desktopAccountMenu",
+    );
+    const clickedMobile = target.closest(
+      "#mobileTopProfileBtn, #mobileAccountMenu",
+    );
     if (!clickedDesktop && !clickedMobile) closeAccountMenus();
   });
 
@@ -2251,7 +2285,6 @@ function bindEvents() {
   });
 }
 
-
 const APP_RESUME_REFRESH_LOG_TAG = "[APP_RESUME_REFRESH]";
 let appResumeRefreshPromise = null;
 let appWasHiddenAt = 0;
@@ -2274,7 +2307,9 @@ async function runAppResumeRefresh(reason = "visible") {
 
   const now = Date.now();
   const hiddenForMs = appWasHiddenAt ? now - appWasHiddenAt : 0;
-  const sinceLastResumeMs = appLastResumeRefreshAt ? now - appLastResumeRefreshAt : 0;
+  const sinceLastResumeMs = appLastResumeRefreshAt
+    ? now - appLastResumeRefreshAt
+    : 0;
 
   if (sinceLastResumeMs && sinceLastResumeMs < 1500) {
     logAppResumeRefresh("skip:cooldown", {
@@ -2288,8 +2323,13 @@ async function runAppResumeRefresh(reason = "visible") {
     logAppResumeRefresh("start", { reason, hiddenForMs });
 
     try {
-      if (typeof hydrateFromFirebaseRealtime === "function" && isFirebaseReady()) {
-        const hydrateOk = await hydrateFromFirebaseRealtime(`app-resume:${reason}`);
+      if (
+        typeof hydrateFromFirebaseRealtime === "function" &&
+        isFirebaseReady()
+      ) {
+        const hydrateOk = await hydrateFromFirebaseRealtime(
+          `app-resume:${reason}`,
+        );
         logAppResumeRefresh("hydrate:done", { hydrateOk });
       } else {
         logAppResumeRefresh("hydrate:skipped", {
@@ -2386,7 +2426,18 @@ window.addEventListener("online", () => {
 bindEvents();
 ensureHeaderSyncButtons();
 ensureAvatarDirectoryReady();
-switchTab(state.settings.currentTab || "dashboard");
+if (typeof suspendViewportPersistence === "function") {
+  suspendViewportPersistence(900);
+}
+switchTab(state.settings.currentTab || "dashboard", {
+  skipPersistPrevious: true,
+  skipViewportRestore: true,
+});
+if (typeof scheduleTabViewportRestore === "function") {
+  scheduleTabViewportRestore(state.settings.currentTab || "dashboard", {
+    fallbackToTop: false,
+  });
+}
 updateLoginOverlay();
 updateAdminSyncToggleButton();
 bindAppResumeRefreshHooks();

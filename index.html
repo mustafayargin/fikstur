@@ -1,19 +1,20 @@
 <!doctype html>
 <html lang="tr">
   <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fikstür Tahmin Paneli Pro</title>
-
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="icon" href="favicon.png" />
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
-  <link rel="manifest" href="manifest.json" />
-
-  <meta name="theme-color" content="#0b1a2b" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-</head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fikstür Tahmin Paneli Pro</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#0b1a2b" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <link rel="icon" href="favicon1.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  </head>
   <body>
     <div class="app-shell">
       <aside class="sidebar" id="sidebar">
@@ -167,7 +168,9 @@
             <div class="dashboard-hero-side" id="dashboardHeroSide"></div>
           </section>
 
-          <div class="dashboard-inline-status" id="dashboardAutoSyncStatus">Son API sonuç güncellemesi bekleniyor...</div>
+          <div class="dashboard-inline-status" id="dashboardAutoSyncStatus">
+            Son API sonuç güncellemesi bekleniyor...
+          </div>
 
           <div class="dashboard-main-layout">
             <section
@@ -270,12 +273,13 @@
                   <p id="dashboardMatchModalMeta">-</p>
                 </div>
                 <button
-                  class="secondary small"
-                  type="button"
-                  onclick="closeDashboardMatchModal()"
-                >
-                  Kapat
-                </button>
+                id="dashboardMatchModalClose"
+                class="secondary small"
+                type="button"
+                onclick="closeDashboardMatchModal()"
+              >
+                Kapat
+              </button>
               </div>
               <div id="dashboardMatchModalBody"></div>
             </div>
@@ -654,6 +658,20 @@
           </section>
 
           <div class="standings-luxury-layout">
+            <section class="card standings-week-card">
+              <div
+                class="card-header standings-card-head standings-list-head"
+              >
+                <div>
+                  <h3>Haftalık Yarış</h3>
+                  <p class="card-subtitle">Seçili haftada kim daha formda?</p>
+                </div>
+                <span class="badge info" id="weeklyLeaderBadge"
+                  >Hafta lideri bekleniyor</span
+                >
+              </div>
+              <div id="weeklyStandings"></div>
+            </section>
             <section class="card standings-board-card">
               <div class="card-header standings-card-head standings-list-head">
                 <div>
@@ -670,20 +688,7 @@
             </section>
 
             <aside class="standings-side-stack standings-side-stack--luxury">
-              <section class="card standings-week-card">
-                <div
-                  class="card-header standings-card-head standings-list-head"
-                >
-                  <div>
-                    <h3>Haftalık Yarış</h3>
-                    <p class="card-subtitle">Seçili haftada kim daha formda?</p>
-                  </div>
-                  <span class="badge info" id="weeklyLeaderBadge"
-                    >Hafta lideri bekleniyor</span
-                  >
-                </div>
-                <div id="weeklyStandings"></div>
-              </section>
+
 
               <section
                 class="card standings-insight-card standings-insight-card--luxury"

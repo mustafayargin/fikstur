@@ -271,6 +271,15 @@ function ensureActiveSelections() {
   }
 }
 
+function resetActiveWeekToPreferredForSeason(seasonId = getActiveSeasonId()) {
+  const resolvedSeasonId = seasonId || getActiveSeasonId() || null;
+  state.settings.activeSeasonId = resolvedSeasonId;
+  state.settings.activeWeekId = resolvedSeasonId
+    ? getPreferredWeekIdForSeason(resolvedSeasonId)
+    : null;
+  return state.settings.activeWeekId;
+}
+
 async function setActiveSeason(seasonId) {
   state.settings.activeSeasonId = seasonId || null;
   state.settings.activeWeekId = getPreferredWeekIdForSeason(seasonId);
@@ -560,9 +569,6 @@ function getPreferredWeekIdForSeason(seasonId) {
 
   if (!weeks.length) return null;
 
-  const firstIncompleteWeek = weeks.find((week) => !isWeekCompleted(week.id));
-  if (firstIncompleteWeek) return firstIncompleteWeek.id;
-
   return weeks[weeks.length - 1].id;
 }
 function ensureWeekForSeason(seasonId, weekNumber) {
@@ -660,14 +666,31 @@ function getGeneralStandings(seasonId = getActiveSeasonId()) {
         a.name.localeCompare(b.name, "tr"),
     );
 }
+
+function isMatchResolvedForScoring(match) {
+  if (!match) return false;
+  if (match.played) return true;
+
+  const hasHomeScore = match.homeScore !== "" && match.homeScore !== null && match.homeScore !== undefined;
+  const hasAwayScore = match.awayScore !== "" && match.awayScore !== null && match.awayScore !== undefined;
+  return hasHomeScore && hasAwayScore;
+}
+
+function getResolvedWeekMatches(weekId) {
+  return getMatchesByWeekId(weekId).filter((match) => isMatchResolvedForScoring(match));
+}
+
 function getWeeklyStandings(weekId) {
-  const matchIds = getMatchesByWeekId(weekId).map((m) => m.id);
+  const resolvedMatches = getResolvedWeekMatches(weekId);
+  if (!resolvedMatches.length) return [];
+
+  const matchIds = new Set(resolvedMatches.map((match) => match.id));
 
   return state.players
     .filter((player) => getPlayerRole(player) !== "admin")
     .map((player) => {
       const preds = state.predictions.filter(
-        (p) => p.playerId === player.id && matchIds.includes(p.matchId),
+        (p) => p.playerId === player.id && matchIds.has(p.matchId),
       );
 
       const predictionCount = preds.filter(
@@ -677,9 +700,9 @@ function getWeeklyStandings(weekId) {
       return {
         id: player.id,
         name: player.name,
-        total: preds.reduce((sum, p) => sum + (p.points || 0), 0),
-        exact: preds.filter((p) => p.points === 3).length,
-        resultOnly: preds.filter((p) => p.points === 1).length,
+        total: preds.reduce((sum, p) => sum + Number(p.points || 0), 0),
+        exact: preds.filter((p) => Number(p.points || 0) === 3).length,
+        resultOnly: preds.filter((p) => Number(p.points || 0) === 1).length,
         predictionCount,
       };
     })

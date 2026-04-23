@@ -1,20 +1,19 @@
 {
   "name": "Fikstür Tahmin Paneli",
   "short_name": "Fikstür",
-  "start_url": "./",
-  "scope": "./",
+  "start_url": "/index.html",
   "display": "standalone",
   "background_color": "#0b1a2b",
   "theme_color": "#0b1a2b",
   "icons": [
     {
-      "src": "favicon.png",
-      "sizes": "192x192",
+      "src": "apple-touch-icon.png",
+      "sizes": "180x180",
       "type": "image/png"
     },
     {
-      "src": "apple-touch-icon.png",
-      "sizes": "180x180",
+      "src": "favicon1.png",
+      "sizes": "192x192",
       "type": "image/png"
     }
   ]
