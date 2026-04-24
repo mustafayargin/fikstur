@@ -2293,6 +2293,117 @@ function bindEvents() {
   });
 }
 
+const IDLE_LOGOUT_LIMIT_MS = 15 * 60 * 1000;
+const IDLE_LOGOUT_STORAGE_KEY = "fikstur:lastUserActivityAt";
+let idleLogoutTimer = null;
+
+function getLastUserActivityAt() {
+  const storedValue = Number(
+    localStorage.getItem(IDLE_LOGOUT_STORAGE_KEY) || 0,
+  );
+  return Number.isFinite(storedValue) ? storedValue : 0;
+}
+
+function clearIdleLogoutTimer() {
+  if (idleLogoutTimer) {
+    clearTimeout(idleLogoutTimer);
+    idleLogoutTimer = null;
+  }
+}
+
+function performIdleLogout() {
+  clearIdleLogoutTimer();
+  localStorage.removeItem(IDLE_LOGOUT_STORAGE_KEY);
+
+  if (!isAuthenticated()) return;
+
+  logoutUser();
+  showAlert(
+    "30 dakika işlem yapılmadığı için oturum kapatıldı. Güncel veriler için tekrar giriş yapmalısın.",
+    {
+      title: "Oturum Süresi Doldu",
+      type: "warning",
+    },
+  );
+}
+
+function scheduleIdleLogoutCheck() {
+  clearIdleLogoutTimer();
+
+  if (!isAuthenticated()) return;
+
+  const lastActivityAt = getLastUserActivityAt() || Date.now();
+  const remainingMs = IDLE_LOGOUT_LIMIT_MS - (Date.now() - lastActivityAt);
+
+  if (remainingMs <= 0) {
+    performIdleLogout();
+    return;
+  }
+
+  idleLogoutTimer = setTimeout(performIdleLogout, remainingMs);
+}
+
+function markUserActivityForIdleLogout() {
+  if (!isAuthenticated()) return;
+
+  localStorage.setItem(IDLE_LOGOUT_STORAGE_KEY, String(Date.now()));
+  scheduleIdleLogoutCheck();
+}
+
+function checkIdleLogoutAfterResume() {
+  if (!isAuthenticated()) return false;
+
+  const lastActivityAt = getLastUserActivityAt();
+  if (lastActivityAt && Date.now() - lastActivityAt >= IDLE_LOGOUT_LIMIT_MS) {
+    performIdleLogout();
+    return true;
+  }
+
+  scheduleIdleLogoutCheck();
+  return false;
+}
+
+function bindIdleLogoutHooks() {
+  if (window.__idleLogoutHooksBound) return;
+  window.__idleLogoutHooksBound = true;
+
+  [
+    "click",
+    "keydown",
+    "pointerdown",
+    "touchstart",
+    "mousemove",
+    "scroll",
+  ].forEach((eventName) => {
+    document.addEventListener(eventName, markUserActivityForIdleLogout, {
+      passive: true,
+      capture: true,
+    });
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      checkIdleLogoutAfterResume();
+    }
+  });
+
+  window.addEventListener("focus", checkIdleLogoutAfterResume);
+  window.addEventListener("pageshow", checkIdleLogoutAfterResume);
+
+  if (isAuthenticated()) {
+    if (!getLastUserActivityAt()) {
+      localStorage.setItem(IDLE_LOGOUT_STORAGE_KEY, String(Date.now()));
+    }
+    scheduleIdleLogoutCheck();
+  }
+}
+
+window.resetIdleLogoutTimer = markUserActivityForIdleLogout;
+window.stopIdleLogoutTimer = () => {
+  clearIdleLogoutTimer();
+  localStorage.removeItem(IDLE_LOGOUT_STORAGE_KEY);
+};
+
 const APP_RESUME_REFRESH_LOG_TAG = "[APP_RESUME_REFRESH]";
 let appResumeRefreshPromise = null;
 let appWasHiddenAt = 0;
@@ -2449,6 +2560,7 @@ if (typeof scheduleTabViewportRestore === "function") {
 updateLoginOverlay();
 updateAdminSyncToggleButton();
 bindAppResumeRefreshHooks();
+bindIdleLogoutHooks();
 
 if (isFirebaseReady()) {
   ensureFirebaseDefaults().catch((error) =>
