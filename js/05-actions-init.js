@@ -2559,8 +2559,8 @@ if (typeof scheduleTabViewportRestore === "function") {
 }
 updateLoginOverlay();
 updateAdminSyncToggleButton();
-bindAppResumeRefreshHooks();
 bindIdleLogoutHooks();
+bindAppResumeRefreshHooks();
 
 if (isFirebaseReady()) {
   ensureFirebaseDefaults().catch((error) =>
