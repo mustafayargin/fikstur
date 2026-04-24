@@ -3471,6 +3471,7 @@ function closeLoginOverlay() {
 }
 function logoutUser() {
   closeAccountMenus();
+  if (typeof stopIdleLogoutTimer === "function") stopIdleLogoutTimer();
   stopPresenceTracking({ removeSession: true });
 
   currentSessionUser = null;
@@ -3561,6 +3562,7 @@ async function loginUser() {
     closeLoginOverlay();
     applyRolePermissions();
     startPresenceTracking();
+    if (typeof resetIdleLogoutTimer === "function") resetIdleLogoutTimer();
 
     await runSessionHydrationWithFastOverlay({
       loadingMessage: "Kayıtlı veriler açılıyor, güncel bilgiler yükleniyor...",
