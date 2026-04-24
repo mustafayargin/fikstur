@@ -911,7 +911,13 @@ function ensureFirebaseRealtimeBridge() {
 
   db.ref("presence").on("value", (snapshot) => {
     firebasePresenceCache = snapshot.exists() ? snapshot.val() || {} : {};
-    debounceFirebaseRealtimeRender();
+
+    // Presence heartbeat 25 saniyede bir değişiyor.
+    // Bunu renderAll() ile yeniden çizmek, tahminler dışındaki sayfalarda scroll'u üste atıyordu.
+    // Online/offline bilgisi bir sonraki normal çizimde güncellenir; sayfa artık zıplamaz.
+    if ((state.settings.currentTab || "dashboard") === "predictions") {
+      debounceFirebaseRealtimeRender();
+    }
   });
 
   firebaseRealtimeBindingsInitialized = true;
@@ -3229,9 +3235,13 @@ function updateSessionCard() {
 
   const desktopChangeBtn = document.getElementById("desktopChangePasswordBtn");
   const mobileChangeBtn = document.getElementById("mobileChangePasswordBtn");
-  const showPassword = isAuth && !isAdmin;
-  if (desktopChangeBtn) desktopChangeBtn.hidden = !showPassword;
-  if (mobileChangeBtn) mobileChangeBtn.hidden = !showPassword;
+  const desktopPlayersBtn = document.getElementById("desktopPlayersPageBtn");
+  const mobilePlayersBtn = document.getElementById("mobilePlayersPageBtn");
+  const showUserAccountTools = isAuth && !isAdmin;
+  if (desktopChangeBtn) desktopChangeBtn.hidden = !showUserAccountTools;
+  if (mobileChangeBtn) mobileChangeBtn.hidden = !showUserAccountTools;
+  if (desktopPlayersBtn) desktopPlayersBtn.hidden = !showUserAccountTools;
+  if (mobilePlayersBtn) mobilePlayersBtn.hidden = !showUserAccountTools;
 }
 
 function closeAccountMenus() {
@@ -3855,11 +3865,17 @@ function schedulePredictionViewportRestore(snapshot) {
 
 function shouldCancelPageViewportRestore(snapshot) {
   if (!snapshot) return true;
+
+  // Render sırasında DOM yeniden kurulunca tarayıcı bazen scroll'u otomatik 0'a çekiyor.
+  // Eski kontrol bunu kullanıcı kaydırması sanıp geri yüklemeyi iptal ediyordu.
   if (Date.now() - lastManualViewportScrollAt > 140) return false;
 
   const targetY = Number(snapshot.windowY || 0);
   const currentY = window.pageYOffset || window.scrollY || 0;
-  return Math.abs(currentY - targetY) > 16;
+
+  if (currentY <= 4 && targetY > 24) return false;
+
+  return Math.abs(currentY - targetY) <= 16;
 }
 
 function restoreWindowViewport(snapshot) {
@@ -3969,7 +3985,7 @@ function applyRolePermissions() {
   const currentTab = state.settings.currentTab || "dashboard";
   if (
     role !== "admin" &&
-    ["players", "backup", "seasons", "weeks", "matches"].includes(currentTab)
+    ["backup", "seasons", "weeks", "matches"].includes(currentTab)
   ) {
     switchTab("dashboard");
     return;
@@ -3988,6 +4004,15 @@ function applyRolePermissions() {
       el.disabled = true;
       el.classList.add("readonly-control");
     });
+
+  if (role !== "admin" && authReady) {
+    document
+      .querySelectorAll("#tab-players .user-self-control")
+      .forEach((el) => {
+        el.disabled = false;
+        el.classList.remove("readonly-control");
+      });
+  }
 
   document
     .querySelectorAll(

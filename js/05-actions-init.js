@@ -548,7 +548,7 @@ function addMatch() {
 function switchTab(tabName, options = {}) {
   if (
     getCurrentRole() !== "admin" &&
-    ["players", "backup", "seasons", "weeks", "matches"].includes(tabName)
+    ["backup", "seasons", "weeks", "matches"].includes(tabName)
   ) {
     tabName = "dashboard";
   }
@@ -2204,6 +2204,14 @@ function bindEvents() {
     .forEach((btn) =>
       btn.addEventListener("click", () => switchTab(btn.dataset.tab)),
     );
+  on("desktopPlayersPageBtn", "click", () => {
+    closeAccountMenus();
+    switchTab("players");
+  });
+  on("mobilePlayersPageBtn", "click", () => {
+    closeAccountMenus();
+    switchTab("players");
+  });
   on("desktopChangePasswordBtn", "click", changeOwnPassword);
   on("mobileChangePasswordBtn", "click", changeOwnPassword);
   on("loginBtn", "click", loginUser);

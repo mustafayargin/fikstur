@@ -93,6 +93,13 @@
                 <button
                   class="secondary full"
                   type="button"
+                  id="desktopPlayersPageBtn"
+                >
+                  Kişiler
+                </button>
+                <button
+                  class="secondary full"
+                  type="button"
                   id="desktopChangePasswordBtn"
                 >
                   Şifre Değiştir
@@ -406,7 +413,7 @@
             <div class="player-detail-modal__dialog">
               <button
                 type="button"
-                class="player-detail-modal__close"
+                class="player-detail-modal__close user-self-control"
                 onclick="closePlayerDetailModal()"
               >
                 ✕
@@ -994,13 +1001,6 @@
           <button
             class="mobile-admin-menu-item"
             type="button"
-            data-tab="dashboard"
-          >
-            Genel Bakış
-          </button>
-          <button
-            class="mobile-admin-menu-item"
-            type="button"
             data-tab="seasons"
           >
             Sezonlar
@@ -1021,23 +1021,6 @@
             data-tab="matches"
           >
             Maçlar
-          </button>
-          <button
-            class="mobile-admin-menu-item"
-            type="button"
-            data-tab="predictions"
-          >
-            Tahminler
-          </button>
-          <button
-            class="mobile-admin-menu-item"
-            type="button"
-            data-tab="standings"
-          >
-            Puan Durumu
-          </button>
-          <button class="mobile-admin-menu-item" type="button" data-tab="stats">
-            İstatistikler
           </button>
           <button
             class="mobile-admin-menu-item"
@@ -1068,6 +1051,13 @@
         </div>
       </div>
       <div class="account-menu-actions">
+        <button
+          class="secondary full"
+          type="button"
+          id="mobilePlayersPageBtn"
+        >
+          Kişiler
+        </button>
         <button
           class="secondary full"
           type="button"

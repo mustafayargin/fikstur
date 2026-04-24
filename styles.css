@@ -12862,3 +12862,173 @@ margin-top: -5px;
     /* premium görünüm */
     filter: drop-shadow(0 4px 10px rgba(0,0,0,0.45));
   }
+/* =========================================
+   SIRALAMA KARTLARI - KOMPAKT İNCE DÜZELTME
+   Sadece haftalık ve genel sıralama kartları
+========================================= */
+#tab-standings #standingsTable,
+#tab-standings #weeklyStandings {
+  gap: 8px !important;
+}
+
+#tab-standings #standingsTable .leaderboard-row,
+#tab-standings #weeklyStandings .leaderboard-row,
+#tab-standings .leaderboard-row.tone-gold,
+#tab-standings .leaderboard-row.tone-silver,
+#tab-standings .leaderboard-row.tone-bronze {
+  min-height: 78px !important;
+  padding: 10px 14px 10px 16px !important;
+  border-radius: 18px !important;
+  gap: 10px !important;
+}
+
+#tab-standings .leaderboard-row-left,
+#tab-standings .leaderboard-main-content {
+  gap: 10px !important;
+}
+
+#tab-standings .leaderboard-avatar {
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+}
+
+#tab-standings .leaderboard-name-line {
+  gap: 5px !important;
+}
+
+#tab-standings .leaderboard-name-line strong {
+  font-size: 14px !important;
+  line-height: 1.05 !important;
+}
+
+#tab-standings .leaderboard-subline {
+  gap: 5px !important;
+  margin-top: 3px !important;
+}
+
+#tab-standings .leaderboard-subline span,
+#tab-standings .leaderboard-name-line .badge,
+#tab-standings .leaderboard-name-line .weekly-leader-pill,
+#tab-standings .leaderboard-name-line .own-pill {
+  font-size: 10px !important;
+  line-height: 1 !important;
+  padding: 4px 7px !important;
+}
+
+#tab-standings .leaderboard-progress {
+  height: 4px !important;
+  max-width: 150px !important;
+  margin-top: 6px !important;
+}
+
+#tab-standings .leaderboard-score-block {
+  flex: 0 0 62px !important;
+  min-width: 62px !important;
+
+  right: 30px;
+
+}
+
+#tab-standings .leaderboard-score-block strong {
+  font-size: 25px !important;
+  line-height: 1 !important;
+  margin-left: 1px;
+
+position: static;
+}
+
+#tab-standings .leaderboard-score-block span {
+  font-size: 9px !important;
+  margin-left: 10px;
+text-align: left;
+position: static;
+
+}
+
+#tab-standings .leaderboard-supported-team-logo {
+  right: -42px !important;
+  width: 145px !important;
+  height: 145px !important;
+  opacity: 0.075 !important;
+}
+
+#tab-standings .leaderboard-supported-team-logo .team-logo-img,
+#tab-standings .leaderboard-supported-team-logo .team-logo {
+  width: 145px !important;
+  height: 145px !important;
+  min-width: 145px !important;
+  min-height: 145px !important;
+}
+
+#tab-standings .leaderboard-row::before {
+  top: 14px !important;
+  bottom: 14px !important;
+  width: 3px !important;
+}
+
+@media (max-width: 720px) {
+  #tab-standings #standingsTable .leaderboard-row,
+  #tab-standings #weeklyStandings .leaderboard-row,
+  #tab-standings .leaderboard-row.tone-gold,
+  #tab-standings .leaderboard-row.tone-silver,
+  #tab-standings .leaderboard-row.tone-bronze {
+    min-height: 70px !important;
+    padding: 8px 10px 8px 14px !important;
+    border-radius: 16px !important;
+  }
+
+  #tab-standings .leaderboard-avatar {
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+  }
+
+  #tab-standings .leaderboard-name-line strong {
+    font-size: 13px !important;
+  }
+
+  #tab-standings .leaderboard-subline span,
+  #tab-standings .leaderboard-name-line .badge,
+  #tab-standings .leaderboard-name-line .weekly-leader-pill,
+  #tab-standings .leaderboard-name-line .own-pill {
+    font-size: 9px !important;
+    padding: 3px 6px !important;
+  }
+
+  #tab-standings .leaderboard-score-block {
+    flex: 0 0 52px !important;
+    min-width: 52px !important;
+  }
+
+  #tab-standings .leaderboard-score-block strong {
+    font-size: 22px !important;
+  }
+
+  #tab-standings .leaderboard-progress {
+    max-width: 120px !important;
+  }
+}
+
+/* Kullanıcı görünümünde Kişiler sayfası sade/izleme modu */
+body[data-role="user"] .player-form-card-enhanced {
+  display: none !important;
+}
+
+body[data-role="user"] #tab-players .page-header p {
+  display: none;
+}
+
+.player-readonly-note {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.48);
+  color: rgba(226, 232, 240, 0.78);
+  font-size: 12px;
+  font-weight: 800;
+}

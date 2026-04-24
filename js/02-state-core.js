@@ -1430,6 +1430,7 @@ function renderPlayers() {
     <div class="players-premium-grid players-summary-grid">
       ${state.players
         .map((player) => {
+          if (getPlayerRole(player) === "admin") return "";
           const isAdminUser = getPlayerRole(player) === "admin";
           const presence = getPresenceStatusForUser(player.id);
           const statusClass = presence.isOnline ? "is-online" : "is-offline";
@@ -1502,10 +1503,26 @@ function renderPlayers() {
 }
 window.__activePlayerDetailId = null;
 
+function canManagePlayerProfile(player) {
+  if (!player) return false;
+  if (getCurrentRole() === "admin") return true;
+  const currentPlayerId = normalizeEntityId(getCurrentPlayerId());
+  return !!currentPlayerId && normalizeEntityId(player.id) === currentPlayerId;
+}
+
+function canEditOnlyOwnProfile(player) {
+  if (!player || getCurrentRole() !== "user") return false;
+  const currentPlayerId = normalizeEntityId(getCurrentPlayerId());
+  return !!currentPlayerId && normalizeEntityId(player.id) === currentPlayerId;
+}
+
 function buildPlayerDetailModalContent(player) {
   if (!player) return "";
 
   const isAdminUser = getPlayerRole(player) === "admin";
+  const isAdminMode = getCurrentRole() === "admin";
+  const canManageThisProfile = canManagePlayerProfile(player);
+  const isOwnUserProfile = canEditOnlyOwnProfile(player);
   const seasonStates = getPlayerSeasonStateMap(player);
   const predictionCount = state.predictions.filter(
     (p) => p.playerId === player.id && p.homePred !== "" && p.awayPred !== "",
@@ -1515,14 +1532,16 @@ function buildPlayerDetailModalContent(player) {
     b.name.localeCompare(a.name, "tr"),
   );
 
-  const seasonMembershipMarkup = isAdminUser
-    ? `
+  const seasonMembershipMarkup = !isAdminMode
+    ? ""
+    : isAdminUser
+      ? `
       <div class="player-admin-note">
         Admin tüm sezon yönetim ekranlarını görür, tahmin tablosunda oyuncu olarak listelenmez.
       </div>
     `
-    : seasonCards.length
-      ? `
+      : seasonCards.length
+        ? `
         <div class="player-season-chip-grid">
           ${seasonCards
             .map((season) => {
@@ -1593,10 +1612,12 @@ function buildPlayerDetailModalContent(player) {
             <span class="player-stat-label">Son giriş</span>
             <strong>${presence.lastSeen ? formatAdminPanelDateTime(presence.lastSeen) : "Henüz giriş yok"}</strong>
           </div>
+          ${canManageThisProfile ? `
           <div class="player-stat-pill">
             <span class="player-stat-label">Şifre</span>
             <strong>${escapeHtml(player.password || "1234")}</strong>
           </div>
+          ` : ""}
           <div class="player-stat-pill">
             <span class="player-stat-label">Tahmin</span>
             <strong>${predictionCount}</strong>
@@ -1607,25 +1628,35 @@ function buildPlayerDetailModalContent(player) {
       <div class="player-card-team-block">
         <div class="player-card-section-title">Takım kartı</div>
         ${supportedTeamMarkup}
+        ${canManageThisProfile ? `
         <div class="player-team-editor-row">
-          <select id="player_team_${player.id}" class="player-team-select">
+          <select id="player_team_${player.id}" class="player-team-select user-self-control">
             ${teamSelectorOptions}
           </select>
-          <button class="small secondary" onclick="savePlayerSupportedTeam('${player.id}', this)">Takımı Kaydet</button>
+          <button class="small secondary user-self-control" onclick="savePlayerSupportedTeam('${player.id}', this)">Takımı Kaydet</button>
         </div>
+        ` : ""}
       </div>
 
+      ${isAdminMode ? `
       <div class="player-card-seasons">
         <div class="player-card-section-title">Sezon katılımı</div>
         ${seasonMembershipMarkup}
       </div>
+      ` : ""}
 
       <div class="player-card-actions">
-        <button class="small secondary" onclick="renamePlayer('${player.id}', this)">Düzenle</button>
-        <button class="small secondary" onclick="changePlayerPassword('${player.id}', this)">Ş. Değiştir</button>
-        ${isAdminUser ? "" : `<button class="small secondary" onclick="togglePanelAdmin('${player.id}', this)">${player.panelAdmin ? "Admin Yetkisini Kaldır" : "Admin Yap"}</button>`}
-        ${isAdminUser ? "" : `<button class="small secondary" onclick="forceLogoutUserSession('${player.id}', this)">Sistemden At</button>`}
-        ${isAdminUser ? "" : `<button class="small danger" onclick="removePlayer('${player.id}', this)">Sil</button>`}
+        ${isAdminMode ? `
+          <button class="small secondary" onclick="renamePlayer('${player.id}', this)">Düzenle</button>
+          <button class="small secondary" onclick="changePlayerPassword('${player.id}', this)">Ş. Değiştir</button>
+          ${isAdminUser ? "" : `<button class="small secondary" onclick="togglePanelAdmin('${player.id}', this)">${player.panelAdmin ? "Admin Yetkisini Kaldır" : "Admin Yap"}</button>`}
+          ${isAdminUser ? "" : `<button class="small secondary" onclick="forceLogoutUserSession('${player.id}', this)">Sistemden At</button>`}
+          ${isAdminUser ? "" : `<button class="small danger" onclick="removePlayer('${player.id}', this)">Sil</button>`}
+        ` : isOwnUserProfile ? `
+          <button class="small secondary user-self-control" onclick="changePlayerPassword('${player.id}', this)">Şifremi Değiştir</button>
+        ` : `
+          <span class="player-readonly-note">Bu kart sadece görüntülenebilir.</span>
+        `}
       </div>
     </div>
   `;
@@ -1667,17 +1698,17 @@ window.refreshPlayerDetailModal = function () {
   body.innerHTML = buildPlayerDetailModalContent(player);
 };
 window.savePlayerSupportedTeam = async function (playerId, buttonOrEvent) {
-  if (isReadOnlyMode()) {
-    return showAlert("Kullanıcı görünümünde takım seçimi değiştirilemez.", {
-      title: "Yetki yok",
-      type: "warning",
-    });
-  }
-
   const actionButton = getActionButtonFromArg(buttonOrEvent);
   const player = getPlayerById(playerId);
   const select = document.getElementById(`player_team_${playerId}`);
   if (!player || !select) return;
+
+  if (!canManagePlayerProfile(player)) {
+    return showAlert("Sadece kendi tuttuğun takımını değiştirebilirsin.", {
+      title: "Yetki yok",
+      type: "warning",
+    });
+  }
 
   const nextSupportedTeam = String(select.value || "").trim();
 
@@ -1932,14 +1963,14 @@ window.togglePanelAdmin = async function (id, buttonOrEvent) {
 };
 
 window.changePlayerPassword = async function (id, buttonOrEvent) {
-  if (isReadOnlyMode())
-    return showAlert("Kullanıcı görünümünde şifre değiştirilemez.", {
-      title: "Yetki yok",
-      type: "warning",
-    });
   const actionButton = getActionButtonFromArg(buttonOrEvent);
   const player = getPlayerById(id);
   if (!player) return;
+  if (!canManagePlayerProfile(player))
+    return showAlert("Sadece kendi şifreni değiştirebilirsin.", {
+      title: "Yetki yok",
+      type: "warning",
+    });
   const password = await showPrompt(
     "Yeni kullanıcı şifresini yaz:",
     player.password || "1234",
