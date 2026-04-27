@@ -2318,13 +2318,6 @@ function performIdleLogout() {
   if (!isAuthenticated()) return;
 
   logoutUser();
-  showAlert(
-    "30 dakika işlem yapılmadığı için oturum kapatıldı. Güncel veriler için tekrar giriş yapmalısın.",
-    {
-      title: "Oturum Süresi Doldu",
-      type: "warning",
-    },
-  );
 }
 
 function scheduleIdleLogoutCheck() {
