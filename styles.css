@@ -5406,16 +5406,16 @@ body[data-role="user"] .nav-tab[data-tab="matches"] {
   aspect-ratio: 1 / 1;
 
   padding: 12px;
-  border-radius: 18px;
+  border-radius: 20px;
 
   /* Daha belirgin zemin (logoyu öne çıkarır) */
-  background: radial-gradient(
-    circle at 50% 40%,
-    rgba(25, 60, 110, 0.9),
-    rgba(10, 25, 50, 0.95)
-  );
+  background: 
+  linear-gradient(
+    160deg,
+    rgba(247, 1, 1, 0.911),
+    rgba(255, 255, 255, 0.747));
 
-  border: 1px solid rgba(255, 255, 255, 0.06);
+
 }
 
 /* LOGO */
