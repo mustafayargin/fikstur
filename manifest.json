@@ -1,7 +1,8 @@
 {
   "name": "Fikstür Tahmin Paneli",
   "short_name": "Fikstür",
-  "start_url": "/index.html",
+  "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#0b1a2b",
   "theme_color": "#0b1a2b",
