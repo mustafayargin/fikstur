@@ -571,6 +571,26 @@ function getPreferredWeekIdForSeason(seasonId) {
 
   return weeks[weeks.length - 1].id;
 }
+
+function forceDefaultLandingAfterLogin(reason = "login") {
+  if (!state.settings) state.settings = {};
+
+  state.settings.currentTab = "dashboard";
+
+  const seasonId = getActiveSeasonId();
+  if (seasonId) {
+    state.settings.activeSeasonId = seasonId;
+    state.settings.activeWeekId = getPreferredWeekIdForSeason(seasonId);
+  }
+
+  console.info("[FIXTURE_STARTUP] Genel Özet ve son hafta ayarlandı", {
+    reason,
+    currentTab: state.settings.currentTab,
+    activeSeasonId: state.settings.activeSeasonId,
+    activeWeekId: state.settings.activeWeekId,
+    activeWeekNo: getWeekNumberById(state.settings.activeWeekId),
+  });
+}
 function ensureWeekForSeason(seasonId, weekNumber) {
   if (!weekNumber) return null;
   let week = getWeeksBySeasonId(seasonId).find(

@@ -1,5 +1,36 @@
 /* 04-predictions-avatar.js */
 
+function desktopPredictionMatchCell(match) {
+  const visual = getMatchVisualState(match);
+  const locked = isMatchLocked(match);
+  const badge = getMatchBadge(match);
+  const scoreText = match.played
+    ? `${match.homeScore} <span>-</span> ${match.awayScore}`
+    : "VS";
+  const centerLabel = match.played ? "Skor" : locked ? "Kilitli" : "Tahmin açık";
+
+  return `
+    <div class="desktop-prediction-match-card prediction-fixture-card ${visual === "postponed" ? "fixture-postponed" : visual === "played-postponed" ? "fixture-rescheduled-played" : ""}">
+      <div class="prediction-fixture-glow"></div>
+      <div class="desktop-prediction-match-inner prediction-fixture-inner">
+        <div class="desktop-prediction-team prediction-fixture-team home-team">
+          ${teamLogoHtml(match.homeTeam, match.seasonId)}
+          <span class="team-name" title="${escapeHtml(match.homeTeam)}">${escapeHtml(match.homeTeam)}</span>
+        </div>
+        <div class="desktop-prediction-center prediction-fixture-center">
+          <div class="desktop-prediction-date-pill prediction-fixture-date">${formatDate(match.date)}</div>
+          <div class="desktop-prediction-score prediction-fixture-score">${scoreText}</div>
+          <div class="prediction-fixture-state"><span class="badge ${badge.cls}">${badge.text}</span><small>${centerLabel}</small></div>
+        </div>
+        <div class="desktop-prediction-team prediction-fixture-team away-team">
+          ${teamLogoHtml(match.awayTeam, match.seasonId)}
+          <span class="team-name" title="${escapeHtml(match.awayTeam)}">${escapeHtml(match.awayTeam)}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderPredictions() {
   const viewportSnapshot = capturePredictionViewport();
   const container = document.getElementById("predictionsTable");
@@ -74,8 +105,7 @@ function renderPredictions() {
 
           const statusText = getPredictionBaseStatus(match.id, player.id);
           const showDeleteAction = hasPrediction || pred.remoteId || isSaving;
-          const showSaveAction =
-            canEdit && shouldShowPredictionSaveAction(match.id, player.id);
+          const showSaveAction = canEdit && shouldShowPredictionSaveAction(match.id, player.id);
 
           const pointValue = Number(pred.points || 0);
           const showPointBadge = hasPrediction;
@@ -84,44 +114,46 @@ function renderPredictions() {
             locked && !match.played
               ? "linear-gradient(135deg,#64748b,#475569)"
               : pointValue >= 3
-                ? "linear-gradient(135deg,#10b981,#059669)"
+                ? "linear-gradient(135deg,#34d399,#059669)"
                 : pointValue >= 1
-                  ? "linear-gradient(135deg,#2563eb,#1d4ed8)"
-                  : "linear-gradient(135deg,#475569,#334155)";
+                  ? "linear-gradient(135deg,#fb923c,#f97316)"
+                  : match.played
+                    ? "linear-gradient(135deg,#f87171,#ef4444)"
+                    : "linear-gradient(135deg,#64748b,#475569)";
 
           return `
-        <div class="prediction-cell ${pointLabel(pred.points)} ${outcomeClass} ${locked || !canEdit ? "locked-cell" : ""}${ownClass}${showPointBadge ? " has-point-badge" : ""}">
-        ${showPointBadge ? `<div class="points-badge-inline" style="background:${badgeBg};">${badgeText}</div>` : ""}
-        <div class="score-inputs compact-inputs center-mode pred-score-row">
-            <input
-              type="number"
-              min="0"
-              value="${pred.homePred}"
-              id="pred_home_${match.id}_${player.id}"
-              data-pred-role="input"
-              data-match-id="${match.id}"
-              data-player-id="${player.id}"
-              ${locked || !canEdit ? "disabled" : ""}
-            />
-            <span>-</span>
-            <input
-              type="number"
-              min="0"
-              value="${pred.awayPred}"
-              id="pred_away_${match.id}_${player.id}"
-              data-pred-role="input"
-              data-match-id="${match.id}"
-              data-player-id="${player.id}"
-              ${locked || !canEdit ? "disabled" : ""}
-            />
-          </div>
+        <div class="prediction-cell prediction-pro-cell ${hasPrediction ? "filled-prediction" : "empty-prediction"} ${pointLabel(pred.points)} ${outcomeClass} ${locked || !canEdit ? "locked-cell" : ""}${ownClass}${showPointBadge ? " has-point-badge" : ""}">
+          ${showPointBadge ? `<div class="points-badge-inline" style="background:${badgeBg};">${badgeText}</div>` : ""}
 
-          <div class="pred-action-area">
-          
+          <div class="desktop-prediction-control">
+            <div class="score-inputs compact-inputs center-mode pred-score-row">
+              <input
+                type="number"
+                min="0"
+                value="${pred.homePred}"
+                id="pred_home_${match.id}_${player.id}"
+                data-pred-role="input"
+                data-match-id="${match.id}"
+                data-player-id="${player.id}"
+                ${locked || !canEdit ? "disabled" : ""}
+              />
+              <span>-</span>
+              <input
+                type="number"
+                min="0"
+                value="${pred.awayPred}"
+                id="pred_away_${match.id}_${player.id}"
+                data-pred-role="input"
+                data-match-id="${match.id}"
+                data-player-id="${player.id}"
+                ${locked || !canEdit ? "disabled" : ""}
+              />
+            </div>
+
             ${
               locked || !canEdit
-                ? `<div class="prediction-save-wrap pred-btn-slot"></div>`
-                : `<div class="prediction-save-wrap pred-btn-slot prediction-button-row">
+                ? `<div class="prediction-save-wrap pred-btn-slot prediction-button-row desktop-icon-actions is-disabled-actions"></div>`
+                : `<div class="prediction-save-wrap pred-btn-slot prediction-button-row desktop-icon-actions">
                     <button
                       class="secondary small prediction-action-btn ${showSaveAction ? "" : "is-hidden"}"
                       type="button"
@@ -129,9 +161,8 @@ function renderPredictions() {
                       data-pred-role="save-btn"
                       data-match-id="${match.id}"
                       data-player-id="${player.id}"
-                    >
-                      ${getPredictionSaveLabel(match.id, player.id)}
-                    </button>
+                      title="Kaydet / güncelle"
+                    >${getPredictionSaveLabel(match.id, player.id)}</button>
                     <button
                       class="secondary small danger prediction-delete-btn ${showDeleteAction ? "" : "is-hidden"}"
                       type="button"
@@ -139,18 +170,15 @@ function renderPredictions() {
                       data-pred-role="delete-btn"
                       data-match-id="${match.id}"
                       data-player-id="${player.id}"
-                    >
-                      Sil
-                    </button>
+                      title="Tahmini sil"
+                    >Sil</button>
                   </div>`
             }
-
-            <div class="pred-status-slot">
-              <div class="prediction-status-chip ${outcomeClass}" id="pred_status_${match.id}_${player.id}">${statusText}</div>
-            </div>
           </div>
 
-    
+          <div class="pred-status-slot">
+            <div class="prediction-status-chip ${outcomeClass}" id="pred_status_${match.id}_${player.id}">${statusText}</div>
+          </div>
         </div>`;
         })
         .join("");
@@ -158,7 +186,7 @@ function renderPredictions() {
       return `
       <div class="prediction-grid-row ${match.played ? "played-row" : ""} ${visual === "postponed" ? "postponed-row" : ""} ${visual === "played-postponed" ? "rescheduled-played-row" : ""}">
         <div class="match-sticky-cell">
-          ${matchCell(match, { showMeta: true, metaClass: "desktop-match-meta" })}
+          ${desktopPredictionMatchCell(match)}
         </div>
         ${playerCols}
       </div>`;
@@ -355,10 +383,13 @@ function shouldShowPredictionSaveAction(matchId, playerId) {
   if (["saving", "queued", "error", "deleteError"].includes(uiState))
     return true;
 
-  if (!hasStoredPredictionRecord(matchId, playerId)) return false;
-
   const { homePred, awayPred } = getPredictionInputSnapshot(matchId, playerId);
   if (homePred === "" || awayPred === "") return false;
+
+  // Yeni tahmin girilirken daha önce kayıt yoksa bile + / kaydet ikonu kaybolmasın.
+  if (!hasStoredPredictionRecord(matchId, playerId)) {
+    return uiState === "dirty" || hasPredictionInputChanged(matchId, playerId);
+  }
 
   return uiState === "dirty" || hasPredictionInputChanged(matchId, playerId);
 }
@@ -473,6 +504,10 @@ function setPredictionUiState(matchId, playerId, uiState) {
     button.classList.toggle(
       "is-queued",
       uiState === "queued" || uiState === "deleteQueued",
+    );
+    button.classList.toggle(
+      "is-hidden",
+      !shouldShowPredictionSaveAction(matchId, playerId),
     );
   }
 

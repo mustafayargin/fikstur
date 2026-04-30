@@ -2403,7 +2403,7 @@ let appWasHiddenAt = 0;
 let appLastResumeRefreshAt = 0;
 
 function logAppResumeRefresh(step, details = {}) {
-  return; // 🔕 loglar kapalı
+  console.info(APP_RESUME_REFRESH_LOG_TAG, step, details);
 }
 
 async function runAppResumeRefresh(reason = "visible") {
@@ -2434,6 +2434,22 @@ async function runAppResumeRefresh(reason = "visible") {
   appResumeRefreshPromise = (async () => {
     logAppResumeRefresh("start", { reason, hiddenForMs });
 
+    const resumeTabName = state.settings?.currentTab || "dashboard";
+    const resumeViewportSnapshot =
+      typeof getWindowScrollPosition === "function"
+        ? getWindowScrollPosition()
+        : { x: window.scrollX || 0, y: window.scrollY || 0 };
+    if (typeof persistViewportForTab === "function") {
+      persistViewportForTab(resumeTabName, {
+        windowX: resumeViewportSnapshot.x,
+        windowY: resumeViewportSnapshot.y,
+      });
+    }
+    logAppResumeRefresh("viewport:capture", {
+      tab: resumeTabName,
+      y: resumeViewportSnapshot.y,
+    });
+
     try {
       if (
         typeof hydrateFromFirebaseRealtime === "function" &&
@@ -2454,6 +2470,9 @@ async function runAppResumeRefresh(reason = "visible") {
       logAppResumeRefresh("renderAll:done", {
         currentTab: state.settings?.currentTab || "dashboard",
       });
+      if (typeof scheduleTabViewportRestore === "function") {
+        scheduleTabViewportRestore(resumeTabName, { fallbackToTop: false });
+      }
 
       if ((state.settings?.currentTab || "dashboard") === "dashboard") {
         const syncResult = await maybeAutoSyncResults({ force: false });
@@ -2468,6 +2487,9 @@ async function runAppResumeRefresh(reason = "visible") {
 
       renderAll();
       logAppResumeRefresh("renderAll:after-sync");
+      if (typeof scheduleTabViewportRestore === "function") {
+        scheduleTabViewportRestore(resumeTabName, { fallbackToTop: false });
+      }
       appLastResumeRefreshAt = Date.now();
       return true;
     } catch (error) {
@@ -2538,6 +2560,10 @@ window.addEventListener("online", () => {
 bindEvents();
 ensureHeaderSyncButtons();
 ensureAvatarDirectoryReady();
+if (isAuthenticated() && typeof forceDefaultLandingAfterLogin === "function") {
+  forceDefaultLandingAfterLogin("page-load");
+  saveState(true);
+}
 if (typeof suspendViewportPersistence === "function") {
   suspendViewportPersistence(900);
 }
@@ -2572,6 +2598,14 @@ if (isAuthenticated()) {
     suppressOverlay: true,
   })
     .then(async () => {
+      if (typeof forceDefaultLandingAfterLogin === "function") {
+        forceDefaultLandingAfterLogin("session-restore-after-hydration");
+        saveState(true);
+        switchTab("dashboard", {
+          skipPersistPrevious: true,
+          skipViewportRestore: true,
+        });
+      }
       if ((state.settings.currentTab || "dashboard") === "dashboard") {
         await maybeAutoSyncResults();
         renderDashboardSyncCard();

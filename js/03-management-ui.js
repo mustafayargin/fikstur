@@ -903,43 +903,66 @@ function drawPredictionShareHeader(
 
 function getShareCellPalette(pred, match, shareView) {
   const hasPrediction = pred && pred.homePred !== "" && pred.awayPred !== "";
+  const neutralCard = {
+    bg: "rgba(15,23,42,0.72)",
+    border: "rgba(148,163,184,0.12)",
+  };
+
   if (!hasPrediction) {
     return {
-      bg: "rgba(15,23,42,0.72)",
-      border: "rgba(148,163,184,0.12)",
+      ...neutralCard,
       accent: "#94a3b8",
+      scoreBg: "rgba(15,23,42,0.82)",
+      scoreBorder: "rgba(148,163,184,0.14)",
+      chipBg: "rgba(15,23,42,0.82)",
+      chipBorder: "rgba(148,163,184,0.14)",
       label: shareView === "pre" ? "—" : "Boş",
     };
   }
+
   if (!match.played || shareView === "pre") {
     return {
       bg: "rgba(15,23,42,0.82)",
       border: "rgba(56,189,248,0.22)",
       accent: "#e2e8f0",
+      scoreBg: "rgba(15,23,42,0.86)",
+      scoreBorder: "rgba(56,189,248,0.22)",
+      chipBg: "rgba(15,23,42,0.84)",
+      chipBorder: "rgba(56,189,248,0.18)",
       label: "Tahmin",
     };
   }
+
   const pts = Number(pred.points || 0);
   if (pts >= 3) {
     return {
-      bg: "rgba(16,185,129,0.18)",
-      border: "rgba(16,185,129,0.34)",
+      ...neutralCard,
       accent: "#dcfce7",
+      scoreBg: "rgba(22,101,52,0.72)",
+      scoreBorder: "rgba(74,222,128,0.42)",
+      chipBg: "rgba(22,101,52,0.70)",
+      chipBorder: "rgba(74,222,128,0.34)",
       label: "Tam skor",
     };
   }
   if (pts >= 1) {
     return {
-      bg: "rgba(245,158,11,0.18)",
-      border: "rgba(245,158,11,0.34)",
+      ...neutralCard,
       accent: "#fef3c7",
+      scoreBg: "rgba(202,138,4,0.75)",
+      scoreBorder: "rgba(250,204,21,0.50)",
+      chipBg: "rgba(202,138,4,0.70)",
+      chipBorder: "rgba(250,204,21,0.40)",
       label: "Yakın",
     };
   }
   return {
-    bg: "rgba(239,68,68,0.16)",
-    border: "rgba(239,68,68,0.32)",
+    ...neutralCard,
     accent: "#fee2e2",
+    scoreBg: "rgba(153,27,27,0.70)",
+    scoreBorder: "rgba(248,113,113,0.40)",
+    chipBg: "rgba(153,27,27,0.64)",
+    chipBorder: "rgba(248,113,113,0.32)",
     label: "0 puan",
   };
 }
@@ -1200,35 +1223,51 @@ async function createPredictionShareExportCanvas(
         playerColW - 20,
         rowH - 20,
         16,
-        "rgba(2,6,23,0.12)",
+        shareView === "post" ? "rgba(2,6,23,0.10)" : "rgba(2,6,23,0.12)",
         palette.border,
       );
+
+      const scoreBoxW = Math.min(playerColW - 48, 92);
+      const scoreBoxH = 34;
+      fillRoundedRect(
+        ctx,
+        cellX + playerColW / 2 - scoreBoxW / 2,
+        rowY + 15,
+        scoreBoxW,
+        scoreBoxH,
+        17,
+        shareView === "post" ? palette.scoreBg : "rgba(15,23,42,0.86)",
+        shareView === "post" ? palette.scoreBorder : palette.border,
+      );
       ctx.fillStyle = palette.accent;
-      ctx.font = "900 28px Inter, Arial, sans-serif";
+      ctx.font = "900 24px Inter, Arial, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(
         getPredictionDisplayValue(pred),
         cellX + playerColW / 2,
-        rowY + 38,
+        rowY + 39,
       );
-      ctx.font = "800 13px Inter, Arial, sans-serif";
-      ctx.fillStyle = shareView === "post" ? palette.accent : "#bfdbfe";
+
       const status =
         shareView === "post"
           ? palette.label
           : pred.homePred !== "" && pred.awayPred !== ""
             ? "Tahmin var"
             : "Tahmin yok";
-      ctx.fillText(status, cellX + playerColW / 2, rowY + 58);
-      if (shareView === "post") {
-        ctx.font = "900 13px Inter, Arial, sans-serif";
-        ctx.fillStyle = Number(pred.points || 0) > 0 ? "#ffffff" : "#cbd5e1";
-        ctx.fillText(
-          `${pred.homePred !== "" && pred.awayPred !== "" ? Number(pred.points || 0) : 0}P`,
-          cellX + playerColW / 2,
-          rowY + 74,
-        );
-      }
+      const chipW = Math.min(playerColW - 44, 104);
+      fillRoundedRect(
+        ctx,
+        cellX + playerColW / 2 - chipW / 2,
+        rowY + 55,
+        chipW,
+        20,
+        10,
+        shareView === "post" ? palette.chipBg : "rgba(15,23,42,0.84)",
+        shareView === "post" ? palette.chipBorder : "rgba(56,189,248,0.18)",
+      );
+      ctx.font = "800 12px Inter, Arial, sans-serif";
+      ctx.fillStyle = shareView === "post" ? palette.accent : "#bfdbfe";
+      ctx.fillText(status, cellX + playerColW / 2, rowY + 69);
       ctx.textAlign = "left";
     });
   }

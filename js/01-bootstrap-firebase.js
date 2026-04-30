@@ -3550,6 +3550,7 @@ async function loginUser() {
     state.settings.auth.isAuthenticated = true;
     state.settings.auth.role = role;
     setAuthenticatedUser(nextUser);
+    forceDefaultLandingAfterLogin("login-before-hydration");
 
     setLoginFeedback(
       "success",
@@ -3567,6 +3568,14 @@ async function loginUser() {
     await runSessionHydrationWithFastOverlay({
       loadingMessage: "Kayıtlı veriler açılıyor, güncel bilgiler yükleniyor...",
     });
+
+    forceDefaultLandingAfterLogin("login-after-hydration");
+    saveState(true);
+    switchTab("dashboard", {
+      skipPersistPrevious: true,
+      skipViewportRestore: true,
+    });
+    renderAll();
 
     window.setTimeout(() => {
       showWelcomeOverlay(nextUser, { duration: 4000 });

@@ -1,5 +1,5 @@
 :root {
-  --bg: #07111f;
+  --bg: #253246d0;
   --bg-2: #0c1628;
   --panel: #111827;
   --panel-2: #162133;
@@ -29,7 +29,7 @@ body {
   padding: 0;
   min-height: 100%;
   font-family: Inter, Arial, sans-serif;
-  background: linear-gradient(180deg, var(--bg) 0%, #091423 100%);
+  background: linear-gradient(180deg, var(--bg) 0%, #09142354 100%);
   color: var(--text);
 }
 
@@ -106,8 +106,8 @@ option {
   border-right: 1px solid var(--line);
   background: linear-gradient(
     180deg,
-    rgba(4, 11, 22, 0.92),
-    rgba(4, 11, 22, 0.78)
+    rgba(4, 11, 22, 0.425),
+    rgba(4, 11, 22, 0.781)
   );
   backdrop-filter: blur(18px);
   display: flex;
@@ -515,8 +515,6 @@ option {
   font-weight: 700;
   line-height: 1.2;
 }
-
-
 
 .team-logo-img,
 .team-logo {
@@ -989,8 +987,16 @@ option {
   min-height: 260px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background:
-    radial-gradient(circle at top right, rgba(56, 189, 248, 0.22), transparent 34%),
-    radial-gradient(circle at bottom left, rgba(250, 204, 21, 0.18), transparent 30%),
+    radial-gradient(
+      circle at top right,
+      rgba(56, 189, 248, 0.22),
+      transparent 34%
+    ),
+    radial-gradient(
+      circle at bottom left,
+      rgba(250, 204, 21, 0.18),
+      transparent 30%
+    ),
     linear-gradient(180deg, rgba(11, 18, 34, 0.98), rgba(7, 10, 20, 0.98));
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.28);
 }
@@ -1118,7 +1124,11 @@ option {
 .stats-deep-card,
 .player-stat-card {
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.025));
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.05),
+    rgba(255, 255, 255, 0.025)
+  );
   box-shadow: 0 18px 34px rgba(0, 0, 0, 0.16);
 }
 
@@ -5925,10 +5935,8 @@ body.login-locked {
   opacity: 0.05;
 }
 
-
 .player-card-supported-team-bg .team-logo-img,
 .player-card-supported-team-bg .team-logo,
-
 .player-card-supported-team-bg__wrap .team-logo-img,
 .player-card-supported-team-bg__wrap .team-logo {
   width: 270px;
@@ -6148,10 +6156,8 @@ body.login-locked {
     opacity: 0.05;
   }
 
-
   .player-card-supported-team-bg .team-logo-img,
   .player-card-supported-team-bg .team-logo,
-
   .player-card-supported-team-bg__wrap .team-logo-img,
   .player-card-supported-team-bg__wrap .team-logo {
     width: 200px;
@@ -6701,8 +6707,6 @@ body.login-locked {
   text-align: center;
 }
 
-
-
 .dashboard-team strong {
   font-size: 14px;
   line-height: 1.35;
@@ -6770,7 +6774,6 @@ body.login-locked {
 }
 
 .dashboard-avatar-row {
-  
   margin-top: 12px;
 }
 
@@ -6813,7 +6816,9 @@ body.login-locked {
 .dashboard-avatar-chip.is-filled {
   background: rgba(34, 197, 94, 0.18);
   border: 2px solid rgba(34, 197, 94, 0.95);
-  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.16), 0 0 10px rgba(34, 197, 94, 0.28);
+  box-shadow:
+    0 0 0 2px rgba(34, 197, 94, 0.16),
+    0 0 10px rgba(34, 197, 94, 0.28);
 }
 
 .dashboard-detail-modal.hidden {
@@ -7260,8 +7265,6 @@ body.dashboard-modal-open {
   gap: 8px;
 }
 
-
-
 .dashboard-team .team-logo,
 .dashboard-team .team-logo-img {
   width: 42px;
@@ -7435,7 +7438,6 @@ body.dashboard-modal-open {
     gap: 6px;
     padding: 8px 0 6px;
   }
-
 
   .dashboard-team .team-logo,
   .dashboard-team .team-logo-img {
@@ -8213,8 +8215,6 @@ body.dashboard-modal-open {
   border-color: rgba(34, 197, 94, 0.28);
 }
 
-
-
 .dashboard-match-card__top {
   align-items: flex-start;
 }
@@ -8406,7 +8406,6 @@ body.dashboard-modal-open {
     padding: 8px 0;
   }
 
- 
   .dashboard-team .team-logo,
   .dashboard-team .team-logo-img {
     width: 36px;
@@ -8442,7 +8441,6 @@ body.dashboard-modal-open {
   .dashboard-match-meta-pills {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
-
 
   .dashboard-side-stack {
     grid-template-columns: 1fr;
@@ -9271,7 +9269,6 @@ body.dashboard-modal-open {
   .standings-insights-grid--luxury {
     grid-template-columns: 1fr;
   }
-  
 }
 
 /* === Standings B-mode polish v2 === */
@@ -10388,7 +10385,6 @@ body.dashboard-modal-open {
   box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.95);
 }
 
-
 .dashboard-inline-avatar.app-avatar {
   width: 26px;
   height: 26px;
@@ -10630,9 +10626,8 @@ body.dashboard-modal-open {
   box-shadow:
     0 12px 24px rgba(0, 0, 0, 0.24),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}.account-trigger-avatar,
-
-
+}
+.account-trigger-avatar,
 .account-trigger-avatar .app-avatar-image,
 .mobile-top-profile-avatar .app-avatar-image,
 .account-trigger-avatar .app-avatar-fallback,
@@ -10678,7 +10673,6 @@ body.dashboard-modal-open {
   }
 
   .desktop-account-trigger {
-    
     min-height: 58px;
     padding: 8px 10px;
     border-radius: 18px;
@@ -10776,7 +10770,7 @@ body.dashboard-modal-open {
   }
 
   .desktop-topbar .desktop-account-trigger {
-margin-top: -20px;
+    margin-top: -20px;
     min-height: 50px !important;
     padding: 9px 12px;
     border-radius: 18px;
@@ -11033,8 +11027,6 @@ margin-top: -20px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
-
-
 
 .player-supported-team-visual .team-logo,
 .player-supported-team-visual .team-logo-img {
@@ -11326,7 +11318,6 @@ body.player-modal-open {
   opacity: 0.1;
 }
 
-
 .podium-supported-team-logo .team-logo-img,
 .podium-supported-team-logo .team-logo {
   width: 210px;
@@ -11341,7 +11332,6 @@ body.player-modal-open {
   height: 600px;
   opacity: 0.2;
 }
-
 
 .podium-rank-1 .podium-supported-team-logo .team-logo-img,
 .podium-rank-1 .podium-supported-team-logo .team-logo {
@@ -12437,7 +12427,7 @@ body.player-modal-open {
 
   .desktop-topbar__spacer {
     height: 100px;
-margin-top: -5px;
+    margin-top: -5px;
     border-radius: 24px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     background:
@@ -12794,7 +12784,11 @@ margin-top: -5px;
   padding: 10px 14px;
   border-radius: 14px;
   border: 1px solid rgba(56, 189, 248, 0.18);
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.86), rgba(8, 47, 73, 0.55));
+  background: linear-gradient(
+    135deg,
+    rgba(15, 23, 42, 0.86),
+    rgba(8, 47, 73, 0.55)
+  );
   color: rgba(226, 232, 240, 0.92);
   font-size: 12px;
   line-height: 1.45;
@@ -12815,53 +12809,53 @@ margin-top: -5px;
   border-color: rgba(56, 189, 248, 0.18);
 }
 
-  .dashboard-card-kickoff {
-    display: none;
+.dashboard-card-kickoff {
+  display: none;
+}
+@media (max-width: 720px) {
+  .account-trigger-avatar,
+  .mobile-top-profile-avatar {
+    width: 56px;
+    height: 56px;
+    flex: 0 0 56px;
+    border-radius: 14px;
   }
-  @media (max-width: 720px) {
-    .account-trigger-avatar,
-    .mobile-top-profile-avatar {
-      width: 56px;
-      height: 56px;
-      flex: 0 0 56px;
-      border-radius: 14px;
-    }
-  
-    .account-trigger-avatar .app-avatar,
-    .mobile-top-profile-avatar .app-avatar {
-      border-radius: 14px;
-    }
+
+  .account-trigger-avatar .app-avatar,
+  .mobile-top-profile-avatar .app-avatar {
+    border-radius: 14px;
   }
-  img.team-logo-img {
-    width: 50px !important;
-    height: 50px !important;
-    padding: 0 !important;
-    object-fit: contain;
-    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.25));
-  }
-  .dashboard-team {
-    gap: 12px;
-  }
-  .dashboard-team img.team-logo-img {
-    width: 46px;
-    height: 46px;
-    padding: 0;
-    background: transparent;
-    border: none;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.35);
-    object-fit: contain;
-  }
-  img.team-logo-img {
-    width: 46px;
-    height: 46px;
-    padding: 0 !important;
-    background: transparent !important;
-    border: none !important;
-    object-fit: contain;
-  
-    /* premium görünüm */
-    filter: drop-shadow(0 4px 10px rgba(0,0,0,0.45));
-  }
+}
+img.team-logo-img {
+  width: 50px !important;
+  height: 50px !important;
+  padding: 0 !important;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.25));
+}
+.dashboard-team {
+  gap: 12px;
+}
+.dashboard-team img.team-logo-img {
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+  object-fit: contain;
+}
+img.team-logo-img {
+  width: 46px;
+  height: 46px;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  object-fit: contain;
+
+  /* premium görünüm */
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.45));
+}
 /* =========================================
    SIRALAMA KARTLARI - KOMPAKT İNCE DÜZELTME
    Sadece haftalık ve genel sıralama kartları
@@ -12927,7 +12921,6 @@ margin-top: -5px;
   min-width: 62px !important;
 
   right: 30px;
-
 }
 
 #tab-standings .leaderboard-score-block strong {
@@ -12935,15 +12928,14 @@ margin-top: -5px;
   line-height: 1 !important;
   margin-left: 1px;
 
-position: static;
+  position: static;
 }
 
 #tab-standings .leaderboard-score-block span {
   font-size: 9px !important;
   margin-left: 10px;
-text-align: left;
-position: static;
-
+  text-align: left;
+  position: static;
 }
 
 #tab-standings .leaderboard-supported-team-logo {
@@ -13031,4 +13023,1419 @@ body[data-role="user"] #tab-players .page-header p {
   color: rgba(226, 232, 240, 0.78);
   font-size: 12px;
   font-weight: 800;
+}
+
+/* =========================================================
+   Tahminler PC profesyonel görünüm düzeltmesi
+   - Sadece masaüstü tahmin tablosu için çalışır
+   - Mobil kartlara dokunmaz
+========================================================= */
+@media (min-width: 769px) {
+  #tab-predictions .excel-predictions {
+    --prediction-match-col: 410px;
+    --prediction-player-col-min: 220px;
+  }
+
+  #tab-predictions .prediction-grid-head > div,
+  #tab-predictions .prediction-grid-row > div {
+    padding: 8px 10px;
+  }
+
+  #tab-predictions .match-sticky-cell {
+    min-width: var(--prediction-match-col);
+    width: var(--prediction-match-col);
+    max-width: var(--prediction-match-col);
+    padding: 0;
+    align-content: stretch;
+    background: linear-gradient(
+      135deg,
+      rgba(18, 31, 49, 0.98),
+      rgba(14, 25, 40, 0.98)
+    );
+  }
+
+  #tab-predictions .desktop-prediction-match-card {
+    position: relative;
+    min-height: 82px;
+    height: 100%;
+    padding: 22px 12px 10px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+  }
+
+  #tab-predictions .desktop-prediction-match-date {
+    position: absolute;
+    top: 6px;
+    left: 10px;
+    z-index: 2;
+    max-width: calc(100% - 20px);
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: rgba(2, 6, 23, 0.48);
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    color: rgba(226, 232, 240, 0.86);
+    font-size: 10.5px;
+    font-weight: 800;
+    line-height: 1.25;
+    white-space: nowrap;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.16);
+  }
+
+  #tab-predictions .desktop-prediction-match-inner {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(92px, 1fr) 102px minmax(92px, 1fr);
+    align-items: center;
+    gap: 10px;
+  }
+
+  #tab-predictions .desktop-prediction-team {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    text-align: center;
+  }
+
+  #tab-predictions .desktop-prediction-team .team-logo,
+  #tab-predictions .desktop-prediction-team .team-logo-img,
+  #tab-predictions .desktop-prediction-team img {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    max-width: 42px;
+    max-height: 42px;
+    object-fit: contain;
+  }
+
+  #tab-predictions .desktop-prediction-team .team-name {
+    width: 100%;
+    max-width: 116px;
+    font-size: 11px;
+    line-height: 1.15;
+    font-weight: 800;
+    text-align: center;
+  }
+
+  #tab-predictions .desktop-prediction-score {
+    min-width: 86px;
+    justify-self: center;
+    padding: 8px 10px;
+    border-radius: 15px;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.12),
+      rgba(255, 255, 255, 0.055)
+    );
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    color: #f8fafc;
+    font-size: 25px;
+    font-weight: 950;
+    line-height: 1;
+    text-align: center;
+    letter-spacing: -0.04em;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 14px 26px rgba(0, 0, 0, 0.16);
+  }
+
+  #tab-predictions .prediction-cell {
+    min-height: 82px;
+    padding: 12px 10px 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    overflow: visible;
+  }
+
+  #tab-predictions .prediction-cell.has-point-badge {
+    padding-top: 14px;
+  }
+
+  #tab-predictions .desktop-prediction-control {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  #tab-predictions .pred-score-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    flex: 0 0 auto;
+  }
+
+  #tab-predictions .pred-score-row input {
+    width: 36px;
+    height: 30px;
+    padding: 0 4px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 850;
+    text-align: center;
+  }
+
+  #tab-predictions .pred-score-row span {
+    width: 8px;
+    text-align: center;
+    color: rgba(226, 232, 240, 0.78);
+    font-weight: 900;
+  }
+
+  #tab-predictions .desktop-icon-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 5px;
+    min-width: 58px;
+    flex: 0 0 58px;
+  }
+
+  #tab-predictions .desktop-icon-actions .prediction-action-btn,
+  #tab-predictions .desktop-icon-actions .prediction-delete-btn {
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+    padding: 0;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0 !important;
+    line-height: 1;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: rgba(255, 255, 255, 0.065);
+    color: #e5e7eb;
+    box-shadow: none;
+    transform: none;
+  }
+
+  #tab-predictions .desktop-icon-actions .prediction-action-btn::before {
+    content: "+";
+    font-size: 18px;
+    font-weight: 900;
+    line-height: 1;
+  }
+
+  #tab-predictions
+    .desktop-icon-actions
+    .prediction-action-btn.is-dirty::before {
+    content: "↻";
+    font-size: 15px;
+  }
+
+  #tab-predictions
+    .desktop-icon-actions
+    .prediction-action-btn.is-saving::before,
+  #tab-predictions
+    .desktop-icon-actions
+    .prediction-action-btn.is-queued::before {
+    content: "…";
+    font-size: 18px;
+  }
+
+  #tab-predictions
+    .desktop-icon-actions
+    .prediction-action-btn.is-saved::before {
+    content: "✓";
+    font-size: 15px;
+  }
+
+  #tab-predictions
+    .desktop-icon-actions
+    .prediction-action-btn.is-error::before {
+    content: "!";
+    font-size: 16px;
+  }
+
+  #tab-predictions .desktop-icon-actions .prediction-delete-btn::before {
+    content: "🗑";
+    font-size: 13px;
+    line-height: 1;
+  }
+
+  #tab-predictions .desktop-icon-actions .prediction-action-btn:hover,
+  #tab-predictions .desktop-icon-actions .prediction-delete-btn:hover {
+    background: rgba(255, 255, 255, 0.13);
+    border-color: rgba(255, 255, 255, 0.28);
+  }
+
+  #tab-predictions .desktop-icon-actions .prediction-delete-btn {
+    background: rgba(239, 68, 68, 0.14);
+    border-color: rgba(239, 68, 68, 0.28);
+  }
+
+  #tab-predictions .desktop-icon-actions .is-hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  #tab-predictions .pred-status-slot {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    min-height: 18px;
+  }
+
+  #tab-predictions .prediction-status-chip {
+    max-width: 150px;
+    min-height: 17px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #tab-predictions .points-badge-inline {
+    top: 5px;
+    left: 5px;
+    min-width: 28px;
+    height: 17px;
+    padding: 0 6px;
+    font-size: 10px;
+  }
+}
+
+/* =========================================================
+   TAHMINLER PC FINAL DOKUNUS - 29.04
+   Mobil tarafa dokunmaz. Inputlar merkezde, ikonlar yanında.
+   ========================================================= */
+@media (min-width: 769px) {
+  #tab-predictions .prediction-grid-head > div,
+  #tab-predictions .prediction-grid-row > div {
+    padding-top: 7px;
+    padding-bottom: 7px;
+  }
+
+  #tab-predictions .desktop-prediction-match-card {
+    min-height: 76px;
+    padding: 26px 14px 9px;
+    align-items: center;
+  }
+
+  #tab-predictions .desktop-prediction-match-date {
+    top: 6px;
+    left: 14px;
+    font-size: 9.5px;
+    line-height: 1.15;
+    padding: 2px 6px;
+    opacity: 0.92;
+    transform: none;
+  }
+
+  #tab-predictions .desktop-prediction-match-inner {
+    grid-template-columns: minmax(92px, 1fr) 94px minmax(92px, 1fr);
+    gap: 12px;
+    align-items: center;
+  }
+
+  #tab-predictions .desktop-prediction-team {
+    gap: 4px;
+    min-height: 55px;
+  }
+
+  #tab-predictions .desktop-prediction-team .team-logo,
+  #tab-predictions .desktop-prediction-team .team-logo-img,
+  #tab-predictions .desktop-prediction-team img {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    max-width: 38px;
+    max-height: 38px;
+  }
+
+  #tab-predictions .desktop-prediction-team .team-name {
+    max-width: 118px;
+    font-size: 10.5px;
+    line-height: 1.1;
+  }
+
+  #tab-predictions .desktop-prediction-score {
+    min-width: 78px;
+    padding: 7px 10px;
+    border-radius: 14px;
+    font-size: 24px;
+  }
+
+  #tab-predictions .prediction-cell {
+    min-height: 76px;
+    padding: 9px 10px 7px;
+    justify-content: center;
+    overflow: visible;
+  }
+
+  #tab-predictions .prediction-cell.has-point-badge {
+    padding-top: 12px;
+  }
+
+  #tab-predictions .desktop-prediction-control {
+    position: relative;
+    width: max-content;
+    max-width: 100%;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+  }
+
+  #tab-predictions .pred-score-row {
+    position: relative;
+    z-index: 1;
+    margin: 0 auto;
+  }
+
+  #tab-predictions .pred-score-row input {
+    width: 34px;
+    height: 28px;
+    border-radius: 10px;
+    font-size: 13.5px;
+  }
+
+  #tab-predictions .desktop-icon-actions {
+    position: absolute;
+    left: calc(100% + 10px);
+    top: 50%;
+    transform: translateY(-50%);
+    width: auto;
+    min-width: 0;
+    flex: 0 0 auto;
+    gap: 5px;
+  }
+
+  #tab-predictions .desktop-icon-actions.is-disabled-actions {
+    display: none;
+  }
+
+  #tab-predictions .desktop-icon-actions .prediction-action-btn,
+  #tab-predictions .desktop-icon-actions .prediction-delete-btn {
+    width: 25px;
+    height: 25px;
+    min-width: 25px;
+    opacity: 0.92;
+  }
+
+  #tab-predictions .desktop-icon-actions .prediction-action-btn.is-hidden,
+  #tab-predictions .desktop-icon-actions .prediction-delete-btn.is-hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  #tab-predictions
+    .prediction-cell:hover
+    .desktop-icon-actions
+    .prediction-action-btn:not(.is-hidden),
+  #tab-predictions
+    .prediction-cell:hover
+    .desktop-icon-actions
+    .prediction-delete-btn:not(.is-hidden),
+  #tab-predictions .desktop-icon-actions .prediction-action-btn.is-dirty,
+  #tab-predictions .desktop-icon-actions .prediction-action-btn.is-saving,
+  #tab-predictions .desktop-icon-actions .prediction-action-btn.is-queued,
+  #tab-predictions .desktop-icon-actions .prediction-action-btn.is-error,
+  #tab-predictions
+    .desktop-icon-actions
+    .prediction-delete-btn:not(.is-hidden) {
+    opacity: 1;
+  }
+
+  #tab-predictions .pred-status-slot {
+    min-height: 16px;
+    margin-top: 4px;
+  }
+
+  #tab-predictions .prediction-status-chip {
+    max-width: 150px;
+    min-height: 15px;
+    padding: 1px 8px;
+    font-size: 9.5px;
+    line-height: 1.15;
+  }
+}
+
+/* =========================================================
+   TAHMINLER PC PREMIUM SIKI GÖRÜNÜM - 29.04 son düzenleme
+   Sadece masaüstü tahmin tablosunu etkiler, mobil kartlara dokunmaz.
+   Tarih artık skor/maç etiketinin üstünde ortada durur.
+   ========================================================= */
+@media (min-width: 769px) {
+  #tab-predictions .excel-predictions {
+    --prediction-match-col: 410px;
+    --prediction-player-col-min: 220px;
+  }
+
+  #tab-predictions .prediction-grid-head > div,
+  #tab-predictions .prediction-grid-row > div {
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+
+  #tab-predictions .match-sticky-cell {
+    padding: 0 !important;
+  }
+
+  #tab-predictions .desktop-prediction-match-card {
+    min-height: 64px !important;
+    height: 100%;
+    padding: 6px 12px !important;
+    display: flex;
+    align-items: center;
+  }
+
+  #tab-predictions .desktop-prediction-match-date {
+    display: none !important;
+  }
+
+  #tab-predictions .desktop-prediction-match-inner {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(92px, 1fr) 92px minmax(92px, 1fr) !important;
+    align-items: center;
+    gap: 10px !important;
+  }
+
+  #tab-predictions .desktop-prediction-team {
+    min-height: 50px !important;
+    gap: 3px !important;
+  }
+
+  #tab-predictions .desktop-prediction-team .team-logo,
+  #tab-predictions .desktop-prediction-team .team-logo-img,
+  #tab-predictions .desktop-prediction-team img {
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+    max-width: 34px !important;
+    max-height: 34px !important;
+  }
+
+  #tab-predictions .desktop-prediction-team .team-name {
+    max-width: 118px;
+    font-size: 10px !important;
+    line-height: 1.05 !important;
+    min-height: 11px;
+  }
+
+  #tab-predictions .desktop-prediction-center {
+    min-width: 86px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+  }
+
+  #tab-predictions .desktop-prediction-date-pill {
+    max-width: 110px;
+    padding: 3px 6px;
+    border-radius: 999px;
+    background: rgba(2, 6, 23, 0.58);
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    color: rgba(226, 232, 240, 0.9);
+    font-size: 9.5px;
+    font-weight: 700;
+    line-height: 1.2;
+
+    white-space: normal; /* ⬅️ kritik */
+    text-align: center; /* ⬅️ ortala */
+  }
+
+  #tab-predictions .desktop-prediction-score {
+    min-width: 70px !important;
+    padding: 6px 9px !important;
+    border-radius: 13px !important;
+    font-size: 22px !important;
+    line-height: 0.95 !important;
+  }
+
+  #tab-predictions .prediction-cell {
+    min-height: 64px !important;
+    padding: 7px 10px 5px !important;
+    justify-content: center;
+    overflow: visible;
+  }
+
+  #tab-predictions .prediction-cell.has-point-badge {
+    padding-top: 9px !important;
+  }
+
+  #tab-predictions .desktop-prediction-control {
+    position: relative;
+    width: max-content;
+    max-width: 100%;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #tab-predictions .pred-score-row input {
+    width: 33px !important;
+    height: 27px !important;
+    border-radius: 10px !important;
+    font-size: 13px !important;
+  }
+
+  #tab-predictions .desktop-icon-actions {
+    position: absolute;
+    left: calc(100% + 8px);
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    width: auto;
+    min-width: 0;
+  }
+
+  #tab-predictions .desktop-icon-actions .prediction-action-btn,
+  #tab-predictions .desktop-icon-actions .prediction-delete-btn {
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px !important;
+  }
+
+  #tab-predictions .desktop-icon-actions .prediction-action-btn:not(.is-hidden),
+  #tab-predictions .desktop-icon-actions .prediction-action-btn.is-dirty,
+  #tab-predictions .desktop-icon-actions .prediction-action-btn.is-saving,
+  #tab-predictions .desktop-icon-actions .prediction-action-btn.is-queued,
+  #tab-predictions .desktop-icon-actions .prediction-action-btn.is-error {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+  }
+
+  #tab-predictions .pred-status-slot {
+    min-height: 14px !important;
+    margin-top: 3px !important;
+  }
+
+  #tab-predictions .prediction-status-chip {
+    max-width: 150px;
+    min-height: 14px !important;
+    padding: 1px 7px !important;
+    font-size: 9px !important;
+    line-height: 1.05 !important;
+  }
+
+  #tab-predictions .points-badge-inline {
+    top: 4px !important;
+    left: 5px !important;
+    min-width: 26px !important;
+    height: 16px !important;
+    padding: 0 5px !important;
+    font-size: 9px !important;
+  }
+}
+#tab-predictions .team-logo-img {
+  background: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  border: 0 !important;
+  object-fit: contain;
+}
+#tab-predictions .team-logo,
+#tab-predictions .fallback-logo {
+  border-radius: 0 !important;
+
+  box-shadow: none !important;
+}
+/* =========================================================
+   TAHMINLER PC - PROFESYONEL AKSIYON BUTONLARI
+   Sadece masaüstü tahmin tablosunu etkiler, mobil görünüm değişmez.
+   ========================================================= */
+@media (min-width: 769px) {
+  #tab-predictions .prediction-cell {
+    position: relative;
+  }
+
+  #tab-predictions .desktop-prediction-control {
+    display: grid !important;
+    grid-template-columns: auto auto;
+    align-items: center !important;
+    justify-content: center !important;
+    column-gap: 8px !important;
+    width: max-content !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    position: relative !important;
+  }
+
+  #tab-predictions .pred-score-row {
+    grid-column: 1;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    position: relative !important;
+    z-index: 2;
+  }
+
+  #tab-predictions .pred-score-row input {
+    width: 34px !important;
+    height: 28px !important;
+    border-radius: 11px !important;
+    border: 1px solid rgba(148, 163, 184, 0.24) !important;
+    background: rgba(2, 6, 23, 0.56) !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 8px 18px rgba(0, 0, 0, 0.16) !important;
+  }
+
+  #tab-predictions .pred-score-row input:focus {
+    border-color: rgba(56, 189, 248, 0.95) !important;
+    box-shadow:
+      0 0 0 3px rgba(14, 165, 233, 0.18),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 10px 22px rgba(14, 165, 233, 0.12) !important;
+  }
+
+  #tab-predictions .pred-score-row span {
+    width: 8px !important;
+    color: rgba(226, 232, 240, 0.75) !important;
+    font-weight: 950 !important;
+  }
+
+  #tab-predictions .desktop-icon-actions {
+    grid-column: 2;
+    position: static !important;
+    transform: none !important;
+    display: inline-flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 4px !important;
+    min-width: 0 !important;
+    width: auto !important;
+    padding: 3px !important;
+    border-radius: 999px !important;
+    background: rgba(15, 23, 42, 0.4) !important;
+    border: 1px solid rgba(148, 163, 184, 0.14) !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      0 10px 24px rgba(0, 0, 0, 0.12) !important;
+    opacity: 0.78;
+    transition:
+      opacity 0.18s ease,
+      background 0.18s ease,
+      border-color 0.18s ease;
+  }
+
+  #tab-predictions .prediction-cell:hover .desktop-icon-actions,
+  #tab-predictions .desktop-icon-actions:focus-within,
+  #tab-predictions .desktop-icon-actions:has(.prediction-action-btn.is-dirty),
+  #tab-predictions .desktop-icon-actions:has(.prediction-action-btn.is-saving),
+  #tab-predictions .desktop-icon-actions:has(.prediction-action-btn.is-queued),
+  #tab-predictions .desktop-icon-actions:has(.prediction-action-btn.is-error) {
+    opacity: 1;
+    background: rgba(15, 23, 42, 0.68) !important;
+    border-color: rgba(56, 189, 248, 0.2) !important;
+  }
+
+  #tab-predictions .desktop-icon-actions.is-disabled-actions {
+    display: none !important;
+  }
+
+  #tab-predictions .desktop-icon-actions .prediction-action-btn,
+  #tab-predictions .desktop-icon-actions .prediction-delete-btn {
+    position: relative !important;
+    width: 25px !important;
+    height: 25px !important;
+    min-width: 25px !important;
+    padding: 0 !important;
+    border-radius: 999px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 0 !important;
+    line-height: 1 !important;
+    color: #e5f2ff !important;
+    background: rgba(30, 41, 59, 0.74) !important;
+    border: 1px solid rgba(148, 163, 184, 0.2) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    transform: none !important;
+    transition:
+      transform 0.16s ease,
+      background 0.16s ease,
+      border-color 0.16s ease,
+      box-shadow 0.16s ease,
+      opacity 0.16s ease,
+      width 0.16s ease,
+      min-width 0.16s ease;
+  }
+
+  #tab-predictions .desktop-icon-actions .prediction-action-btn::before {
+    content: "+" !important;
+    font-size: 17px !important;
+    font-weight: 950 !important;
+    line-height: 1 !important;
+    transform: translateY(-1px);
+  }
+
+  #tab-predictions
+    .desktop-icon-actions
+    .prediction-action-btn.is-dirty::before {
+    content: "✓" !important;
+    font-size: 14px !important;
+    transform: none;
+  }
+
+  #tab-predictions
+    .desktop-icon-actions
+    .prediction-action-btn.is-saving::before,
+  #tab-predictions
+    .desktop-icon-actions
+    .prediction-action-btn.is-queued::before {
+    content: "…" !important;
+    font-size: 18px !important;
+    transform: translateY(-2px);
+  }
+
+  #tab-predictions
+    .desktop-icon-actions
+    .prediction-action-btn.is-saved::before {
+    content: "✓" !important;
+    font-size: 14px !important;
+    transform: none;
+  }
+
+  #tab-predictions
+    .desktop-icon-actions
+    .prediction-action-btn.is-error::before {
+    content: "!" !important;
+    font-size: 15px !important;
+    transform: none;
+  }
+
+  #tab-predictions .desktop-icon-actions .prediction-action-btn {
+    background: linear-gradient(
+      135deg,
+      rgba(14, 165, 233, 0.32),
+      rgba(34, 197, 94, 0.22)
+    ) !important;
+    border-color: rgba(125, 211, 252, 0.34) !important;
+  }
+
+  #tab-predictions .desktop-icon-actions .prediction-action-btn.is-dirty {
+    background: linear-gradient(
+      135deg,
+      rgba(34, 197, 94, 0.35),
+      rgba(16, 185, 129, 0.24)
+    ) !important;
+    border-color: rgba(74, 222, 128, 0.38) !important;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.09) !important;
+  }
+
+  #tab-predictions .desktop-icon-actions .prediction-action-btn:hover {
+    transform: translateY(-1px) scale(1.05) !important;
+    border-color: rgba(125, 211, 252, 0.7) !important;
+    box-shadow: 0 10px 22px rgba(14, 165, 233, 0.16) !important;
+  }
+
+  #tab-predictions .desktop-icon-actions .prediction-delete-btn {
+    background: rgba(127, 29, 29, 0.28) !important;
+    border-color: rgba(248, 113, 113, 0.24) !important;
+    color: #fecaca !important;
+  }
+
+  #tab-predictions .desktop-icon-actions .prediction-delete-btn::before {
+    content: "" !important;
+    width: 12px;
+    height: 12px;
+    background: currentColor;
+    opacity: 0.95;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6h18'/%3E%3Cpath d='M8 6V4h8v2'/%3E%3Cpath d='M19 6l-1 14H6L5 6'/%3E%3Cpath d='M10 11v6'/%3E%3Cpath d='M14 11v6'/%3E%3C/svg%3E")
+      center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6h18'/%3E%3Cpath d='M8 6V4h8v2'/%3E%3Cpath d='M19 6l-1 14H6L5 6'/%3E%3Cpath d='M10 11v6'/%3E%3Cpath d='M14 11v6'/%3E%3C/svg%3E")
+      center / contain no-repeat;
+  }
+
+  #tab-predictions .desktop-icon-actions .prediction-delete-btn:hover {
+    transform: translateY(-1px) scale(1.05) !important;
+    background: rgba(239, 68, 68, 0.28) !important;
+    border-color: rgba(248, 113, 113, 0.58) !important;
+    box-shadow: 0 10px 22px rgba(239, 68, 68, 0.14) !important;
+  }
+
+  #tab-predictions .desktop-icon-actions .prediction-action-btn.is-hidden,
+  #tab-predictions .desktop-icon-actions .prediction-delete-btn.is-hidden {
+    width: 0 !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    border-width: 0 !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    overflow: hidden !important;
+  }
+
+  /* Çöp kutusu sadece tahmin varsa vardır; temiz görünüm için satıra gelince belirginleşir. */
+  #tab-predictions
+    .desktop-icon-actions
+    .prediction-delete-btn:not(.is-hidden) {
+    opacity: 0.38 !important;
+  }
+
+  #tab-predictions
+    .prediction-cell:hover
+    .desktop-icon-actions
+    .prediction-delete-btn:not(.is-hidden),
+  #tab-predictions
+    .desktop-icon-actions:focus-within
+    .prediction-delete-btn:not(.is-hidden) {
+    opacity: 1 !important;
+  }
+
+  #tab-predictions .prediction-status-chip {
+    max-width: 158px !important;
+    background: rgba(51, 65, 85, 0.58) !important;
+    border: 1px solid rgba(148, 163, 184, 0.14) !important;
+    color: rgba(226, 232, 240, 0.9) !important;
+  }
+}
+
+/* =========================================================
+   TAHMINLER SAYFASI - PREMIUM MAÇ MERKEZİ TASARIMI
+   29.04 ChatGPT görsel revizyonu / sadece masaüstü tahmin sayfası
+   ========================================================= */
+@media (min-width: 769px) {
+  #tab-predictions .predictions-scroll-shell {
+    border-radius: 20px !important;
+    background:
+      radial-gradient(
+        circle at 16% 0%,
+        rgba(14, 165, 233, 0.12),
+        transparent 34%
+      ),
+      radial-gradient(
+        circle at 84% 10%,
+        rgba(124, 58, 237, 0.1),
+        transparent 32%
+      ),
+      rgba(2, 6, 23, 0.3) !important;
+    border: 1px solid rgba(148, 163, 184, 0.14) !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      0 24px 70px rgba(0, 0, 0, 0.24) !important;
+  }
+
+  #tab-predictions .excel-predictions {
+    --prediction-match-col: 430px !important;
+    --prediction-player-col-min: 226px !important;
+    gap: 0 !important;
+    background: transparent !important;
+  }
+
+  #tab-predictions .prediction-grid-head {
+    position: sticky;
+    top: 0;
+    z-index: 9;
+    backdrop-filter: blur(18px);
+  }
+
+  #tab-predictions .prediction-grid-head > div {
+    min-height: 42px !important;
+    background: linear-gradient(
+      180deg,
+      rgba(15, 23, 42, 0.94),
+      rgba(15, 23, 42, 0.76)
+    ) !important;
+    border-bottom: 1px solid rgba(125, 211, 252, 0.14) !important;
+    color: rgba(191, 219, 254, 0.98) !important;
+    letter-spacing: 0.02em;
+  }
+
+  #tab-predictions .prediction-grid-row {
+    background: rgba(15, 23, 42, 0.34) !important;
+    transition:
+      background 0.18s ease,
+      box-shadow 0.18s ease,
+      transform 0.18s ease;
+  }
+
+  #tab-predictions .prediction-grid-row:hover {
+    background: linear-gradient(
+      90deg,
+      rgba(14, 165, 233, 0.075),
+      rgba(15, 23, 42, 0.46),
+      rgba(124, 58, 237, 0.055)
+    ) !important;
+    box-shadow: inset 3px 0 0 rgba(56, 189, 248, 0.56);
+  }
+
+  #tab-predictions .prediction-grid-row > div {
+    border-color: rgba(148, 163, 184, 0.105) !important;
+  }
+
+  #tab-predictions .match-sticky-cell {
+    background: linear-gradient(
+      90deg,
+      rgba(8, 18, 33, 0.98),
+      rgba(15, 23, 42, 0.9)
+    ) !important;
+  }
+
+  #tab-predictions .prediction-fixture-card {
+    position: relative;
+    min-height: 74px !important;
+    padding: 8px 14px !important;
+    overflow: hidden;
+    background:
+      linear-gradient(135deg, rgba(15, 23, 42, 0.86), rgba(8, 47, 73, 0.32)),
+      rgba(2, 6, 23, 0.44) !important;
+    border-right: 1px solid rgba(125, 211, 252, 0.1);
+  }
+
+  #tab-predictions .prediction-fixture-glow {
+    position: absolute;
+    inset: 8px 10px;
+    border-radius: 18px;
+    pointer-events: none;
+    background: linear-gradient(
+      120deg,
+      rgba(56, 189, 248, 0.08),
+      transparent 42%,
+      rgba(168, 85, 247, 0.07)
+    );
+    border: 1px solid rgba(148, 163, 184, 0.09);
+  }
+
+  #tab-predictions .prediction-fixture-inner {
+    position: relative;
+    z-index: 1;
+    grid-template-columns: minmax(110px, 1fr) 106px minmax(110px, 1fr) !important;
+    gap: 12px !important;
+  }
+
+  #tab-predictions .prediction-fixture-team {
+    min-height: 56px !important;
+    padding: 4px 6px;
+    border-radius: 16px;
+    background: rgba(15, 23, 42, 0.28);
+    border: 1px solid rgba(148, 163, 184, 0.06);
+  }
+
+  #tab-predictions .prediction-fixture-team .team-logo,
+  #tab-predictions .prediction-fixture-team .team-logo-img,
+  #tab-predictions .prediction-fixture-team img {
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+    max-width: 38px !important;
+    max-height: 38px !important;
+    filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.3));
+  }
+
+  #tab-predictions .prediction-fixture-team .team-name {
+    max-width: 132px !important;
+    color: #f8fafc !important;
+    font-size: 10.5px !important;
+    font-weight: 950 !important;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.32);
+  }
+
+  #tab-predictions .prediction-fixture-center {
+    gap: 4px !important;
+  }
+
+  #tab-predictions .prediction-fixture-date {
+    max-width: 116px !important;
+    padding: 3px 7px !important;
+    background: rgba(2, 6, 23, 0.66) !important;
+    border-color: rgba(125, 211, 252, 0.16) !important;
+    color: rgba(219, 234, 254, 0.94) !important;
+    font-size: 9px !important;
+  }
+
+  #tab-predictions .prediction-fixture-score {
+    min-width: 66px !important;
+    padding: 6px 12px !important;
+    border-radius: 16px !important;
+    background:
+      radial-gradient(
+        circle at 50% 0%,
+        rgba(255, 255, 255, 0.16),
+        transparent 38%
+      ),
+      linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.82)) !important;
+    border: 1px solid rgba(125, 211, 252, 0.22) !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.07),
+      0 12px 26px rgba(0, 0, 0, 0.22) !important;
+    color: #f8fafc !important;
+    font-size: 18px !important;
+    letter-spacing: 0.03em;
+  }
+
+  #tab-predictions .prediction-fixture-score span {
+    color: rgba(125, 211, 252, 0.92);
+  }
+
+  #tab-predictions .prediction-fixture-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-height: 16px;
+  }
+
+  #tab-predictions .prediction-fixture-state .badge {
+    transform: scale(0.82);
+    transform-origin: center;
+    margin: 0 !important;
+  }
+
+  #tab-predictions .prediction-fixture-state small {
+    color: rgba(203, 213, 225, 0.74);
+    font-size: 8.5px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  #tab-predictions .player-head-pill {
+    min-height: 28px !important;
+    padding: 5px 14px !important;
+    border-radius: 999px !important;
+    background:
+      radial-gradient(
+        circle at 20% 0%,
+        rgba(125, 211, 252, 0.18),
+        transparent 42%
+      ),
+      linear-gradient(180deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.78)) !important;
+    border: 1px solid rgba(148, 163, 184, 0.18) !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 10px 24px rgba(0, 0, 0, 0.18) !important;
+  }
+
+  #tab-predictions .prediction-pro-cell {
+    min-height: 74px !important;
+    padding: 10px 12px 7px !important;
+    background: rgba(15, 23, 42, 0.32) !important;
+    transition:
+      background 0.18s ease,
+      box-shadow 0.18s ease,
+      transform 0.18s ease,
+      border-color 0.18s ease;
+  }
+
+  #tab-predictions .prediction-pro-cell.empty-prediction {
+    background: rgba(15, 23, 42, 0.2) !important;
+  }
+
+  #tab-predictions .prediction-pro-cell.filled-prediction {
+    background:
+      radial-gradient(
+        circle at 50% 0%,
+        rgba(14, 165, 233, 0.13),
+        transparent 40%
+      ),
+      rgba(15, 23, 42, 0.42) !important;
+    box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.11);
+  }
+
+  #tab-predictions .prediction-pro-cell:hover {
+    background:
+      radial-gradient(
+        circle at 50% 0%,
+        rgba(56, 189, 248, 0.16),
+        transparent 42%
+      ),
+      rgba(15, 23, 42, 0.58) !important;
+    box-shadow:
+      inset 0 0 0 1px rgba(125, 211, 252, 0.2),
+      0 12px 26px rgba(0, 0, 0, 0.16);
+  }
+
+  #tab-predictions .prediction-pro-cell .pred-score-row {
+    padding: 4px 8px !important;
+    border-radius: 999px;
+    background: rgba(2, 6, 23, 0.42) !important;
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  #tab-predictions .prediction-pro-cell.empty-prediction .pred-score-row {
+    opacity: 0.58;
+  }
+
+  #tab-predictions .prediction-pro-cell:hover .pred-score-row,
+  #tab-predictions .prediction-pro-cell:focus-within .pred-score-row,
+  #tab-predictions .prediction-pro-cell.filled-prediction .pred-score-row {
+    opacity: 1;
+  }
+
+  #tab-predictions .prediction-pro-cell .pred-score-row input {
+    width: 38px !important;
+    height: 31px !important;
+    border-radius: 13px !important;
+    font-size: 14px !important;
+    font-weight: 950 !important;
+    background: rgba(2, 6, 23, 0.72) !important;
+    border-color: rgba(148, 163, 184, 0.19) !important;
+  }
+
+  #tab-predictions .prediction-pro-cell .pred-score-row span {
+    width: 10px !important;
+    opacity: 0.72;
+  }
+
+  #tab-predictions .prediction-pro-cell .prediction-status-chip {
+    opacity: 0.42;
+    transform: translateY(-1px);
+    transition:
+      opacity 0.18s ease,
+      transform 0.18s ease;
+  }
+
+  #tab-predictions .prediction-pro-cell:hover .prediction-status-chip,
+  #tab-predictions .prediction-pro-cell:focus-within .prediction-status-chip,
+  #tab-predictions
+    .prediction-pro-cell.filled-prediction
+    .prediction-status-chip {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  #tab-predictions .points-badge-inline {
+    top: 5px !important;
+    left: 7px !important;
+    height: 18px !important;
+    min-width: 32px !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(255, 255, 255, 0.13) !important;
+    box-shadow:
+      0 8px 18px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.14) !important;
+    letter-spacing: 0.03em;
+  }
+
+  #tab-predictions .prediction-pro-cell.empty-prediction .desktop-icon-actions {
+    opacity: 0 !important;
+    visibility: hidden !important;
+  }
+
+  #tab-predictions
+    .prediction-pro-cell.empty-prediction:hover
+    .desktop-icon-actions,
+  #tab-predictions
+    .prediction-pro-cell.empty-prediction:focus-within
+    .desktop-icon-actions {
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+}
+
+@media (min-width: 769px) {
+  #tab-predictions .desktop-prediction-control .pred-score-row {
+    margin: 0 auto !important;
+  }
+
+  #tab-predictions .desktop-prediction-control .desktop-icon-actions {
+    position: absolute !important;
+    right: 100px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    margin: 0 !important;
+  }
+}
+.pred-score-input:focus {
+  box-shadow: 0 0 0 2px rgba(0, 150, 255, 0.3);
+}
+.desktop-prediction-control.has-value {
+  background: rgba(0, 150, 255, 0.05);
+}
+.desktop-icon-btn.delete:hover {
+  background: rgba(255, 0, 0, 0.15);
+}/* ========================= */
+/* 3P - YEŞİL (Aynı kalıyor) */
+/* ========================= */
+#tab-predictions
+  .prediction-pro-cell.filled-prediction.prediction-exact
+  .pred-score-row
+  input,
+#tab-predictions
+  .premium-user-card.filled-prediction.prediction-exact
+  .pred-score-row
+  input {
+  background: linear-gradient(
+    180deg,
+    rgba(22, 101, 52, 0.72),
+    rgba(6, 78, 59, 0.58)
+  ) !important;
+  border-color: rgba(74, 222, 128, 0.42) !important;
+  color: #dcfce7 !important;
+}
+
+#tab-predictions
+  .prediction-pro-cell.filled-prediction.prediction-exact
+  .prediction-status-chip,
+#tab-predictions
+  .premium-user-card.filled-prediction.prediction-exact
+  .prediction-status-chip {
+  background: rgba(22, 101, 52, 0.7) !important;
+  border-color: rgba(74, 222, 128, 0.34) !important;
+  color: #dcfce7 !important;
+}
+
+
+/* ========================= */
+/* 1P - AMBER (YENİ RENK) 🔥 */
+/* ========================= */
+#tab-predictions
+  .prediction-pro-cell.filled-prediction.prediction-close
+  .pred-score-row
+  input,
+#tab-predictions
+  .premium-user-card.filled-prediction.prediction-close
+  .pred-score-row
+  input {
+  background: linear-gradient(
+    180deg,
+    rgba(202, 138, 4, 0.75),
+    rgba(161, 98, 7, 0.6)
+  ) !important;
+  border-color: rgba(250, 204, 21, 0.5) !important;
+  color: #fef3c7 !important;
+}
+
+#tab-predictions
+  .prediction-pro-cell.filled-prediction.prediction-close
+  .prediction-status-chip,
+#tab-predictions
+  .premium-user-card.filled-prediction.prediction-close
+  .prediction-status-chip {
+  background: rgba(202, 138, 4, 0.7) !important;
+  border-color: rgba(250, 204, 21, 0.4) !important;
+  color: #fef3c7 !important;
+}
+
+
+/* ========================= */
+/* 0P - KIRMIZI (Aynı kalıyor) */
+/* ========================= */
+#tab-predictions
+  .prediction-pro-cell.filled-prediction.prediction-miss
+  .pred-score-row
+  input,
+#tab-predictions
+  .premium-user-card.filled-prediction.prediction-miss
+  .pred-score-row
+  input {
+  background: linear-gradient(
+    180deg,
+    rgba(153, 27, 27, 0.7),
+    rgba(127, 29, 29, 0.56)
+  ) !important;
+  border-color: rgba(248, 113, 113, 0.4) !important;
+  color: #fee2e2 !important;
+}
+
+#tab-predictions
+  .prediction-pro-cell.filled-prediction.prediction-miss
+  .prediction-status-chip,
+#tab-predictions
+  .premium-user-card.filled-prediction.prediction-miss
+  .prediction-status-chip {
+  background: rgba(153, 27, 27, 0.64) !important;
+  border-color: rgba(248, 113, 113, 0.32) !important;
+  color: #fee2e2 !important;
+}
+/* =========================================================
+   TAHMINLER - KENDI KOLONUNU NETLESTIRME + IKON CERCEVESI TEMIZLIK
+   30.04 ChatGPT revizyonu
+   - Sadece masaüstü tahmin tablosunda çalışır
+   - Kullanıcının kendi kolonunu veri girişinde daha belirgin yapar
+   - Kaydet / çöp ikonlarının etrafındaki ince kapsül çerçeveyi kaldırır
+========================================================= */
+@media (min-width: 769px) {
+  #tab-predictions .player-head-col.own-player-column {
+    background:
+      linear-gradient(180deg, rgba(14, 165, 233, 0.18), rgba(15, 23, 42, 0.58)) !important;
+    box-shadow:
+      inset 1px 0 0 rgba(125, 211, 252, 0.26),
+      inset -1px 0 0 rgba(125, 211, 252, 0.26) !important;
+  }
+
+  #tab-predictions .player-head-col.own-player-column .player-head-pill {
+    background:
+      radial-gradient(circle at 18% 0%, rgba(34, 197, 94, 0.32), transparent 44%),
+      linear-gradient(135deg, rgba(14, 165, 233, 0.52), rgba(16, 185, 129, 0.28)) !important;
+    border-color: rgba(125, 211, 252, 0.56) !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.14),
+      0 0 0 1px rgba(34, 197, 94, 0.12),
+      0 12px 28px rgba(14, 165, 233, 0.18) !important;
+  }
+
+  #tab-predictions .prediction-pro-cell.own-player-column {
+    background:
+      radial-gradient(circle at 50% 0%, rgba(14, 165, 233, 0.20), transparent 42%),
+      linear-gradient(180deg, rgba(8, 47, 73, 0.46), rgba(15, 23, 42, 0.38)) !important;
+    box-shadow:
+      inset 1px 0 0 rgba(125, 211, 252, 0.24),
+      inset -1px 0 0 rgba(125, 211, 252, 0.24),
+      inset 0 0 0 1px rgba(56, 189, 248, 0.10) !important;
+  }
+
+  #tab-predictions .prediction-pro-cell.own-player-column:hover,
+  #tab-predictions .prediction-pro-cell.own-player-column:focus-within {
+    background:
+      radial-gradient(circle at 50% 0%, rgba(34, 197, 94, 0.18), transparent 44%),
+      linear-gradient(180deg, rgba(14, 165, 233, 0.30), rgba(15, 23, 42, 0.50)) !important;
+    box-shadow:
+      inset 1px 0 0 rgba(125, 211, 252, 0.34),
+      inset -1px 0 0 rgba(125, 211, 252, 0.34),
+      inset 0 0 0 1px rgba(125, 211, 252, 0.22),
+      0 14px 30px rgba(14, 165, 233, 0.10) !important;
+  }
+
+  #tab-predictions .prediction-pro-cell.own-player-column .pred-score-row input {
+    border-color: rgba(125, 211, 252, 0.42) !important;
+    background: rgba(2, 6, 23, 0.82) !important;
+  }
+
+  #tab-predictions .prediction-pro-cell.own-player-column .prediction-status-chip {
+    border-color: rgba(125, 211, 252, 0.26) !important;
+  }
+
+  #tab-predictions .desktop-icon-actions {
+    padding: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  #tab-predictions .prediction-cell:hover .desktop-icon-actions,
+  #tab-predictions .desktop-icon-actions:focus-within,
+  #tab-predictions .desktop-icon-actions:has(.prediction-action-btn.is-dirty),
+  #tab-predictions .desktop-icon-actions:has(.prediction-action-btn.is-saving),
+  #tab-predictions .desktop-icon-actions:has(.prediction-action-btn.is-queued),
+  #tab-predictions .desktop-icon-actions:has(.prediction-action-btn.is-error) {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
 }
