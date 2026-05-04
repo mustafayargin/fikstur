@@ -60,8 +60,6 @@ jobs:
             if (!dateValue) return null;
 
             const text = String(dateValue).trim();
-
-            // Eğer tarih sonunda Z veya +03:00 gibi timezone yoksa Türkiye saati kabul ediyoruz.
             const hasTimezone = /Z$|[+-]\d{2}:\d{2}$/.test(text);
             const fixedText = hasTimezone ? text : text + "+03:00";
 
@@ -135,8 +133,8 @@ jobs:
 
               const res = await sendToTokens(
                 tokens,
-                "Tahmin Paneli Test",
-                "Bu bir GitHub Actions test bildirimidir."
+                "⚽ Tahmin Paneli Test 😊",
+                "Bu bir GitHub Actions test bildirimidir 🔥"
               );
 
               console.log("Test gönderim sonucu:");
@@ -198,16 +196,17 @@ jobs:
 
               console.log("Yakalanan bildirim tipi:", type);
 
-              const key = matchId + "_" + type;
+              const weekNo = match.weekNo || "unknown";
+              const key = "week_" + weekNo + "_" + type;
 
               if (sentData[key]) {
-                console.log("Atlandı: Bu bildirim daha önce gönderilmiş:", key);
+                console.log("Atlandı: Bu hafta için bu bildirim daha önce gönderilmiş:", key);
                 continue;
               }
 
-             const title =  "⚽ Haftanın maçları başlamak üzere 😊";
-            const body = `⚽ Haftanın maçları ${typeText(type)} içinde başlıyor! Tahminini yapmayı unutma 🔥`;
-        
+              const title = "⚽ Haftanın maçları başlamak üzere 😊";
+              const body = `⚽ Haftanın maçları ${typeText(type)} içinde başlıyor! Tahminini yapmayı unutma 🔥`;
+
               console.log("Gönderilecek bildirim key:", key);
               console.log("Başlık:", title);
               console.log("Mesaj:", body);
@@ -230,6 +229,8 @@ jobs:
               });
 
               if (res.successCount > 0) {
+                sentData[key] = true;
+
                 await db.ref("sentNotifications/" + key).set({
                   sent: true,
                   type,
