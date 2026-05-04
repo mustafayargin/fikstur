@@ -1,9 +1,6 @@
 name: Send Notifications
 
 on:
-  schedule:
-    # Her 5 dakikada bir çalışır (GitHub yoğunluğa göre bunu 10-15 dk'ya çıkarabilir)
-     - cron: "*/45 * * * *"
   workflow_dispatch:
     inputs:
       testMode:
@@ -16,7 +13,6 @@ on:
           - dry-run
           - test-now
 
-# Gerekli izinleri tanımlıyoruz
 permissions:
   contents: read
   actions: write
@@ -24,6 +20,7 @@ permissions:
 jobs:
   notify:
     runs-on: ubuntu-latest
+    timeout-minutes: 3
 
     steps:
       - name: Checkout Repository
@@ -32,7 +29,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20" # Daha güncel ve stabil sürüm
+          node-version: "20"
 
       - name: Install Firebase Admin
         run: npm install firebase-admin
@@ -66,7 +63,6 @@ jobs:
 
             const db = admin.database();
 
-            // Yardımcı Fonksiyonlar
             const parseMatchDate = (dateValue) => {
               if (!dateValue) return null;
               const text = String(dateValue).trim();
@@ -81,15 +77,31 @@ jobs:
               return null;
             };
 
-            const sendToTokens = async (tokens, title, body) => {
-              const message = {
-                data: { title, body, url: "./index.html" },
-                tokens: tokens
-              };
-              return await admin.messaging().sendEachForMulticast(message);
+            const withTimeout = (promise, ms, label) => {
+              const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error(`${label} zaman aşımına uğradı`)), ms);
+              });
+
+              return Promise.race([promise, timeoutPromise]);
             };
 
-            // Verileri Çek
+            const sendToTokens = async (tokens, title, body) => {
+              const message = {
+                data: {
+                  title,
+                  body,
+                  url: "./index.html"
+                },
+                tokens
+              };
+
+              return await withTimeout(
+                admin.messaging().sendEachForMulticast(message),
+                30000,
+                "FCM bildirim gönderimi"
+              );
+            };
+
             const [tokensSnap, matchesSnap, sentSnap] = await Promise.all([
               db.ref("fcmTokens").once("value"),
               db.ref("matches").once("value"),
@@ -97,31 +109,49 @@ jobs:
             ]);
 
             const tokens = Object.values(tokensSnap.val() || {})
-              .map(i => i?.token).filter(Boolean);
+              .map(i => i?.token)
+              .filter(Boolean);
+
             const matches = Object.entries(matchesSnap.val() || {});
             const sentData = sentSnap.val() || {};
 
             console.log(`Token: ${tokens.length} | Maç: ${matches.length}`);
 
-            if (tokens.length === 0) return console.log("Gönderilecek token yok.");
+            if (tokens.length === 0) {
+              console.log("Gönderilecek token yok.");
+              return;
+            }
 
-            // TEST MODU
             if (process.env.TEST_MODE === "test-now") {
-              const res = await sendToTokens(tokens, "⚽ Skor Avcıları Test", "Test bildirimi aktif! 🔥");
+              const res = await sendToTokens(
+                tokens,
+                "⚽ Skor Avcıları Test",
+                "Test bildirimi aktif! 🔥"
+              );
+
               console.log("Test sonucu:", res.successCount, "başarılı.");
               return;
             }
 
             const now = new Date();
 
-            // 1. Yeni Hafta Bildirimi Kontrolü
             const weeksMap = {};
+
             matches.forEach(([id, m]) => {
               const w = m.weekNo || "unknown";
-              if (!weeksMap[w]) weeksMap[w] = { futureMatchCount: 0, firstMatchDate: null };
+
+              if (!weeksMap[w]) {
+                weeksMap[w] = {
+                  futureMatchCount: 0,
+                  firstMatchDate: null
+                };
+              }
+
               const mDate = parseMatchDate(m.date);
+
               if (mDate && mDate > now) {
                 weeksMap[w].futureMatchCount++;
+
                 if (!weeksMap[w].firstMatchDate || mDate < weeksMap[w].firstMatchDate) {
                   weeksMap[w].firstMatchDate = mDate;
                 }
@@ -130,18 +160,30 @@ jobs:
 
             for (const [weekNo, info] of Object.entries(weeksMap)) {
               const key = `week_${weekNo}_added`;
+
               if (weekNo !== "unknown" && info.futureMatchCount > 0 && !sentData[key]) {
                 console.log(`${weekNo}. hafta bildirimi gönderiliyor...`);
+
                 if (process.env.TEST_MODE === "normal") {
-                  const res = await sendToTokens(tokens, "📅 Yeni hafta eklendi!", "Tahminlerinizi girmeyi unutmayın! ⚽");
+                  const res = await sendToTokens(
+                    tokens,
+                    "📅 Yeni hafta eklendi!",
+                    "Tahminlerinizi girmeyi unutmayın! ⚽"
+                  );
+
+                  console.log("Yeni hafta bildirim sonucu:", res.successCount, "başarılı.");
+
                   if (res.successCount > 0) {
-                    await db.ref(`sentNotifications/${key}`).set({ sent: true, sentAt: new Date().toISOString(), weekNo });
+                    await db.ref(`sentNotifications/${key}`).set({
+                      sent: true,
+                      sentAt: new Date().toISOString(),
+                      weekNo
+                    });
                   }
                 }
               }
             }
 
-            // 2. Maç Hatırlatıcı Kontrolü (3h ve 1h)
             for (const [id, m] of matches) {
               const mDate = parseMatchDate(m.date);
               if (!mDate) continue;
@@ -150,13 +192,26 @@ jobs:
               const type = getNotificationType(diffHours);
 
               if (type) {
-                const key = `week_${m.weekNo || 'x'}_${type}`;
+                const key = `week_${m.weekNo || "x"}_${type}`;
+
                 if (!sentData[key]) {
-                  console.log(`Maç hatırlatıcı (${type}) gönderiliyor: ${m.homeTeam}`);
+                  console.log(`Maç hatırlatıcı (${type}) gönderiliyor: ${m.homeTeam || ""}`);
+
                   if (process.env.TEST_MODE === "normal") {
-                    const res = await sendToTokens(tokens, "😊 Maçlar Başlıyor", `Haftanın maçları ${type === "3h" ? "3 saat" : "1 saat"} içinde başlıyor!`);
+                    const res = await sendToTokens(
+                      tokens,
+                      "😊 Maçlar Başlıyor",
+                      `Haftanın maçları ${type === "3h" ? "3 saat" : "1 saat"} içinde başlıyor!`
+                    );
+
+                    console.log("Maç hatırlatıcı sonucu:", res.successCount, "başarılı.");
+
                     if (res.successCount > 0) {
-                      await db.ref(`sentNotifications/${key}`).set({ sent: true, sentAt: new Date().toISOString(), type });
+                      await db.ref(`sentNotifications/${key}`).set({
+                        sent: true,
+                        sentAt: new Date().toISOString(),
+                        type
+                      });
                     }
                   }
                 }
@@ -164,5 +219,13 @@ jobs:
             }
           }
 
-          run().catch(e => { console.error(e); process.exit(1); });
+          run()
+            .then(() => {
+              console.log("Bildirim kontrolü tamamlandı.");
+              process.exit(0);
+            })
+            .catch(e => {
+              console.error("Bildirim sistemi hata verdi:", e);
+              process.exit(1);
+            });
           EOF
