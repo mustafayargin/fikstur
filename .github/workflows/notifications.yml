@@ -3,7 +3,7 @@ name: Send Notifications
 on:
   schedule:
     # Her 5 dakikada bir çalışır (GitHub yoğunluğa göre bunu 10-15 dk'ya çıkarabilir)
-    # - cron: "*/5 * * * *"
+     - cron: "*/45 * * * *"
   workflow_dispatch:
     inputs:
       testMode:
