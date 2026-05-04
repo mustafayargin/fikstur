@@ -1,9 +1,6 @@
 name: Send Notifications
 on:
-  schedule:
-    - cron: "*/30 * * * *"
-
-  workflow_dispatch:
+workflow_dispatch:
     inputs:
       testMode:
         description: "normal = gerçek gönderim, dry-run = sadece log, test-now = hemen test bildirimi"
