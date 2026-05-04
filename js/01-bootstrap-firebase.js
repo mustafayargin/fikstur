@@ -2369,7 +2369,6 @@ async function syncUsersFromSheet(options = {}) {
 async function sendMatchesToSheet(matches, options = {}) {
   const forceWrite = !!options.force;
   if (!forceWrite && !window.__ALLOW_MATCH_WRITE__) {
-    console.log("Firebase write engellendi (auto sync)");
     return null;
   }
   if (!useOnlineMode || !Array.isArray(matches) || !matches.length) return null;

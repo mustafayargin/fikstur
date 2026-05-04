@@ -86,12 +86,7 @@ function showPredictionReminderNotification(target, reminder) {
       icon: "./icons/icon-192.png",
       badge: "./icons/icon-192.png",
     });
-    console.log("[Bildirim] Tahmin kapanma hatırlatması gönderildi:", {
-      weekId: target.week.id,
-      weekNumber,
-      reminder: reminder.id,
-      lockTime: new Date(target.lockTs).toLocaleString("tr-TR"),
-    });
+
   } catch (error) {
     console.warn("[Bildirim] Bildirim gösterilemedi:", error);
   }
@@ -102,7 +97,6 @@ function checkPredictionNotifications() {
 
   const target = getNextPredictionLockTarget();
   if (!target) {
-    console.log("[Bildirim] Yaklaşan tahmin kapanışı bulunamadı.");
     return;
   }
 
@@ -148,14 +142,14 @@ async function registerFiksturMessagingServiceWorker() {
   }
 
   const swUrl = new URL("./firebase-messaging-sw.js", window.location.href).toString();
-  console.log("[FCM] Service worker kayıt deneniyor:", swUrl);
+
 
   const registration = await navigator.serviceWorker.register("./firebase-messaging-sw.js", {
     scope: "./",
   });
 
   await navigator.serviceWorker.ready;
-  console.log("[FCM] Service worker kayıt edildi:", registration.scope);
+
   return registration;
 }
 
@@ -183,7 +177,7 @@ async function saveFiksturFcmTokenToFirebase(token) {
     }
 
     localStorage.setItem(PREDICTION_NOTIFICATION_FCM_TOKEN_KEY, token);
-    console.log("[FCM] Token Firebase'e kaydedildi:", payload);
+
   } catch (error) {
     console.warn("[FCM] Token Firebase'e kaydedilemedi:", error);
     throw error;
@@ -191,13 +185,7 @@ async function saveFiksturFcmTokenToFirebase(token) {
 }
 
 async function setupFiksturFcmToken() {
-  console.log("[FCM] Token hazırlığı başladı.", {
-    permission: Notification.permission,
-    secureContext: window.isSecureContext,
-    hasFirebase: !!window.firebase,
-    hasMessaging: !!window.firebase?.messaging,
-    hasVapidKey: hasValidFiksturVapidKey(),
-  });
+
 
   if (!window.firebase?.messaging) {
     console.warn("[FCM] Firebase Messaging kütüphanesi bulunamadı.");
@@ -206,7 +194,7 @@ async function setupFiksturFcmToken() {
 
   if (typeof window.firebase.messaging.isSupported === "function") {
     const supported = await window.firebase.messaging.isSupported();
-    console.log("[FCM] Messaging destek durumu:", supported);
+
     if (!supported) {
       throw new Error("Bu tarayıcı Firebase Messaging desteklemiyor.");
     }
@@ -221,7 +209,6 @@ async function setupFiksturFcmToken() {
   const messaging = window.firebase.messaging();
 
   messaging.onMessage((payload) => {
-    console.log("[FCM] Uygulama açıkken bildirim geldi:", payload);
     const title = payload?.notification?.title || "Tahmin Paneli";
     const body = payload?.notification?.body || "Yeni bildirimin var.";
     try {
@@ -257,7 +244,7 @@ async function setupFiksturFcmToken() {
     return null;
   }
 
-  console.log("[FCM] TOKEN:", token);
+
   await saveFiksturFcmTokenToFirebase(token);
   return token;
 }
@@ -284,7 +271,6 @@ async function enablePredictionNotifications() {
     return;
   }
 
-  console.log("[Bildirim] Kullanıcı bildirim izni:", permission);
 
   if (permission !== "granted") {
     localStorage.removeItem(PREDICTION_NOTIFICATION_STORAGE_KEY);
@@ -346,7 +332,7 @@ function bindPredictionNotificationHooks() {
   }
 
   setTimeout(checkPredictionNotifications, 3000);
-  console.log("[Bildirim] Tahmin kapanma bildirim kontrolü hazır.");
+
 }
 
 bindPredictionNotificationHooks();

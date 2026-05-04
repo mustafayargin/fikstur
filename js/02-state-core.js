@@ -588,13 +588,6 @@ function forceDefaultLandingAfterLogin(reason = "login") {
     state.settings.activeWeekId = getPreferredWeekIdForSeason(seasonId);
   }
 
-  console.info("[FIXTURE_STARTUP] Genel Özet ve son hafta ayarlandı", {
-    reason,
-    currentTab: state.settings.currentTab,
-    activeSeasonId: state.settings.activeSeasonId,
-    activeWeekId: state.settings.activeWeekId,
-    activeWeekNo: getWeekNumberById(state.settings.activeWeekId),
-  });
 }
 function ensureWeekForSeason(seasonId, weekNumber) {
   if (!weekNumber) return null;

@@ -638,8 +638,6 @@ window.deletePredictionEntry = async function (matchId, playerId) {
 
     const result = await deleteOnlinePrediction(payload);
 
-    console.log("DELETE RESULT:", result);
-
     btn.innerText = "Sil";
     btn.disabled = false;
 
@@ -1826,13 +1824,7 @@ function renderAdvancedStats() {
 
   if (!heroTarget || !overviewTarget || !leadersTarget || !playerCardsTarget || !deepTarget) {
     return;
-  }
-
-  console.log("[İstatistikler] Son 5 hafta puanı hesaplandı:", playerStats.map((player) => ({
-    oyuncu: player.name,
-    son5HaftaPuani: player.recentFormPoints,
-    haftalar: player.recentForm.map((item) => item.label).join(" | "),
-  })));
+  };
 
   const championLabel = champion
     ? `${champion.name}, ${season?.name || "sezonu"} ${champion.total} puanla şampiyon tamamladı.`

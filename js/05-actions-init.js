@@ -2403,7 +2403,7 @@ let appWasHiddenAt = 0;
 let appLastResumeRefreshAt = 0;
 
 function logAppResumeRefresh(step, details = {}) {
-  console.info(APP_RESUME_REFRESH_LOG_TAG, step, details);
+
 }
 
 async function runAppResumeRefresh(reason = "visible") {
