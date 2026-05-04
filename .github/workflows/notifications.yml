@@ -1,84 +1,108 @@
-run: |
-  node <<'EOF'
-  const admin = require("firebase-admin");
+name: Send Notifications
 
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
 
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    databaseURL: "https://superlig-tahmin-panel-default-rtdb.europe-west1.firebasedatabase.app"
-  });
+jobs:
+  notify:
+    runs-on: ubuntu-latest
 
-  const db = admin.database();
+    steps:
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
 
-  async function run() {
-    const tokensSnap = await db.ref("fcmTokens").once("value");
-    const matchesSnap = await db.ref("matches").once("value");
-    const sentSnap = await db.ref("sentNotifications").once("value");
+      - name: Install Firebase Admin
+        run: npm install firebase-admin
 
-    const tokensData = tokensSnap.val();
-    const matches = matchesSnap.val();
-    const sent = sentSnap.val() || {};
+      - name: Run notification script
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          node <<'EOF'
+          const admin = require("firebase-admin");
 
-    if (!tokensData || !matches) {
-      console.log("Token veya match yok");
-      return;
-    }
+          const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
-    const tokens = Object.values(tokensData)
-      .map((item) => item && item.token)
-      .filter(Boolean);
+          admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+            databaseURL: "https://superlig-tahmin-panel-default-rtdb.europe-west1.firebasedatabase.app"
+          });
 
-    if (!tokens.length) {
-      console.log("Token yok");
-      return;
-    }
+          const db = admin.database();
 
-    const now = new Date();
+          async function run() {
+            const tokensSnap = await db.ref("fcmTokens").once("value");
+            const matchesSnap = await db.ref("matches").once("value");
+            const sentSnap = await db.ref("sentNotifications").once("value");
 
-    for (const [matchId, match] of Object.entries(matches)) {
-      if (!match.date) continue;
+            const tokensData = tokensSnap.val();
+            const matches = matchesSnap.val();
+            const sent = sentSnap.val() || {};
 
-      const matchDate = new Date(match.date);
-      const diffMs = matchDate - now;
-      const diffHours = diffMs / (1000 * 60 * 60);
+            if (!tokensData || !matches) {
+              console.log("Token veya maç yok");
+              return;
+            }
 
-      let type = null;
+            const tokens = Object.values(tokensData)
+              .map((item) => item && item.token)
+              .filter(Boolean);
 
-      if (diffHours <= 24 && diffHours > 23) type = "24h";
-      else if (diffHours <= 3 && diffHours > 2) type = "3h";
-      else if (diffHours <= 1 && diffHours > 0) type = "1h";
+            if (!tokens.length) {
+              console.log("Geçerli token yok");
+              return;
+            }
 
-      if (!type) continue;
+            const now = new Date();
 
-      const key = matchId + "_" + type;
+            for (const [matchId, match] of Object.entries(matches)) {
+              if (!match.date) continue;
 
-      if (sent[key]) {
-        console.log("Zaten gönderilmiş:", key);
-        continue;
-      }
+              const matchDate = new Date(match.date);
+              const diffMs = matchDate.getTime() - now.getTime();
+              const diffHours = diffMs / (1000 * 60 * 60);
 
-      console.log("Bildirim gönderiliyor:", key);
+              let type = null;
 
-      const message = {
-        data: {
-          title: "Tahmin Paneli",
-          body: `${match.homeTeam} - ${match.awayTeam} maçı ${type} içinde başlıyor!`,
-          url: "./index.html"
-        },
-        tokens: tokens
-      };
+              if (diffHours <= 24 && diffHours > 23) type = "24h";
+              else if (diffHours <= 3 && diffHours > 2) type = "3h";
+              else if (diffHours <= 1 && diffHours > 0) type = "1h";
 
-      const res = await admin.messaging().sendEachForMulticast(message);
+              if (!type) continue;
 
-      console.log("Gönderildi:", res.successCount);
+              const key = matchId + "_" + type;
 
-      await db.ref("sentNotifications/" + key).set(true);
-    }
-  }
+              if (sent[key]) {
+                console.log("Zaten gönderilmiş:", key);
+                continue;
+              }
 
-  run().catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
-  EOF
+              const body =
+                match.homeTeam + " - " + match.awayTeam + " maçı " + type + " içinde başlıyor!";
+
+              const message = {
+                data: {
+                  title: "Tahmin Paneli",
+                  body: body,
+                  url: "./index.html"
+                },
+                tokens: tokens
+              };
+
+              const res = await admin.messaging().sendEachForMulticast(message);
+
+              console.log("Gönderildi:", key, res.successCount);
+
+              await db.ref("sentNotifications/" + key).set(true);
+            }
+          }
+
+          run().catch((err) => {
+            console.error("Bildirim gönderme hatası:", err);
+            process.exit(1);
+          });
+          EOF
