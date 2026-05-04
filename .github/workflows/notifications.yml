@@ -4,6 +4,16 @@ on:
   schedule:
     - cron: "*/30 * * * *"
   workflow_dispatch:
+    inputs:
+      testMode:
+        description: "normal = gerçek gönderim, dry-run = sadece log, test-now = hemen test bildirimi"
+        required: true
+        default: "normal"
+        type: choice
+        options:
+          - normal
+          - dry-run
+          - test-now
 
 jobs:
   notify:
@@ -21,9 +31,21 @@ jobs:
       - name: Run notification script
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          TEST_MODE: ${{ github.event.inputs.testMode || 'normal' }}
         run: |
           node <<'EOF'
           const admin = require("firebase-admin");
+
+          console.log("====================================");
+          console.log("Bildirim sistemi başladı");
+          console.log("Çalışma modu:", process.env.TEST_MODE);
+          console.log("Şu an UTC:", new Date().toISOString());
+          console.log("====================================");
+
+          if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+            console.error("HATA: FIREBASE_SERVICE_ACCOUNT secret bulunamadı.");
+            process.exit(1);
+          }
 
           const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
@@ -34,75 +56,205 @@ jobs:
 
           const db = admin.database();
 
+          function parseMatchDate(dateValue) {
+            if (!dateValue) return null;
+
+            const text = String(dateValue).trim();
+
+            // Eğer tarih sonunda Z veya +03:00 gibi timezone yoksa Türkiye saati kabul ediyoruz.
+            const hasTimezone = /Z$|[+-]\d{2}:\d{2}$/.test(text);
+            const fixedText = hasTimezone ? text : text + "+03:00";
+
+            const d = new Date(fixedText);
+            if (isNaN(d.getTime())) return null;
+
+            return d;
+          }
+
+          function getNotificationType(diffHours) {
+            if (diffHours <= 24 && diffHours > 23) return "24h";
+            if (diffHours <= 3 && diffHours > 2) return "3h";
+            if (diffHours <= 1 && diffHours > 0) return "1h";
+            return null;
+          }
+
+          function typeText(type) {
+            if (type === "24h") return "24 saat";
+            if (type === "3h") return "3 saat";
+            if (type === "1h") return "1 saat";
+            return type;
+          }
+
+          async function sendToTokens(tokens, title, body) {
+            const message = {
+              data: {
+                title,
+                body,
+                url: "./index.html"
+              },
+              tokens
+            };
+
+            return await admin.messaging().sendEachForMulticast(message);
+          }
+
           async function run() {
+            console.log("Firebase verileri okunuyor...");
+
             const tokensSnap = await db.ref("fcmTokens").once("value");
             const matchesSnap = await db.ref("matches").once("value");
             const sentSnap = await db.ref("sentNotifications").once("value");
 
-            const tokensData = tokensSnap.val();
-            const matches = matchesSnap.val();
-            const sent = sentSnap.val() || {};
-
-            if (!tokensData || !matches) {
-              console.log("Token veya maç yok");
-              return;
-            }
+            const tokensData = tokensSnap.val() || {};
+            const matchesData = matchesSnap.val() || {};
+            const sentData = sentSnap.val() || {};
 
             const tokens = Object.values(tokensData)
               .map((item) => item && item.token)
               .filter(Boolean);
 
+            const matches = Object.entries(matchesData);
+
+            console.log("Token kayıt sayısı:", Object.keys(tokensData).length);
+            console.log("Geçerli token sayısı:", tokens.length);
+            console.log("Maç sayısı:", matches.length);
+            console.log("sentNotifications kayıt sayısı:", Object.keys(sentData).length);
+
             if (!tokens.length) {
-              console.log("Geçerli token yok");
+              console.log("Çıkış: Geçerli token yok.");
+              return;
+            }
+
+            if (!matches.length) {
+              console.log("Çıkış: Maç yok.");
+              return;
+            }
+
+            if (process.env.TEST_MODE === "test-now") {
+              console.log("TEST-NOW modu aktif. Hemen test bildirimi gönderiliyor...");
+
+              const res = await sendToTokens(
+                tokens,
+                "Tahmin Paneli Test",
+                "Bu bir GitHub Actions test bildirimidir."
+              );
+
+              console.log("Test gönderim sonucu:");
+              console.log("Başarılı:", res.successCount);
+              console.log("Başarısız:", res.failureCount);
+
+              res.responses.forEach((r, i) => {
+                if (!r.success) {
+                  console.log("Token hata index:", i, r.error && r.error.message);
+                }
+              });
+
               return;
             }
 
             const now = new Date();
 
-            for (const [matchId, match] of Object.entries(matches)) {
-              if (!match.date) continue;
+            console.log("------------------------------------");
+            console.log("Maçlar kontrol ediliyor...");
+            console.log("------------------------------------");
 
-              const matchDate = new Date(match.date);
-              const diffMs = matchDate.getTime() - now.getTime();
-              const diffHours = diffMs / (1000 * 60 * 60);
+            for (const [matchId, match] of matches) {
+              console.log("");
+              console.log("Maç kontrol:", matchId);
+              console.log("Hafta:", match.weekNo || "Yok");
+              console.log("Ev sahibi:", match.homeTeam || "Yok");
+              console.log("Deplasman:", match.awayTeam || "Yok");
+              console.log("Ham tarih:", match.date || "Yok");
 
-              let type = null;
-
-              if (diffHours <= 24 && diffHours > 23) type = "24h";
-              else if (diffHours <= 3 && diffHours > 2) type = "3h";
-              else if (diffHours <= 1 && diffHours > 0) type = "1h";
-
-              if (!type) continue;
-
-              const key = matchId + "_" + type;
-
-              if (sent[key]) {
-                console.log("Zaten gönderilmiş:", key);
+              if (!match.date) {
+                console.log("Atlandı: Maç tarihi yok.");
                 continue;
               }
 
-              const body =
-                match.homeTeam + " - " + match.awayTeam + " maçı " + type + " içinde başlıyor!";
+              const matchDate = parseMatchDate(match.date);
 
-              const message = {
-                data: {
-                  title: "Tahmin Paneli",
-                  body: body,
-                  url: "./index.html"
-                },
-                tokens: tokens
-              };
+              if (!matchDate) {
+                console.log("Atlandı: Maç tarihi geçersiz.");
+                continue;
+              }
 
-              const res = await admin.messaging().sendEachForMulticast(message);
+              const diffMs = matchDate.getTime() - now.getTime();
+              const diffHours = diffMs / (1000 * 60 * 60);
 
-              console.log("Gönderildi:", key, res.successCount);
+              console.log("Maç tarihi ISO:", matchDate.toISOString());
+              console.log("Kalan saat:", diffHours.toFixed(2));
 
-              await db.ref("sentNotifications/" + key).set(true);
+              if (diffHours <= 0) {
+                console.log("Atlandı: Maç başlamış veya geçmiş.");
+                continue;
+              }
+
+              const type = getNotificationType(diffHours);
+
+              if (!type) {
+                console.log("Atlandı: 24h / 3h / 1h bildirim aralığında değil.");
+                continue;
+              }
+
+              console.log("Yakalanan bildirim tipi:", type);
+
+              const key = matchId + "_" + type;
+
+              if (sentData[key]) {
+                console.log("Atlandı: Bu bildirim daha önce gönderilmiş:", key);
+                continue;
+              }
+
+              const title = "Tahmin Paneli";
+              const body = `${match.homeTeam || "Ev sahibi"} - ${match.awayTeam || "Deplasman"} maçı ${typeText(type)} içinde başlıyor! Tahminini yapmayı unutma.`;
+
+              console.log("Gönderilecek bildirim key:", key);
+              console.log("Başlık:", title);
+              console.log("Mesaj:", body);
+
+              if (process.env.TEST_MODE === "dry-run") {
+                console.log("DRY-RUN: Bildirim gönderilmedi, sentNotifications yazılmadı.");
+                continue;
+              }
+
+              const res = await sendToTokens(tokens, title, body);
+
+              console.log("Gönderim sonucu:");
+              console.log("Başarılı:", res.successCount);
+              console.log("Başarısız:", res.failureCount);
+
+              res.responses.forEach((r, i) => {
+                if (!r.success) {
+                  console.log("Token hata index:", i, r.error && r.error.message);
+                }
+              });
+
+              if (res.successCount > 0) {
+                await db.ref("sentNotifications/" + key).set({
+                  sent: true,
+                  type,
+                  matchId,
+                  homeTeam: match.homeTeam || "",
+                  awayTeam: match.awayTeam || "",
+                  weekNo: match.weekNo || "",
+                  matchDate: match.date,
+                  sentAt: new Date().toISOString(),
+                  successCount: res.successCount,
+                  failureCount: res.failureCount
+                });
+
+                console.log("sentNotifications kaydedildi:", key);
+              } else {
+                console.log("Hiç başarılı gönderim yok. sentNotifications yazılmadı.");
+              }
             }
+
+            console.log("");
+            console.log("Bildirim kontrolü tamamlandı.");
           }
 
           run().catch((err) => {
-            console.error("Bildirim gönderme hatası:", err);
+            console.error("GENEL HATA:", err);
             process.exit(1);
           });
           EOF
