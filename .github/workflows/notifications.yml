@@ -2,7 +2,7 @@ name: Send Notifications
 
 on:
   schedule:
-        - cron: "4,40 * * * *"
+        - cron: "*/5 * * * *"
   workflow_dispatch:
     inputs:
       testMode:
