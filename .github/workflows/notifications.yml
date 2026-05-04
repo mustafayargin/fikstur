@@ -1,0 +1,64 @@
+name: Send Notifications
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"  # 30 dakikada bir çalışır
+  workflow_dispatch:
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install Firebase Admin
+        run: npm install firebase-admin
+
+      - name: Run notification script
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          node <<EOF
+          const admin = require("firebase-admin");
+
+          const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+
+          admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+            databaseURL: "https://superlig-tahmin-panel-default-rtdb.europe-west1.firebasedatabase.app"
+          });
+
+          const db = admin.database();
+
+          async function run() {
+            const tokensSnap = await db.ref("fcmTokens").once("value");
+            const tokensData = tokensSnap.val();
+
+            if (!tokensData) {
+              console.log("Token yok");
+              return;
+            }
+
+            const tokens = Object.values(tokensData).map(t => t.token);
+
+            console.log("Token sayısı:", tokens.length);
+
+            const message = {
+              notification: {
+                title: "Tahmin Paneli",
+                body: "Test otomatik bildirim 🚀"
+              },
+              tokens
+            };
+
+            const res = await admin.messaging().sendEachForMulticast(message);
+
+            console.log("Gönderildi:", res.successCount);
+          }
+
+          run();
+          EOF
