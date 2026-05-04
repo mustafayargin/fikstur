@@ -70,14 +70,13 @@ jobs:
           }
 
           function getNotificationType(diffHours) {
-            if (diffHours <= 24 && diffHours > 23) return "24h";
+            // 24 saat bildirimi kapatıldı
             if (diffHours <= 3 && diffHours > 2) return "3h";
             if (diffHours <= 1 && diffHours > 0) return "1h";
             return null;
           }
 
           function typeText(type) {
-            if (type === "24h") return "24 saat";
             if (type === "3h") return "3 saat";
             if (type === "1h") return "1 saat";
             return type;
@@ -86,11 +85,11 @@ jobs:
           async function sendToTokens(tokens, title, body) {
             const message = {
               data: {
-                title,
-                body,
+                title: title,
+                body: body,
                 url: "./index.html"
               },
-              tokens
+              tokens: tokens
             };
 
             return await admin.messaging().sendEachForMulticast(message);
@@ -153,7 +152,108 @@ jobs:
             const now = new Date();
 
             console.log("------------------------------------");
-            console.log("Maçlar kontrol ediliyor...");
+            console.log("Yeni hafta bildirimi kontrol ediliyor...");
+            console.log("------------------------------------");
+
+            const weeksMap = {};
+
+            for (const [matchId, match] of matches) {
+              const weekNo = match.weekNo || "unknown";
+
+              if (!weeksMap[weekNo]) {
+                weeksMap[weekNo] = {
+                  weekNo: weekNo,
+                  matchCount: 0,
+                  futureMatchCount: 0,
+                  firstMatchDate: null
+                };
+              }
+
+              weeksMap[weekNo].matchCount++;
+
+              const matchDate = parseMatchDate(match.date);
+
+              if (matchDate && matchDate.getTime() > now.getTime()) {
+                weeksMap[weekNo].futureMatchCount++;
+
+                if (!weeksMap[weekNo].firstMatchDate || matchDate < weeksMap[weekNo].firstMatchDate) {
+                  weeksMap[weekNo].firstMatchDate = matchDate;
+                }
+              }
+            }
+
+            for (const weekNo of Object.keys(weeksMap)) {
+              const weekInfo = weeksMap[weekNo];
+              const key = "week_" + weekNo + "_added";
+
+              console.log("");
+              console.log("Hafta kontrol:", weekNo);
+              console.log("Haftadaki maç sayısı:", weekInfo.matchCount);
+              console.log("Gelecek maç sayısı:", weekInfo.futureMatchCount);
+              console.log("İlk gelecek maç:", weekInfo.firstMatchDate ? weekInfo.firstMatchDate.toISOString() : "Yok");
+
+              if (weekNo === "unknown") {
+                console.log("Atlandı: weekNo yok.");
+                continue;
+              }
+
+              if (weekInfo.futureMatchCount <= 0) {
+                console.log("Atlandı: Bu haftada gelecek maç yok.");
+                continue;
+              }
+
+              if (sentData[key]) {
+                console.log("Atlandı: Yeni hafta bildirimi daha önce gönderilmiş:", key);
+                continue;
+              }
+
+              const title = "📅 Yeni hafta eklendi! ⚽";
+              const body = "Tahminlerinizi girebilirsiniz 🔥";
+
+              console.log("Yeni hafta bildirimi yakalandı:", key);
+              console.log("Başlık:", title);
+              console.log("Mesaj:", body);
+
+              if (process.env.TEST_MODE === "dry-run") {
+                console.log("DRY-RUN: Yeni hafta bildirimi gönderilmedi, sentNotifications yazılmadı.");
+                continue;
+              }
+
+              const res = await sendToTokens(tokens, title, body);
+
+              console.log("Yeni hafta gönderim sonucu:");
+              console.log("Başarılı:", res.successCount);
+              console.log("Başarısız:", res.failureCount);
+
+              res.responses.forEach((r, i) => {
+                if (!r.success) {
+                  console.log("Token hata index:", i, r.error && r.error.message);
+                }
+              });
+
+              if (res.successCount > 0) {
+                sentData[key] = true;
+
+                await db.ref("sentNotifications/" + key).set({
+                  sent: true,
+                  type: "week_added",
+                  weekNo: weekNo,
+                  matchCount: weekInfo.matchCount,
+                  futureMatchCount: weekInfo.futureMatchCount,
+                  firstMatchDate: weekInfo.firstMatchDate ? weekInfo.firstMatchDate.toISOString() : "",
+                  sentAt: new Date().toISOString(),
+                  successCount: res.successCount,
+                  failureCount: res.failureCount
+                });
+
+                console.log("sentNotifications kaydedildi:", key);
+              } else {
+                console.log("Hiç başarılı gönderim yok. Yeni hafta bildirimi kaydedilmedi.");
+              }
+            }
+
+            console.log("------------------------------------");
+            console.log("Maç zamanı bildirimleri kontrol ediliyor...");
             console.log("------------------------------------");
 
             for (const [matchId, match] of matches) {
@@ -190,7 +290,7 @@ jobs:
               const type = getNotificationType(diffHours);
 
               if (!type) {
-                console.log("Atlandı: 24h / 3h / 1h bildirim aralığında değil.");
+                console.log("Atlandı: 3h / 1h bildirim aralığında değil.");
                 continue;
               }
 
@@ -204,7 +304,7 @@ jobs:
                 continue;
               }
 
-              const title = "⚽ Haftanın maçları başlamak üzere 😊";
+              const title = "😊 Haftanın maçları başlamak üzere ";
               const body = `⚽ Haftanın maçları ${typeText(type)} içinde başlıyor! Tahminini yapmayı unutma 🔥`;
 
               console.log("Gönderilecek bildirim key:", key);
@@ -233,8 +333,8 @@ jobs:
 
                 await db.ref("sentNotifications/" + key).set({
                   sent: true,
-                  type,
-                  matchId,
+                  type: type,
+                  matchId: matchId,
                   homeTeam: match.homeTeam || "",
                   awayTeam: match.awayTeam || "",
                   weekNo: match.weekNo || "",
