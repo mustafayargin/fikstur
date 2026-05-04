@@ -14,7 +14,7 @@ on:
           - dry-run
           - test-now
   schedule:
-    - cron: "* * * * *"
+    - cron: "2-59/5 * * * *"
 jobs:
   notify:
     runs-on: ubuntu-latest
