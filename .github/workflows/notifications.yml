@@ -48,12 +48,13 @@ jobs:
             console.log("Token sayısı:", tokens.length);
 
             const message = {
-              notification: {
-                title: "Tahmin Paneli",
-                body: "Test otomatik bildirim 🚀"
-              },
-              tokens
-            };
+  data: {
+    title: "Tahmin Paneli",
+    body: "Test otomatik bildirim 🚀",
+    url: "./index.html"
+  },
+  tokens
+};
 
             const res = await admin.messaging().sendEachForMulticast(message);
 
