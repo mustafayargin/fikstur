@@ -1313,6 +1313,7 @@
 
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 
     <script>
       window.FIKSTUR_FIREBASE_CONFIG = {
@@ -1326,6 +1327,10 @@
         appId: "1:89142067230:web:96a69696dc1dbcac16ee0f",
         measurementId: "G-9E1VX0KTQH",
       };
+
+      // Firebase Console > Project settings > Cloud Messaging > Web Push certificates
+      // bölümünden oluşturduğun VAPID key buraya yazılacak.
+      window.FIKSTUR_FIREBASE_VAPID_KEY = "BOlctNJfYtPVYYvTBezBinoc66KLJNY8yAAtncF5HwKO7dYfjFW76yoK1agD35aBIqfedJBo_5Fh_5ToWRcXe9E";
     </script>
 
     <script src="js/01-bootstrap-firebase.js"></script>
@@ -1334,5 +1339,6 @@
 
     <script src="js/04-predictions-avatar.js"></script>
     <script src="js/05-actions-init.js"></script>
+    <script src="js/06-notifications.js"></script>
   </body>
 </html>

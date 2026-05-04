@@ -1,5 +1,5 @@
 :root {
-  --bg: #253246d0;
+  --bg: #15253dd0;
   --bg-2: #0c1628;
   --panel: #111827;
   --panel-2: #162133;
@@ -29,7 +29,7 @@ body {
   padding: 0;
   min-height: 100%;
   font-family: Inter, Arial, sans-serif;
-  background: linear-gradient(180deg, var(--bg) 0%, #09142354 100%);
+  background: linear-gradient(180deg, var(--bg) 0%, #091423b4 100%);
   color: var(--text);
 }
 
@@ -14438,4 +14438,33 @@ body[data-role="user"] #tab-players .page-header p {
     border: 0 !important;
     box-shadow: none !important;
   }
+}
+
+/* Tahmin kapanma bildirim butonu */
+.prediction-notification-btn {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-weight: 800;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.9);
+  color: #172033;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.14);
+}
+
+.prediction-notification-btn:hover {
+  transform: translateY(-1px);
+}
+
+.prediction-notification-btn.is-warning {
+  background: rgba(255, 237, 213, 0.96);
+  color: #7c2d12;
+}
+
+.prediction-notification-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+  opacity: 0.88;
 }

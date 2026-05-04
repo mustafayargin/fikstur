@@ -1686,23 +1686,23 @@ function getPlayerSeasonStats(seasonId = getActiveSeasonId()) {
         return isLeader ? count + 1 : count;
       }, 0);
 
-      const recentPlayedMatches = seasonMatches
-        .filter((match) => {
-          if (match?.played) return true;
-          return match?.homeScore !== "" && match?.awayScore !== "" && match?.homeScore != null && match?.awayScore != null;
-        })
-        .slice(-5);
+      const recentPlayedWeeks = weeklyPlayedSummaries.slice(-5);
 
-      const recentForm = recentPlayedMatches.map((match) => {
-        const pred = preds.find((item) => String(item.matchId) === String(match.id));
-        if (!pred || pred.homePred === "" || pred.awayPred === "") {
-          return { label: "-", value: 0, type: "missing" };
+      const recentForm = recentPlayedWeeks.map((weekSummary) => {
+        const week = getWeekById(weekSummary.weekId);
+        if (weekSummary.total === null) {
+          return {
+            label: `${week?.number || "?"}.H -`,
+            value: 0,
+            type: "missing",
+          };
         }
-        const points = Number(pred.points || 0);
+
+        const points = Number(weekSummary.total || 0);
         return {
-          label: `${points}p`,
+          label: `${week?.number || "?"}.H ${points}p`,
           value: points,
-          type: points === 3 ? "exact" : points === 1 ? "result" : "zero",
+          type: points >= 10 ? "exact" : points > 0 ? "result" : "zero",
         };
       });
       const recentFormPoints = recentForm.reduce(
@@ -1827,6 +1827,12 @@ function renderAdvancedStats() {
   if (!heroTarget || !overviewTarget || !leadersTarget || !playerCardsTarget || !deepTarget) {
     return;
   }
+
+  console.log("[İstatistikler] Son 5 hafta puanı hesaplandı:", playerStats.map((player) => ({
+    oyuncu: player.name,
+    son5HaftaPuani: player.recentFormPoints,
+    haftalar: player.recentForm.map((item) => item.label).join(" | "),
+  })));
 
   const championLabel = champion
     ? `${champion.name}, ${season?.name || "sezonu"} ${champion.total} puanla şampiyon tamamladı.`
@@ -1989,7 +1995,7 @@ function renderAdvancedStats() {
               </div>
 
               <div class="player-form-row">
-                <span class="player-card-caption">Son 5 maç formu</span>
+                <span class="player-card-caption">Son 5 hafta puanı</span>
                 <div class="player-form-pills">${formMarkup}</div>
               </div>
 
@@ -2010,7 +2016,7 @@ function renderAdvancedStats() {
     {
       label: "Yükselen oyuncu",
       value: risingStar ? escapeHtml(risingStar.name) : "-",
-      note: risingStar ? `Son 5 maçta ${risingStar.recentFormPoints} puan topladı.` : "Henüz veri yok.",
+      note: risingStar ? `Son 5 haftada ${risingStar.recentFormPoints} puan topladı.` : "Henüz veri yok.",
     },
     {
       label: "En iyi tek hafta",

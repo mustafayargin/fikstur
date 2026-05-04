@@ -503,12 +503,17 @@ function renderPredictionLockBanner(weekId) {
     const toneClass = diff <= 60 * 60 * 1000 ? "warning" : "open";
     banner.className = `prediction-lock-banner ${isAdmin ? "admin" : toneClass}`;
 
+    const notificationButton =
+      typeof getPredictionNotificationButtonHtml === "function"
+        ? getPredictionNotificationButtonHtml()
+        : "";
+
     if (isAdmin) {
-      banner.innerHTML = `<strong>🔓 Admin görünümü · ${countdown}</strong><span>Kullanıcılar için haftalık kilit bu sürenin sonunda devreye girer.</span>`;
+      banner.innerHTML = `<strong>🔓 Admin görünümü · ${countdown}</strong><span>Kullanıcılar için haftalık kilit bu sürenin sonunda devreye girer.</span>${notificationButton}`;
       return;
     }
 
-    banner.innerHTML = `<strong>⏳ Tahmin vermek için kalan süre: ${countdown}</strong><span>Haftanın ilk maçına 10 dk kala tüm tahminler otomatik kilitlenir.</span>`;
+    banner.innerHTML = `<strong>⏳ Tahmin vermek için kalan süre: ${countdown}</strong><span>Haftanın ilk maçına 10 dk kala tüm tahminler otomatik kilitlenir.</span>${notificationButton}`;
   };
 
   updateBanner();
