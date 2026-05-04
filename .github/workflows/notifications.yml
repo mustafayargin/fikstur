@@ -1,6 +1,7 @@
 name: Send Notifications
+
 on:
-workflow_dispatch:
+  workflow_dispatch:
     inputs:
       testMode:
         description: "normal = gerçek gönderim, dry-run = sadece log, test-now = hemen test bildirimi"
@@ -11,6 +12,7 @@ workflow_dispatch:
           - normal
           - dry-run
           - test-now
+
 jobs:
   notify:
     runs-on: ubuntu-latest
@@ -66,7 +68,6 @@ jobs:
           }
 
           function getNotificationType(diffHours) {
-            // 24 saat bildirimi kapatıldı
             if (diffHours <= 3 && diffHours > 2) return "3h";
             if (diffHours <= 1 && diffHours > 0) return "1h";
             return null;
