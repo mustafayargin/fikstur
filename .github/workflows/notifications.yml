@@ -205,9 +205,9 @@ jobs:
                 continue;
               }
 
-              const title = "Tahmin Paneli";
-              const body = `${match.homeTeam || "Ev sahibi"} - ${match.awayTeam || "Deplasman"} maçı ${typeText(type)} içinde başlıyor! Tahminini yapmayı unutma.`;
-
+             const title =  "⚽ Haftanın maçları başlamak üzere 😊";
+            const body = `⚽ Haftanın maçları ${typeText(type)} içinde başlıyor! Tahminini yapmayı unutma 🔥`;
+        
               console.log("Gönderilecek bildirim key:", key);
               console.log("Başlık:", title);
               console.log("Mesaj:", body);
