@@ -1,76 +1,84 @@
-name: Send Notifications
+run: |
+  node <<'EOF'
+  const admin = require("firebase-admin");
 
-on:
-  schedule:
-    - cron: "*/30 * * * *"
-  workflow_dispatch:
+  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
-jobs:
-  notify:
-    runs-on: ubuntu-latest
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    databaseURL: "https://superlig-tahmin-panel-default-rtdb.europe-west1.firebasedatabase.app"
+  });
 
-    steps:
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "18"
+  const db = admin.database();
 
-      - name: Install Firebase Admin
-        run: npm install firebase-admin
+  async function run() {
+    const tokensSnap = await db.ref("fcmTokens").once("value");
+    const matchesSnap = await db.ref("matches").once("value");
+    const sentSnap = await db.ref("sentNotifications").once("value");
 
-      - name: Run notification script
-        env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-        run: |
-          node <<'EOF'
-          const admin = require("firebase-admin");
+    const tokensData = tokensSnap.val();
+    const matches = matchesSnap.val();
+    const sent = sentSnap.val() || {};
 
-          const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    if (!tokensData || !matches) {
+      console.log("Token veya match yok");
+      return;
+    }
 
-          admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount),
-            databaseURL: "https://superlig-tahmin-panel-default-rtdb.europe-west1.firebasedatabase.app"
-          });
+    const tokens = Object.values(tokensData)
+      .map((item) => item && item.token)
+      .filter(Boolean);
 
-          const db = admin.database();
+    if (!tokens.length) {
+      console.log("Token yok");
+      return;
+    }
 
-          async function run() {
-            const tokensSnap = await db.ref("fcmTokens").once("value");
-            const tokensData = tokensSnap.val();
+    const now = new Date();
 
-            if (!tokensData) {
-              console.log("Token yok");
-              return;
-            }
+    for (const [matchId, match] of Object.entries(matches)) {
+      if (!match.date) continue;
 
-            const tokens = Object.values(tokensData)
-              .map((item) => item && item.token)
-              .filter(Boolean);
+      const matchDate = new Date(match.date);
+      const diffMs = matchDate - now;
+      const diffHours = diffMs / (1000 * 60 * 60);
 
-            console.log("Token sayısı:", tokens.length);
+      let type = null;
 
-            if (!tokens.length) {
-              console.log("Geçerli token yok");
-              return;
-            }
+      if (diffHours <= 24 && diffHours > 23) type = "24h";
+      else if (diffHours <= 3 && diffHours > 2) type = "3h";
+      else if (diffHours <= 1 && diffHours > 0) type = "1h";
 
-            const message = {
-              data: {
-                title: "Tahmin Paneli",
-                body: "Test otomatik bildirim",
-                url: "./index.html"
-              },
-              tokens: tokens
-            };
+      if (!type) continue;
 
-            const res = await admin.messaging().sendEachForMulticast(message);
+      const key = matchId + "_" + type;
 
-            console.log("Başarılı gönderim:", res.successCount);
-            console.log("Başarısız gönderim:", res.failureCount);
-          }
+      if (sent[key]) {
+        console.log("Zaten gönderilmiş:", key);
+        continue;
+      }
 
-          run().catch((err) => {
-            console.error("Bildirim gönderme hatası:", err);
-            process.exit(1);
-          });
-          EOF
+      console.log("Bildirim gönderiliyor:", key);
+
+      const message = {
+        data: {
+          title: "Tahmin Paneli",
+          body: `${match.homeTeam} - ${match.awayTeam} maçı ${type} içinde başlıyor!`,
+          url: "./index.html"
+        },
+        tokens: tokens
+      };
+
+      const res = await admin.messaging().sendEachForMulticast(message);
+
+      console.log("Gönderildi:", res.successCount);
+
+      await db.ref("sentNotifications/" + key).set(true);
+    }
+  }
+
+  run().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+  EOF
