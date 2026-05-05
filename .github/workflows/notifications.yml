@@ -167,7 +167,7 @@ jobs:
                 if (process.env.TEST_MODE === "normal") {
                   const res = await sendToTokens(
                     tokens,
-                    "📅 ${weekNo}. hafta açıldı!`",
+                    `📅 ${weekNo}. hafta açıldı!`,
                     "😅 Tahminlerini girmeyi unutma! ⚽"
                   );
 
