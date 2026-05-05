@@ -73,7 +73,7 @@ jobs:
 
             const getNotificationType = (diffHours) => {
               if (diffHours <= 3 && diffHours > 2) return "3h";
-              if (diffHours <= 1 && diffHours > 0) return "1h";
+              if (diffHours <= 2 && diffHours > 0) return "2h";
               return null;
             };
 
@@ -167,8 +167,8 @@ jobs:
                 if (process.env.TEST_MODE === "normal") {
                   const res = await sendToTokens(
                     tokens,
-                    "📅 Yeni hafta eklendi!",
-                    "Tahminlerinizi girmeyi unutmayın! ⚽"
+                    "📅 ${weekNo}. hafta açıldı!`",
+                    "😅 Tahminlerini girmeyi unutma! ⚽"
                   );
 
                   console.log("Yeni hafta bildirim sonucu:", res.successCount, "başarılı.");
@@ -200,8 +200,8 @@ jobs:
                   if (process.env.TEST_MODE === "normal") {
                     const res = await sendToTokens(
                       tokens,
-                      "😊 Maçlar Başlıyor",
-                      `Haftanın maçları ${type === "3h" ? "3 saat" : "1 saat"} içinde başlıyor!`
+                      "⚽ Maçlar başlamak üzere!",
+                      `Tahminlerini unutma! Maçlar ${type === "3h" ? "3 saat" : "2 saat"} içinde başlıyor.`
                     );
 
                     console.log("Maç hatırlatıcı sonucu:", res.successCount, "başarılı.");
