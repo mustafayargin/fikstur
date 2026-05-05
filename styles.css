@@ -14468,3 +14468,69 @@ body[data-role="user"] #tab-players .page-header p {
   font-weight: 800;
   opacity: 0.88;
 }
+.match-edit-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(5, 10, 20, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+
+.match-edit-card {
+  width: min(520px, 100%);
+  background: #1f2b3a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+}
+
+.match-edit-card h3 {
+  margin: 0 0 16px;
+}
+
+.match-edit-card label {
+  display: block;
+  margin: 12px 0 6px;
+  font-size: 13px;
+  color: #9fc2ff;
+}
+
+.match-edit-card input {
+  width: 100%;
+}
+
+.match-edit-check {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  color: #fff !important;
+}
+
+.match-edit-check input {
+  width: auto;
+}
+
+.match-edit-actions {
+  margin-top: 18px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.match-action-buttons {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.match-action-buttons button {
+  width: auto;
+  min-width: 74px;
+  margin: 0;
+}

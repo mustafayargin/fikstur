@@ -449,8 +449,17 @@ function renderMatches(
               <span class="auto-save-note">Otomatik</span>
             </div>
           </div>
-          ${isDashboard ? "" : `<div><button class="small danger" onclick="removeMatch('${match.id}')">Sil</button></div>`}
-        </div>`;
+          ${
+            isDashboard
+              ? ""
+              : `
+            <div class="match-action-buttons">
+              <button class="small secondary" onclick="editMatch('${match.id}')">Düzenle</button>
+              ${match.played ? `<button class="small secondary" onclick="clearMatchScore('${match.id}')">Skoru Temizle</button>` : ""}
+              <button class="small danger" onclick="removeMatch('${match.id}')">Sil</button>
+            </div>
+          `
+          }        </div>`;
         })
         .join("")}</div>
     </div>`;
@@ -552,7 +561,263 @@ window.forceLogoutUserSession = async function (playerId) {
     });
   }
 };
+async function saveSingleMatchChange(match, successMessage) {
+  recalculateAllPoints();
+  saveState();
+  renderAll();
 
+  if (!useOnlineMode) {
+    showAlert(successMessage, {
+      title: "İşlem tamamlandı",
+      type: "success",
+    });
+    return;
+  }
+
+  try {
+    window.__ALLOW_MATCH_WRITE__ = true;
+
+    await sendMatchesToSheet([match], { force: true });
+
+    await syncOnlineMatchesFromSheet({
+      seasonId: match.seasonId,
+      seasonLabel: getSeasonById(match.seasonId)?.name || "",
+      silent: true,
+    });
+
+    recalculateAllPoints();
+    saveState();
+    renderAll();
+
+    showAlert(successMessage, {
+      title: "İşlem tamamlandı",
+      type: "success",
+    });
+  } catch (error) {
+    console.error("Maç güncelleme hatası:", error);
+    showAlert(
+      "Değişiklik yerelde kaydedildi ama Firebase'e yazılırken hata oluştu.",
+      {
+        title: "Senkron hatası",
+        type: "warning",
+      },
+    );
+  } finally {
+    window.__ALLOW_MATCH_WRITE__ = false;
+  }
+}
+
+function toMatchDatetimeLocalValue(dateValue) {
+  if (!dateValue) return "";
+
+  const text = String(dateValue).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(text)) {
+    return text.slice(0, 16);
+  }
+
+  const d = new Date(text);
+  if (isNaN(d.getTime())) return "";
+
+  const pad = (n) => String(n).padStart(2, "0");
+
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function openMatchEditModal(match) {
+  return new Promise((resolve) => {
+    const oldModal = document.getElementById("matchEditModal");
+    if (oldModal) oldModal.remove();
+
+    const modal = document.createElement("div");
+    modal.id = "matchEditModal";
+    modal.className = "match-edit-modal";
+
+    modal.innerHTML = `
+      <div class="match-edit-card">
+        <h3>Maçı Düzenle</h3>
+
+        <label>Ev sahibi</label>
+        <input id="editMatchHomeTeam" type="text" value="${escapeHtml(match.homeTeam || "")}" />
+
+        <label>Deplasman</label>
+        <input id="editMatchAwayTeam" type="text" value="${escapeHtml(match.awayTeam || "")}" />
+
+        <label>Maç tarihi / saati</label>
+        <input id="editMatchDate" type="datetime-local" value="${toMatchDatetimeLocalValue(match.date)}" />
+
+        <label class="match-edit-check">
+          <input id="editMatchClearScore" type="checkbox" />
+          Test skorunu temizle ve maçı bekliyor yap
+        </label>
+
+        <div class="match-edit-actions">
+          <button class="secondary" id="matchEditCancelBtn">Vazgeç</button>
+          <button id="matchEditSaveBtn">Kaydet</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const close = (value) => {
+      modal.remove();
+      resolve(value);
+    };
+
+    modal.querySelector("#matchEditCancelBtn").onclick = () => close(null);
+
+    modal.querySelector("#matchEditSaveBtn").onclick = () => {
+      close({
+        homeTeam: modal.querySelector("#editMatchHomeTeam").value.trim(),
+        awayTeam: modal.querySelector("#editMatchAwayTeam").value.trim(),
+        date: modal.querySelector("#editMatchDate").value.trim(),
+        clearScore: modal.querySelector("#editMatchClearScore").checked,
+      });
+    };
+  });
+}
+
+function toMatchDatetimeLocalValue(dateValue) {
+  if (!dateValue) return "";
+
+  const text = String(dateValue).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(text)) {
+    return text.slice(0, 16);
+  }
+
+  const d = new Date(text);
+  if (isNaN(d.getTime())) return "";
+
+  const pad = (n) => String(n).padStart(2, "0");
+
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function openMatchEditModal(match) {
+  return new Promise((resolve) => {
+    const oldModal = document.getElementById("matchEditModal");
+    if (oldModal) oldModal.remove();
+
+    const modal = document.createElement("div");
+    modal.id = "matchEditModal";
+    modal.className = "match-edit-modal";
+
+    modal.innerHTML = `
+      <div class="match-edit-card">
+        <h3>Maçı Düzenle</h3>
+
+        <label>Ev sahibi</label>
+        <input id="editMatchHomeTeam" type="text" value="${escapeHtml(match.homeTeam || "")}" />
+
+        <label>Deplasman</label>
+        <input id="editMatchAwayTeam" type="text" value="${escapeHtml(match.awayTeam || "")}" />
+
+        <label>Maç tarihi / saati</label>
+        <input id="editMatchDate" type="datetime-local" value="${toMatchDatetimeLocalValue(match.date)}" />
+
+        <label class="match-edit-check">
+          <input id="editMatchClearScore" type="checkbox" />
+          Test skorunu temizle ve maçı bekliyor yap
+        </label>
+
+        <div class="match-edit-actions">
+          <button class="secondary" id="matchEditCancelBtn">Vazgeç</button>
+          <button id="matchEditSaveBtn">Kaydet</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const close = (value) => {
+      modal.remove();
+      resolve(value);
+    };
+
+    modal.querySelector("#matchEditCancelBtn").onclick = () => close(null);
+
+    modal.querySelector("#matchEditSaveBtn").onclick = () => {
+      close({
+        homeTeam: modal.querySelector("#editMatchHomeTeam").value.trim(),
+        awayTeam: modal.querySelector("#editMatchAwayTeam").value.trim(),
+        date: modal.querySelector("#editMatchDate").value.trim(),
+        clearScore: modal.querySelector("#editMatchClearScore").checked,
+      });
+    };
+  });
+}
+
+window.editMatch = async function (matchId) {
+  if (isReadOnlyMode()) {
+    return showAlert("Kullanıcı görünümünde maç düzenlenemez.", {
+      title: "Yetki yok",
+      type: "warning",
+    });
+  }
+
+  const match = state.matches.find((m) => m.id === matchId);
+  if (!match) return;
+
+  const form = await openMatchEditModal(match);
+  if (!form) return;
+
+  if (!form.homeTeam || !form.awayTeam || !form.date) {
+    return showAlert("Takım ve tarih alanları boş olamaz.", {
+      title: "Eksik bilgi",
+      type: "warning",
+    });
+  }
+
+  if (form.homeTeam === form.awayTeam) {
+    return showAlert("Ev sahibi ve deplasman aynı olamaz.", {
+      title: "Geçersiz maç",
+      type: "warning",
+    });
+  }
+
+  match.homeTeam = form.homeTeam;
+  match.awayTeam = form.awayTeam;
+  match.date = form.date;
+
+  if (form.clearScore) {
+    match.homeScore = null;
+    match.awayScore = null;
+    match.played = false;
+  }
+
+  await saveSingleMatchChange(match, "Maç bilgileri güncellendi.");
+};
+
+window.clearMatchScore = async function (matchId) {
+  if (isReadOnlyMode()) {
+    return showAlert("Kullanıcı görünümünde skor temizlenemez.", {
+      title: "Yetki yok",
+      type: "warning",
+    });
+  }
+
+  const match = state.matches.find((m) => m.id === matchId);
+  if (!match) return;
+
+  const ok = await showConfirm(
+    `${match.homeTeam} - ${match.awayTeam} maçının skorunu temizlemek istiyor musun?`,
+    {
+      title: "Skor temizlensin mi?",
+      type: "warning",
+      confirmText: "Temizle",
+    },
+  );
+
+  if (!ok) return;
+
+  match.homeScore = null;
+  match.awayScore = null;
+  match.played = false;
+
+  await saveSingleMatchChange(match, "Maç skoru temizlendi.");
+};
 window.removeMatch = async function (matchId) {
   if (isReadOnlyMode())
     return showAlert("Kullanıcı görünümünde maç silinemez.", {
