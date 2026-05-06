@@ -47,6 +47,10 @@ function renderCurrentTabOnly(
       renderStats();
       break;
 
+    case "notifications":
+      if (typeof renderNotificationCenter === "function") renderNotificationCenter();
+      break;
+
     case "backup":
       renderBackupPanel();
       break;
@@ -548,7 +552,7 @@ function addMatch() {
 function switchTab(tabName, options = {}) {
   if (
     getCurrentRole() !== "admin" &&
-    ["backup", "seasons", "weeks", "matches"].includes(tabName)
+    ["backup", "notifications", "seasons", "weeks", "matches"].includes(tabName)
   ) {
     tabName = "dashboard";
   }

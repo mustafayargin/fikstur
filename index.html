@@ -40,6 +40,9 @@
             <button class="nav-tab" data-tab="predictions">Tahminler</button>
             <button class="nav-tab" data-tab="standings">Puan Durumu</button>
             <button class="nav-tab" data-tab="stats">İstatistikler</button>
+            <button class="nav-tab admin-only" data-tab="notifications">
+              Bildirim Merkezi
+            </button>
             <button class="nav-tab admin-only" data-tab="backup">
               Yedekleme
             </button>
@@ -280,13 +283,13 @@
                   <p id="dashboardMatchModalMeta">-</p>
                 </div>
                 <button
-                id="dashboardMatchModalClose"
-                class="secondary small"
-                type="button"
-                onclick="closeDashboardMatchModal()"
-              >
-                Kapat
-              </button>
+                  id="dashboardMatchModalClose"
+                  class="secondary small"
+                  type="button"
+                  onclick="closeDashboardMatchModal()"
+                >
+                  Kapat
+                </button>
               </div>
               <div id="dashboardMatchModalBody"></div>
             </div>
@@ -666,9 +669,7 @@
 
           <div class="standings-luxury-layout">
             <section class="card standings-week-card">
-              <div
-                class="card-header standings-card-head standings-list-head"
-              >
+              <div class="card-header standings-card-head standings-list-head">
                 <div>
                   <h3>Haftalık Yarış</h3>
                   <p class="card-subtitle">Seçili haftada kim daha formda?</p>
@@ -695,8 +696,6 @@
             </section>
 
             <aside class="standings-side-stack standings-side-stack--luxury">
-
-
               <section
                 class="card standings-insight-card standings-insight-card--luxury"
               >
@@ -776,6 +775,138 @@
               </div>
             </div>
             <div class="stats-deep-grid" id="statsDeepGrid"></div>
+          </section>
+        </section>
+
+
+        <section class="tab-panel admin-only" id="tab-notifications">
+          <div class="page-header notification-page-header">
+            <div>
+              <h2>Bildirim Merkezi</h2>
+              <p>
+                Otomatik cron bildirimlerini takip et, manuel mesaj taslağı hazırla
+                ve gönderim geçmişini tek ekrandan kontrol et.
+              </p>
+            </div>
+            <div class="header-actions notification-header-actions">
+              <span class="badge gray" id="notificationFirebaseStatusBadge">Firebase kontrol ediliyor</span>
+              <span class="badge warn" id="notificationQueueStatusBadge">Kuyruk hazırlanıyor</span>
+            </div>
+          </div>
+
+          <section class="notification-status-grid">
+            <article class="card notification-stat-card">
+              <span>Son cron kontrolü</span>
+              <strong id="notificationLastCronText">Henüz kayıt yok</strong>
+              <small id="notificationLastCronMeta">GitHub Action çalışınca buraya yazılacak.</small>
+            </article>
+            <article class="card notification-stat-card">
+              <span>Başarılı gönderim</span>
+              <strong id="notificationSuccessCountText">0</strong>
+              <small>Son kayıtlardaki başarılı gönderim toplamı.</small>
+            </article>
+            <article class="card notification-stat-card">
+              <span>Bekleyen bildirim</span>
+              <strong id="notificationPendingCountText">0</strong>
+              <small>Firebase kuyruğunda bekleyen manuel mesaj.</small>
+            </article>
+            <article class="card notification-stat-card is-warning">
+              <span>Son hata</span>
+              <strong id="notificationLastErrorText">Yok</strong>
+              <small>Son hata kaydı burada görünecek.</small>
+            </article>
+          </section>
+
+          <section class="notification-layout">
+            <article class="card notification-compose-card">
+              <div class="card-header">
+                <div>
+                  <h3>Manuel Bildirim Hazırla</h3>
+                  <p class="small-meta">
+                    Mesajı Firebase kuyruğuna alır. Cron-job saatte bir GitHub Action çalıştırınca otomatik gönderilir.
+                  </p>
+                </div>
+              </div>
+
+              <div class="notification-form-grid">
+                <label>
+                  Bildirim başlığı
+                  <input id="manualNotificationTitle" type="text" placeholder="Örn: 8. hafta eklendi" />
+                </label>
+                <label>
+                  Hedef kitle
+                  <select id="manualNotificationTarget">
+                    <option value="all">Tüm kullanıcılar</option>
+                    <option value="active">Aktif kullanıcılar</option>
+                    <option value="pending">Tahmini eksik olanlar</option>
+                  </select>
+                </label>
+              </div>
+
+              <label class="notification-message-field">
+                Mesaj metni
+                <textarea id="manualNotificationMessage" rows="7" placeholder="Kullanıcılara gidecek bildirim metnini buraya yaz..."></textarea>
+              </label>
+
+              <div class="notification-preview-box">
+                <span>Önizleme</span>
+                <p id="manualNotificationPreview">
+                  Başlık ve mesaj yazıldığında burada göndermeden önce kontrol edilecek.
+                </p>
+              </div>
+
+              <div class="notification-action-row">
+                <button class="secondary" type="button" id="saveManualNotificationDraftBtn">Taslak Kaydet</button>
+                <button type="button" id="queueManualNotificationBtn">Bildirim Kuyruğuna Al</button>
+              </div>
+            </article>
+
+            <aside class="notification-side-stack">
+              <article class="card notification-mini-card">
+                <h3>Otomatik Bildirimler</h3>
+                <div class="notification-check-list">
+                  <span><b>✓</b> Hafta eklendi bildirimi</span>
+                  <span><b>✓</b> Maça 1 saat kaldı bildirimi</span>
+                  <span><b>✓</b> Tahmin hatırlatma bildirimi</span>
+                </div>
+              </article>
+
+              <article class="card notification-mini-card">
+                <h3>Bağlantı Durumu</h3>
+                <div class="notification-connection-list">
+                  <div><span>Cron-job.org</span><strong id="notificationCronStatus">Saatlik aktif</strong></div>
+                  <div><span>GitHub Action</span><strong id="notificationGithubStatus">notifications.yml</strong></div>
+                  <div><span>Firebase kayıtları</span><strong id="notificationFirebaseStatus">Kontrol ediliyor</strong></div>
+                </div>
+              </article>
+            </aside>
+          </section>
+
+          <section class="card notification-history-card">
+            <div class="card-header">
+              <div>
+                <h3>Bildirim Geçmişi</h3>
+                <p class="small-meta">Firebase kuyruğundaki manuel mesajlar ve otomatik gönderim kayıtları burada listelenir.</p>
+              </div>
+            </div>
+            <div class="notification-history-table-wrap">
+              <table class="notification-history-table">
+                <thead>
+                  <tr>
+                    <th>Tarih</th>
+                    <th>Tip</th>
+                    <th>Mesaj</th>
+                    <th>Hedef</th>
+                    <th>Durum</th>
+                  </tr>
+                </thead>
+                <tbody id="notificationHistoryBody">
+                  <tr>
+                    <td colspan="5">Kayıtlar yükleniyor...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </section>
         </section>
 
@@ -1025,6 +1156,13 @@
           <button
             class="mobile-admin-menu-item"
             type="button"
+            data-tab="notifications"
+          >
+            Bildirimler
+          </button>
+          <button
+            class="mobile-admin-menu-item"
+            type="button"
             data-tab="backup"
           >
             Yedekleme
@@ -1051,11 +1189,7 @@
         </div>
       </div>
       <div class="account-menu-actions">
-        <button
-          class="secondary full"
-          type="button"
-          id="mobilePlayersPageBtn"
-        >
+        <button class="secondary full" type="button" id="mobilePlayersPageBtn">
           Kişiler
         </button>
         <button
@@ -1328,9 +1462,10 @@
         measurementId: "G-9E1VX0KTQH",
       };
 
-      // Firebase Console > Project settings > Cloud Messaging > Web Push certificate
+      // Firebase Console > Project sett3ing > Cloud Messaging > Web Push certificatesdeneme
       // bölümünden oluşturduğun VAPID key buraya yazılacak.
-      window.FIKSTUR_FIREBASE_VAPID_KEY = "BOlctNJfYtPVYYvTBezBinoc66KLJNY8yAAtncF5HwKO7dYfjFW76yoK1agD35aBIqfedJBo_5Fh_5ToWRcXe9E";
+      window.FIKSTUR_FIREBASE_VAPID_KEY =
+        "BOlctNJfYtPVYYvTBezBinoc66KLJNY8yAAtncF5HwKO7dYfjFW76yoK1agD35aBIqfedJBo_5Fh_5ToWRcXe9E";
     </script>
 
     <script src="js/01-bootstrap-firebase.js"></script>

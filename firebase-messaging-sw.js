@@ -24,16 +24,10 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log("[FCM SW] Arka plan bildirimi geldi:", payload);
 
-  const title =
-  payload?.data?.title ||
-  payload?.notification?.title ||
-  "Tahmin Paneli";
+  const title = payload?.notification?.title || "Tahmin Paneli";
 
   const options = {
-    body:
-  payload?.data?.body ||
-  payload?.notification?.body ||
-  "Yeni bildirimin var.",
+    body: payload?.notification?.body || "Yeni bildirimin var.",
     icon: "./icons/icon-192.png",
     badge: "./icons/icon-192.png",
     data: {

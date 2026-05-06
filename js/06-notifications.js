@@ -323,7 +323,7 @@ function bindPredictionNotificationHooks() {
 
   window.addEventListener("focus", checkPredictionNotifications);
 
-  if (Notification?.permission === "granted" && hasValidFiksturVapidKey()) {
+  if (isPredictionNotificationSupported() && Notification.permission === "granted" && hasValidFiksturVapidKey()) {
     setTimeout(() => {
       setupFiksturFcmToken().catch((error) => {
         console.warn("[FCM] Otomatik token yenileme başarısız:", error);
@@ -336,3 +336,297 @@ function bindPredictionNotificationHooks() {
 }
 
 bindPredictionNotificationHooks();
+
+/* Admin Bildirim Merkezi - Firebase Kuyruk Entegrasyonu */
+const ADMIN_NOTIFICATION_DRAFT_KEY = "fikstur_admin_notification_draft_v1";
+const ADMIN_NOTIFICATION_QUEUE_PATH = "adminNotificationQueue";
+const ADMIN_NOTIFICATION_LOG_PATH = "notificationLogs";
+const ADMIN_NOTIFICATION_SENT_PATH = "sentNotifications";
+
+function formatNotificationCenterDate(value) {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleString("tr-TR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getNotificationTargetLabel(target) {
+  if (target === "active") return "Aktif kullanıcılar";
+  if (target === "pending") return "Tahmini eksik olanlar";
+  return "Tüm kullanıcılar";
+}
+
+function setNotificationText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
+}
+
+function getManualNotificationFormValues() {
+  return {
+    title: document.getElementById("manualNotificationTitle")?.value.trim() || "",
+    message: document.getElementById("manualNotificationMessage")?.value.trim() || "",
+    target: document.getElementById("manualNotificationTarget")?.value || "all",
+  };
+}
+
+function updateManualNotificationPreview() {
+  const preview = document.getElementById("manualNotificationPreview");
+  if (!preview) return;
+  const { title, message, target } = getManualNotificationFormValues();
+  if (!title && !message) {
+    preview.textContent = "Başlık ve mesaj yazıldığında burada göndermeden önce kontrol edilecek.";
+    return;
+  }
+  preview.textContent = `${title || "Başlıksız bildirim"} — ${message || "Mesaj metni boş"} (${getNotificationTargetLabel(target)})`;
+}
+
+async function readAdminNotificationCenterData() {
+  const [queue, logs, sent] = await Promise.all([
+    firebaseRead(ADMIN_NOTIFICATION_QUEUE_PATH).catch(() => null),
+    firebaseRead(ADMIN_NOTIFICATION_LOG_PATH).catch(() => null),
+    firebaseRead(ADMIN_NOTIFICATION_SENT_PATH).catch(() => null),
+  ]);
+  return { queue: queue || {}, logs: logs || {}, sent: sent || {} };
+}
+
+function normalizeNotificationRows(data) {
+  const rows = [];
+
+  Object.entries(data.queue || {}).forEach(([id, item]) => {
+    rows.push({
+      id,
+      date: item.createdAt || item.updatedAt,
+      type: item.type === "manual" ? "Manuel" : "Kuyruk",
+      message: `${item.title || "Başlıksız"} - ${item.message || ""}`,
+      target: getNotificationTargetLabel(item.target),
+      status: item.status || "pending",
+      successCount: item.successCount || 0,
+      errorCount: item.errorCount || 0,
+      errorMessage: item.errorMessage || "",
+    });
+  });
+
+  Object.entries(data.logs || {}).forEach(([id, item]) => {
+    rows.push({
+      id,
+      date: item.createdAt || item.sentAt || item.finishedAt,
+      type: item.type || "Log",
+      message: item.message || item.title || "Bildirim kaydı",
+      target: getNotificationTargetLabel(item.target),
+      status: item.status || "done",
+      successCount: item.successCount || 0,
+      errorCount: item.errorCount || 0,
+      errorMessage: item.errorMessage || "",
+    });
+  });
+
+  Object.entries(data.sent || {}).forEach(([id, item]) => {
+    rows.push({
+      id,
+      date: item.sentAt,
+      type: item.weekNo ? "Otomatik hafta" : item.type ? `Otomatik ${item.type}` : "Otomatik",
+      message: item.weekNo ? `${item.weekNo}. hafta bildirimi gönderildi` : "Maç hatırlatma bildirimi gönderildi",
+      target: "Tüm kullanıcılar",
+      status: item.sent ? "sent" : "done",
+      successCount: item.successCount || 0,
+      errorCount: item.errorCount || 0,
+      errorMessage: item.errorMessage || "",
+    });
+  });
+
+  return rows.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+}
+
+function renderNotificationHistoryRows(rows) {
+  const tbody = document.getElementById("notificationHistoryBody");
+  if (!tbody) return;
+
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="5">Henüz bildirim kaydı yok.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.slice(0, 12).map((row) => {
+    const status = String(row.status || "pending");
+    const badgeClass = status === "sent" || status === "done" || status === "processed" ? "success" : status === "error" || status === "failed" ? "danger" : "gray";
+    const statusText = status === "pending" ? "Bekliyor" : status === "processing" ? "İşleniyor" : status === "sent" || status === "done" || status === "processed" ? "Gönderildi" : status === "error" || status === "failed" ? "Hata" : status;
+    const extra = row.successCount ? ` (${row.successCount} başarılı)` : row.errorMessage ? ` - ${row.errorMessage}` : "";
+    return `
+      <tr>
+        <td>${escapeHtml(formatNotificationCenterDate(row.date))}</td>
+        <td>${escapeHtml(row.type)}</td>
+        <td>${escapeHtml(row.message)}</td>
+        <td>${escapeHtml(row.target)}</td>
+        <td><span class="badge ${badgeClass}">${escapeHtml(statusText + extra)}</span></td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function updateNotificationSummary(rows) {
+  const pendingCount = rows.filter((r) => ["pending", "queued", "draft"].includes(String(r.status || ""))).length;
+  const successTotal = rows.reduce((sum, r) => sum + (Number(r.successCount) || 0), 0);
+  const lastRow = rows[0];
+  const lastError = rows.find((r) => r.status === "error" || r.status === "failed" || r.errorMessage);
+
+  setNotificationText("notificationPendingCountText", String(pendingCount));
+  setNotificationText("notificationSuccessCountText", String(successTotal));
+  setNotificationText("notificationLastCronText", lastRow ? formatNotificationCenterDate(lastRow.date) : "Henüz kayıt yok");
+  setNotificationText("notificationLastCronMeta", lastRow ? `${lastRow.type} · ${lastRow.status}` : "GitHub Action çalışınca buraya yazılacak.");
+  setNotificationText("notificationLastErrorText", lastError ? (lastError.errorMessage || "Hata var") : "Yok");
+  setNotificationText("notificationFirebaseStatus", isFirebaseReady() ? "Bağlı" : "Kapalı");
+
+  const fbBadge = document.getElementById("notificationFirebaseStatusBadge");
+  if (fbBadge) {
+    fbBadge.textContent = isFirebaseReady() ? "Firebase bağlı" : "Firebase kapalı";
+    fbBadge.className = `badge ${isFirebaseReady() ? "success" : "warn"}`;
+  }
+
+  const queueBadge = document.getElementById("notificationQueueStatusBadge");
+  if (queueBadge) {
+    queueBadge.textContent = pendingCount ? `${pendingCount} bekleyen` : "Kuyruk boş";
+    queueBadge.className = `badge ${pendingCount ? "warn" : "gray"}`;
+  }
+}
+
+async function renderNotificationCenter() {
+  if (!document.getElementById("tab-notifications")) return;
+  updateManualNotificationPreview();
+
+  const draft = (() => {
+    try { return JSON.parse(localStorage.getItem(ADMIN_NOTIFICATION_DRAFT_KEY) || "null"); } catch { return null; }
+  })();
+  if (draft && !document.getElementById("manualNotificationTitle")?.value && !document.getElementById("manualNotificationMessage")?.value) {
+    const titleEl = document.getElementById("manualNotificationTitle");
+    const msgEl = document.getElementById("manualNotificationMessage");
+    const targetEl = document.getElementById("manualNotificationTarget");
+    if (titleEl) titleEl.value = draft.title || "";
+    if (msgEl) msgEl.value = draft.message || "";
+    if (targetEl) targetEl.value = draft.target || "all";
+    updateManualNotificationPreview();
+  }
+
+  if (!isFirebaseReady()) {
+    renderNotificationHistoryRows([]);
+    updateNotificationSummary([]);
+    return;
+  }
+
+  try {
+    const data = await readAdminNotificationCenterData();
+    const rows = normalizeNotificationRows(data);
+    renderNotificationHistoryRows(rows);
+    updateNotificationSummary(rows);
+  } catch (error) {
+    console.error("Bildirim merkezi yüklenemedi:", error);
+    setNotificationText("notificationLastErrorText", error.message || "Yüklenemedi");
+  }
+}
+
+async function queueManualNotification() {
+  if (getCurrentRole() !== "admin") {
+    alert("Bu işlem sadece admin içindir.");
+    return;
+  }
+
+  if (!isFirebaseReady()) {
+    alert("Firebase bağlantısı hazır değil. Bildirim kuyruğuna alınamadı.");
+    return;
+  }
+
+  const { title, message, target } = getManualNotificationFormValues();
+  if (!title || !message) {
+    alert("Başlık ve mesaj metni zorunlu kanka.");
+    return;
+  }
+
+  const id = sanitizeFirebaseKey(`manual_${Date.now()}`);
+  const now = new Date().toISOString();
+  const payload = {
+    id,
+    type: "manual",
+    status: "pending",
+    title,
+    message,
+    target,
+    createdAt: now,
+    createdBy: getCurrentUsername() || "admin",
+  };
+
+  await firebaseWrite(`${ADMIN_NOTIFICATION_QUEUE_PATH}/${id}`, payload);
+  localStorage.removeItem(ADMIN_NOTIFICATION_DRAFT_KEY);
+
+  const titleEl = document.getElementById("manualNotificationTitle");
+  const msgEl = document.getElementById("manualNotificationMessage");
+  if (titleEl) titleEl.value = "";
+  if (msgEl) msgEl.value = "";
+  updateManualNotificationPreview();
+  await renderNotificationCenter();
+  alert("Bildirim Firebase kuyruğuna alındı. Cron-job çalışınca gönderilecek.");
+}
+
+function saveManualNotificationDraft() {
+  const values = getManualNotificationFormValues();
+  localStorage.setItem(ADMIN_NOTIFICATION_DRAFT_KEY, JSON.stringify(values));
+  alert("Taslak bu cihazda kaydedildi kanka.");
+}
+
+function bindAdminNotificationCenterEvents() {
+  if (window.__adminNotificationCenterBound) return;
+  window.__adminNotificationCenterBound = true;
+
+  document.addEventListener("input", (event) => {
+    if (["manualNotificationTitle", "manualNotificationMessage"].includes(event.target?.id)) {
+      updateManualNotificationPreview();
+    }
+  });
+
+  document.addEventListener("change", (event) => {
+    if (event.target?.id === "manualNotificationTarget") updateManualNotificationPreview();
+  });
+
+  document.addEventListener("click", async (event) => {
+    const draftButton = event.target.closest?.("#saveManualNotificationDraftBtn");
+    const queueButton = event.target.closest?.("#queueManualNotificationBtn");
+
+    if (draftButton) {
+      event.preventDefault();
+      saveManualNotificationDraft();
+      return;
+    }
+
+    if (queueButton) {
+      event.preventDefault();
+      queueButton.disabled = true;
+      try {
+        await queueManualNotification();
+      } catch (error) {
+        console.error("Bildirim kuyruğa alınamadı:", error);
+        alert(`Bildirim kuyruğa alınamadı: ${error.message || error}`);
+      } finally {
+        queueButton.disabled = false;
+      }
+    }
+  });
+}
+
+window.renderNotificationCenter = renderNotificationCenter;
+window.updateManualNotificationPreview = updateManualNotificationPreview;
+window.queueManualNotification = queueManualNotification;
+window.saveManualNotificationDraft = saveManualNotificationDraft;
+
+bindAdminNotificationCenterEvents();
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => {
+    bindAdminNotificationCenterEvents();
+    renderNotificationCenter().catch((error) => console.warn("Bildirim merkezi ilk yükleme hatası:", error));
+  });
+} else {
+  renderNotificationCenter().catch((error) => console.warn("Bildirim merkezi ilk yükleme hatası:", error));
+}

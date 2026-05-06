@@ -3995,7 +3995,7 @@ function applyRolePermissions() {
   const currentTab = state.settings.currentTab || "dashboard";
   if (
     role !== "admin" &&
-    ["backup", "seasons", "weeks", "matches"].includes(currentTab)
+    ["backup", "notifications", "seasons", "weeks", "matches"].includes(currentTab)
   ) {
     switchTab("dashboard");
     return;
@@ -4003,7 +4003,7 @@ function applyRolePermissions() {
 
   document
     .querySelectorAll(
-      "#tab-seasons button, #tab-seasons input, #tab-seasons select, #tab-weeks button, #tab-weeks input, #tab-weeks select, #tab-matches button, #tab-matches input, #tab-matches select, #tab-players button, #tab-players input, #tab-players select, #tab-backup button, #tab-backup input, #tab-backup select",
+      "#tab-seasons button, #tab-seasons input, #tab-seasons select, #tab-weeks button, #tab-weeks input, #tab-weeks select, #tab-matches button, #tab-matches input, #tab-matches select, #tab-players button, #tab-players input, #tab-players select, #tab-notifications button, #tab-notifications input, #tab-notifications select, #tab-notifications textarea, #tab-backup button, #tab-backup input, #tab-backup select",
     )
     .forEach((el) => {
       if (role === "admin" && authReady) {
