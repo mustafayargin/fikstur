@@ -102,18 +102,46 @@ jobs:
               );
             };
 
-            const [tokensSnap, matchesSnap, sentSnap] = await Promise.all([
+            const [tokensSnap, usersSnap, matchesSnap, sentSnap, queueSnap] = await Promise.all([
               db.ref("fcmTokens").once("value"),
+              db.ref("users").once("value"),
               db.ref("matches").once("value"),
-              db.ref("sentNotifications").once("value")
+              db.ref("sentNotifications").once("value"),
+              db.ref("adminNotificationQueue").once("value")
             ]);
 
-            const tokens = Object.values(tokensSnap.val() || {})
-              .map(i => i?.token)
-              .filter(Boolean);
+            const tokenRecords = Object.values(tokensSnap.val() || {})
+              .filter(i => i?.token);
+
+            const usersData = usersSnap.val() || {};
+            const activeUserIds = new Set(
+              Object.values(usersData)
+                .filter(u => u && u.aktif !== false && u.active !== false)
+                .flatMap(u => [u.id, u.playerId, u.kisiId, u.kullaniciAdi].filter(Boolean).map(String))
+            );
+
+            const selectTokensForTarget = (target) => {
+              const selected = tokenRecords.filter((item) => {
+                if (target === "active") {
+                  const ids = [item.userId, item.playerId, item.username, item.kullaniciAdi]
+                    .filter(Boolean)
+                    .map(String);
+                  return ids.length === 0 || ids.some(id => activeUserIds.has(id));
+                }
+
+                // pending hedefi ikinci aşamada tahmini eksik kullanıcı filtrelemesine bağlanacak.
+                // Şimdilik güvenli davranıp tüm tokenlara gönderiyoruz.
+                return true;
+              });
+
+              return [...new Set(selected.map(i => i.token).filter(Boolean))];
+            };
+
+            const tokens = selectTokensForTarget("all");
 
             const matches = Object.entries(matchesSnap.val() || {});
             const sentData = sentSnap.val() || {};
+            const queueData = queueSnap.val() || {};
 
             console.log(`Token: ${tokens.length} | Maç: ${matches.length}`);
 
@@ -131,6 +159,79 @@ jobs:
 
               console.log("Test sonucu:", res.successCount, "başarılı.");
               return;
+            }
+
+            const pendingManualNotifications = Object.entries(queueData)
+              .filter(([id, item]) => item && item.status === "pending" && item.type === "manual")
+              .sort((a, b) => String(a[1].createdAt || "").localeCompare(String(b[1].createdAt || "")))
+              .slice(0, 5);
+
+            for (const [queueId, item] of pendingManualNotifications) {
+              const targetTokens = selectTokensForTarget(item.target || "all");
+              const startedAt = new Date().toISOString();
+
+              console.log(`Manuel bildirim gönderiliyor: ${queueId} | hedef token: ${targetTokens.length}`);
+
+              await db.ref(`adminNotificationQueue/${queueId}`).update({
+                status: "processing",
+                startedAt,
+                updatedAt: startedAt
+              });
+
+              try {
+                if (targetTokens.length === 0) {
+                  throw new Error("Hedef kullanıcı/token bulunamadı.");
+                }
+
+                let res = { successCount: 0, failureCount: 0 };
+                if (process.env.TEST_MODE === "normal") {
+                  res = await sendToTokens(
+                    targetTokens,
+                    item.title || "Skor Avcıları",
+                    item.message || "Yeni bildirimin var."
+                  );
+                }
+
+                const finishedAt = new Date().toISOString();
+                await db.ref(`adminNotificationQueue/${queueId}`).update({
+                  status: "sent",
+                  successCount: res.successCount || 0,
+                  errorCount: res.failureCount || 0,
+                  finishedAt,
+                  updatedAt: finishedAt
+                });
+
+                await db.ref(`notificationLogs/${queueId}`).set({
+                  type: "Manuel",
+                  status: "sent",
+                  title: item.title || "Skor Avcıları",
+                  message: item.message || "Yeni bildirimin var.",
+                  target: item.target || "all",
+                  successCount: res.successCount || 0,
+                  errorCount: res.failureCount || 0,
+                  createdAt: finishedAt
+                });
+              } catch (error) {
+                const failedAt = new Date().toISOString();
+                console.error(`Manuel bildirim hata verdi (${queueId}):`, error);
+
+                await db.ref(`adminNotificationQueue/${queueId}`).update({
+                  status: "error",
+                  errorMessage: error.message || String(error),
+                  finishedAt: failedAt,
+                  updatedAt: failedAt
+                });
+
+                await db.ref(`notificationLogs/${queueId}`).set({
+                  type: "Manuel",
+                  status: "error",
+                  title: item.title || "Skor Avcıları",
+                  message: item.message || "Yeni bildirimin var.",
+                  target: item.target || "all",
+                  errorMessage: error.message || String(error),
+                  createdAt: failedAt
+                });
+              }
             }
 
             const now = new Date();
@@ -210,7 +311,9 @@ jobs:
                       await db.ref(`sentNotifications/${key}`).set({
                         sent: true,
                         sentAt: new Date().toISOString(),
-                        type
+                        type,
+                        successCount: res.successCount || 0,
+                        errorCount: res.failureCount || 0
                       });
                     }
                   }
