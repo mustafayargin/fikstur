@@ -1246,18 +1246,21 @@
           </section>
 
           <div class="dashboard-grid backup-layout backup-layout-redesign">
+
             <section class="card stack-actions backup-main-card">
-              <div class="card-header"><h3>Haftalık Dışa Aktarma</h3></div>
-              <label for="backupWeekSelect">Hafta seç</label>
-              <select id="backupWeekSelect"></select>
-              <div class="status-note" id="backupWeekSummary">
-                Hafta bilgisi hazırlanıyor...
+              <div class="card-header"><h3>Sezon Yedeği</h3></div>
+              <div class="status-note">
+                Seçili sezonu; sezon bilgisi, haftalar, takımlar, maçlar,
+                tahminler, kullanıcı sezon bilgileri ve ilgili Firebase kayıtlarıyla
+                tek JSON dosyası olarak indirir.
               </div>
-              <div class="backup-action-grid">
-                <button id="exportWeekCsvBtn">Seçili Haftayı CSV İndir</button>
-                <button class="secondary" id="exportWeekJsonBtn">
-                  Seçili Haftayı JSON İndir
-                </button>
+              <label for="backupSeasonSelect">Sezon seç</label>
+              <select id="backupSeasonSelect"></select>
+              <div class="status-note" id="backupSeasonSummary">
+                Sezon bilgisi hazırlanıyor...
+              </div>
+              <div class="backup-action-grid single-col">
+                <button id="exportSeasonBackupBtn">Seçili Sezonu JSON Yedekle</button>
               </div>
             </section>
 
@@ -1265,7 +1268,8 @@
               <div class="card-header"><h3>Tam Yedek ve Geri Yükleme</h3></div>
               <div class="status-note">
                 Tam yedek tüm sezonları, haftaları, maçları, kullanıcıları ve
-                tahminleri içerir.
+                tahminleri içerir. Sezon JSON dosyası yüklersen sadece ilgili
+                sezon geri alınır.
               </div>
               <div class="backup-action-grid single-col">
                 <button id="exportFullBackupBtn">Tüm Veriyi Yedekle</button>

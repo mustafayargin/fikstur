@@ -642,15 +642,6 @@ function switchTab(tabName, options = {}) {
   saveState(true);
 }
 
-function getBackupSelectedWeekId() {
-  const select = document.getElementById("backupWeekSelect");
-  return select?.value || state.settings.activeWeekId || "";
-}
-
-function getBackupSelectedWeek() {
-  const weekId = getBackupSelectedWeekId();
-  return weekId ? getWeekById(weekId) : null;
-}
 
 function formatBackupDateStamp() {
   return new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
@@ -694,116 +685,258 @@ function buildFullBackupPayload() {
   };
 }
 
-function buildWeekExportPayload(weekId) {
-  const week = getWeekById(weekId);
-  if (!week) return null;
+function getBackupSelectedSeasonId() {
+  const select = document.getElementById("backupSeasonSelect");
+  return select?.value || getActiveSeasonId() || state.seasons?.[0]?.id || "";
+}
 
-  const season = getSeasonById(week.seasonId);
-  const matches = getMatchesByWeekId(weekId);
-  const matchIds = new Set(matches.map((match) => String(match.id)));
-  const predictions = state.predictions.filter((pred) =>
-    matchIds.has(String(pred.matchId)),
+function getBackupSelectedSeason() {
+  const seasonId = getBackupSelectedSeasonId();
+  return seasonId ? getSeasonById(seasonId) : null;
+}
+
+function backupMapToArray(map) {
+  if (!map || typeof map !== "object") return [];
+  return Object.entries(map).map(([key, value]) => ({
+    _firebaseKey: key,
+    ...(value || {}),
+    id: value?.id || key,
+  }));
+}
+
+function backupArrayToFirebaseMap(rows = []) {
+  const out = {};
+  (rows || []).forEach((item) => {
+    const key = sanitizeFirebaseKey(item._firebaseKey || item.id || uid("row"));
+    if (!key) return;
+    const clean = { ...(item || {}) };
+    delete clean._firebaseKey;
+    out[key] = clean;
+  });
+  return out;
+}
+
+function isSeasonRelatedBackupRecord(item = {}, ctx = {}) {
+  const seasonId = normalizeText(ctx.seasonId || "");
+  const seasonName = normalizeText(ctx.seasonName || "");
+  const matchIds = ctx.matchIds || new Set();
+  const weekIds = ctx.weekIds || new Set();
+  const itemSeasonId = normalizeText(item.seasonId || item.localSeasonId || item.sezonId || "");
+  const itemSeasonName = normalizeText(item.season || item.sezon || item.seasonName || "");
+  const itemMatchId = String(item.matchId || item.localMatchId || item.macId || "").trim();
+  const itemWeekId = String(item.weekId || item.localWeekId || item.haftaId || "").trim();
+
+  if (seasonId && itemSeasonId && itemSeasonId === seasonId) return true;
+  if (seasonName && itemSeasonName && itemSeasonName === seasonName) return true;
+  if (itemMatchId && matchIds.has(itemMatchId)) return true;
+  if (itemWeekId && weekIds.has(itemWeekId)) return true;
+  return false;
+}
+
+async function buildFirebaseSeasonBackupData(season, appStateData = null) {
+  if (!season || !isFirebaseReady()) return null;
+
+  const [settings, users, matches, predictions, predictionLogs, auditLogs, notificationLogs, queue, sent] =
+    await Promise.all([
+      firebaseRead("settings").catch(() => null),
+      firebaseRead("users").catch(() => null),
+      firebaseRead("matches").catch(() => null),
+      firebaseRead("predictions").catch(() => null),
+      firebaseRead("predictionLogs").catch(() => null),
+      firebaseRead("settings/auditLogs").catch(() => null),
+      firebaseRead("notificationLogs").catch(() => null),
+      firebaseRead("adminNotificationQueue").catch(() => null),
+      firebaseRead("sentNotifications").catch(() => null),
+    ]);
+
+  const localMatches = getMatchesBySeasonId(season.id);
+  const localWeeks = getWeeksBySeasonId(season.id);
+  const ctx = {
+    seasonId: String(season.id || ""),
+    seasonName: String(season.name || ""),
+    matchIds: new Set(localMatches.map((match) => String(match.id))),
+    weekIds: new Set(localWeeks.map((week) => String(week.id))),
+  };
+
+  const remoteMatches = backupMapToArray(matches).filter((item) =>
+    isSeasonRelatedBackupRecord(item, ctx),
   );
-  const playerIds = new Set(predictions.map((pred) => String(pred.playerId)));
-  const players = state.players.filter((player) =>
-    playerIds.has(String(player.id)),
+  remoteMatches.forEach((match) => ctx.matchIds.add(String(match.id || match._firebaseKey || "")));
+
+  const remotePredictions = backupMapToArray(predictions).filter((item) =>
+    isSeasonRelatedBackupRecord(item, ctx),
   );
-  const teams = state.teams.filter(
-    (team) => String(team.seasonId) === String(week.seasonId),
+
+  const usedPlayerIds = new Set(
+    remotePredictions
+      .map((pred) => String(pred.playerId || pred.kullaniciId || pred.userId || ""))
+      .filter(Boolean),
   );
+
+  const remoteUsers = backupMapToArray(users).filter((user) => {
+    const userId = String(user.id || user._firebaseKey || "");
+    if (usedPlayerIds.has(userId)) return true;
+    const seasonStates = normalizeSeasonStateMap(
+      user.seasonStates || user.seasonMemberships || user.activeSeasons || {},
+    );
+    return Object.prototype.hasOwnProperty.call(seasonStates, season.id);
+  });
+
+  const filterMap = (map) => backupMapToArray(map).filter((item) => isSeasonRelatedBackupRecord(item, ctx));
 
   return {
-    type: "week-backup",
-    app: "super-lig-tahmin-paneli",
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    season: season ? { ...season } : null,
-    week: { ...week },
-    teams,
-    players,
-    matches,
-    predictions,
+    exportedFromFirebaseAt: new Date().toISOString(),
+    appState: appStateData ? serializeStateForBackup(appStateData) : null,
+    settings: {
+      seasonsMeta: Array.isArray(settings?.seasonsMeta)
+        ? settings.seasonsMeta.filter((item) =>
+            normalizeText(item.id || "") === normalizeText(season.id || "") ||
+            normalizeText(item.name || "") === normalizeText(season.name || ""),
+          )
+        : [],
+    },
+    users: remoteUsers,
+    matches: remoteMatches,
+    predictions: remotePredictions,
+    predictionLogs: filterMap(predictionLogs),
+    auditLogs: filterMap(auditLogs),
+    notificationLogs: filterMap(notificationLogs),
+    adminNotificationQueue: filterMap(queue),
+    sentNotifications: filterMap(sent),
   };
 }
 
-function buildWeekCsv(weekId) {
-  const week = getWeekById(weekId);
-  if (!week) return "";
+async function buildSeasonBackupPayload(seasonId) {
+  const season = getSeasonById(seasonId);
+  if (!season) return null;
 
-  const season = getSeasonById(week.seasonId);
-  const matches = getMatchesByWeekId(weekId);
+  const weeks = getWeeksBySeasonId(season.id);
+  const teams = state.teams.filter((team) => String(team.seasonId) === String(season.id));
+  const matches = getMatchesBySeasonId(season.id);
+  const matchIds = new Set(matches.map((match) => String(match.id)));
+  const predictions = state.predictions.filter((pred) => matchIds.has(String(pred.matchId)));
+  const players = state.players.map((player) => ({ ...player }));
 
-  const orderedPlayers = [...state.players]
-    .filter((player) => getPlayerRole(player) !== "admin")
-    .sort((a, b) =>
-      String(a.name || "").localeCompare(String(b.name || ""), "tr"),
-    );
+  const localData = {
+    seasons: [{ ...season }],
+    weeks,
+    teams,
+    matches,
+    predictions,
+    players,
+    settings: {
+      activeSeasonId: season.id,
+      activeWeekId: weeks[0]?.id || null,
+      celebratedChampions: state.settings?.celebratedChampions?.[season.id]
+        ? { [season.id]: state.settings.celebratedChampions[season.id] }
+        : {},
+    },
+  };
 
-  const header = [
-    "Sezon",
-    "Hafta",
-    "Tarih",
-    "Ev Sahibi",
-    "Deplasman",
-    "Gerçek Skor",
-    "Durum",
+  return {
+    type: "season-full-backup",
+    app: "super-lig-tahmin-paneli",
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    season: { id: season.id, name: season.name, leagueName: season.leagueName || "" },
+    firebaseData: await buildFirebaseSeasonBackupData(season, localData),
+  };
+}
+
+async function restoreFirebaseSeasonBackupData(firebaseData) {
+  if (!firebaseData || !isFirebaseReady()) return false;
+
+  const writeRows = async (path, rows) => {
+    const entries = Object.entries(backupArrayToFirebaseMap(rows));
+    for (const [key, value] of entries) {
+      await firebaseWrite(`${path}/${key}`, value);
+    }
+  };
+
+  await Promise.all([
+    writeRows("users", firebaseData.users || []),
+    writeRows("matches", firebaseData.matches || []),
+    writeRows("predictions", firebaseData.predictions || []),
+    writeRows("predictionLogs", firebaseData.predictionLogs || []),
+    writeRows("settings/auditLogs", firebaseData.auditLogs || []),
+    writeRows("notificationLogs", firebaseData.notificationLogs || []),
+    writeRows("adminNotificationQueue", firebaseData.adminNotificationQueue || []),
+    writeRows("sentNotifications", firebaseData.sentNotifications || []),
+  ]);
+
+  const seasonsMeta = firebaseData.settings?.seasonsMeta || [];
+  if (seasonsMeta.length) {
+    const currentSettings = (await firebaseRead("settings").catch(() => null)) || {};
+    const currentMeta = Array.isArray(currentSettings.seasonsMeta) ? currentSettings.seasonsMeta : [];
+    const metaMap = new Map(currentMeta.map((item) => [String(item.id || item.name), item]));
+    seasonsMeta.forEach((item) => metaMap.set(String(item.id || item.name), item));
+    await firebaseUpdate("settings", { seasonsMeta: Array.from(metaMap.values()) });
+  }
+
+  return true;
+}
+
+function getSeasonBackupAppState(payload) {
+  return payload?.firebaseData?.appState || payload?.data || null;
+}
+
+function mergeSeasonBackupIntoState(payload) {
+  const incoming = getSeasonBackupAppState(payload) || {};
+  const season = incoming.seasons?.[0] || payload?.season || null;
+  if (!season?.id) throw new Error("Sezon bilgisi bulunamadı.");
+
+  const next = serializeStateForBackup(state);
+  const seasonId = String(season.id);
+  const incomingMatches = incoming.matches || [];
+  const incomingMatchIds = new Set(incomingMatches.map((match) => String(match.id)));
+
+  next.seasons = [
+    ...(next.seasons || []).filter((item) => String(item.id) !== seasonId),
+    { ...season },
+  ];
+  next.weeks = [
+    ...(next.weeks || []).filter((item) => String(item.seasonId) !== seasonId),
+    ...(incoming.weeks || []),
+  ];
+  next.teams = [
+    ...(next.teams || []).filter((item) => String(item.seasonId) !== seasonId),
+    ...(incoming.teams || []),
   ];
 
-  orderedPlayers.forEach((player) => {
-    header.push(`${player.name} Tahmin`);
-    header.push(`${player.name} Puan`);
+  const removedMatchIds = new Set(
+    (next.matches || [])
+      .filter((match) => String(match.seasonId) === seasonId)
+      .map((match) => String(match.id)),
+  );
+  incomingMatchIds.forEach((id) => removedMatchIds.add(id));
+
+  next.matches = [
+    ...(next.matches || []).filter((match) => String(match.seasonId) !== seasonId),
+    ...incomingMatches,
+  ];
+  next.predictions = [
+    ...(next.predictions || []).filter((pred) => !removedMatchIds.has(String(pred.matchId))),
+    ...(incoming.predictions || []),
+  ];
+
+  const playerMap = new Map((next.players || []).map((player) => [String(player.id), player]));
+  (incoming.players || []).forEach((player) => {
+    if (!player?.id) return;
+    playerMap.set(String(player.id), { ...(playerMap.get(String(player.id)) || {}), ...player });
   });
+  next.players = Array.from(playerMap.values());
 
-  const rows = matches.map((match) => {
-    const dateLabel = match.date ? formatDate(match.date) : "";
+  next.settings = { ...(next.settings || {}) };
+  next.settings.activeSeasonId = seasonId;
+  next.settings.activeWeekId = incoming.settings?.activeWeekId || (incoming.weeks || [])[0]?.id || next.settings.activeWeekId || null;
+  next.settings.celebratedChampions = {
+    ...(next.settings.celebratedChampions || {}),
+    ...(incoming.settings?.celebratedChampions || {}),
+  };
 
-    const actualScoreRaw =
-      match.homeScore !== null &&
-      match.homeScore !== undefined &&
-      match.homeScore !== "" &&
-      match.awayScore !== null &&
-      match.awayScore !== undefined &&
-      match.awayScore !== ""
-        ? `${match.homeScore}-${match.awayScore}`
-        : "";
-
-    const actualScore = forceExcelText(actualScoreRaw);
-
-    const row = [
-      season?.name || "",
-      week.number || "",
-      dateLabel,
-      match.homeTeam || "",
-      match.awayTeam || "",
-      actualScore,
-      match.played ? "Oynandı" : isMatchLocked(match) ? "Kilitli" : "Açık",
-    ];
-
-    orderedPlayers.forEach((player) => {
-      const pred = state.predictions.find(
-        (item) =>
-          String(item.matchId) === String(match.id) &&
-          String(item.playerId) === String(player.id),
-      );
-
-      const predictionRaw =
-        pred && (pred.homePred !== "" || pred.awayPred !== "")
-          ? `${pred.homePred !== "" ? pred.homePred : "-"}-${pred.awayPred !== "" ? pred.awayPred : "-"}`
-          : "";
-
-      const predictionText = forceExcelText(predictionRaw);
-
-      row.push(predictionText);
-      row.push(pred ? Number(pred.points || 0) : "");
-    });
-
-    return row;
-  });
-
-  return [header, ...rows]
-    .map((row) => row.map(csvEscape).join(";"))
-    .join("\n");
+  return next;
 }
+
 
 async function syncBackupStateToFirebase(stateObj) {
   if (!isFirebaseReady()) return true;
@@ -935,6 +1068,33 @@ async function applyImportedState(nextState, options = {}) {
   return true;
 }
 
+async function exportSelectedSeasonBackup() {
+  const season = getBackupSelectedSeason();
+  if (!season) {
+    showAlert("Önce dışa aktarmak istediğin sezonu seçmelisin.", {
+      title: "Sezon seçilmedi",
+      type: "warning",
+    });
+    return;
+  }
+
+  const payload = await buildSeasonBackupPayload(season.id);
+  if (!payload) {
+    showAlert("Sezon yedeği hazırlanamadı.", {
+      title: "Yedek hatası",
+      type: "danger",
+    });
+    return;
+  }
+
+  downloadTextFile(
+    JSON.stringify(payload, null, 2),
+    `fikstur-${slugify(season.name || "sezon")}-tam-sezon-yedegi-${formatBackupDateStamp()}.json`,
+    "application/json",
+  );
+  setBackupImportStatus(`${season.name} sezon yedeği indirildi.`);
+}
+
 async function exportFullBackup() {
   const payload = buildFullBackupPayload();
   downloadTextFile(
@@ -943,147 +1103,6 @@ async function exportFullBackup() {
     "application/json",
   );
   setBackupImportStatus("Tam yedek indirildi.");
-}
-
-async function exportSelectedWeekJson() {
-  const week = getBackupSelectedWeek();
-  if (!week) {
-    showAlert("Önce dışa aktarmak istediğin haftayı seçmelisin.", {
-      title: "Hafta seçilmedi",
-      type: "warning",
-    });
-    return;
-  }
-
-  const payload = buildWeekExportPayload(week.id);
-  const season = getSeasonById(week.seasonId);
-  downloadTextFile(
-    JSON.stringify(payload, null, 2),
-    `fikstur-${slugify(season?.name || "sezon")}-hafta-${week.number || "x"}.json`,
-    "application/json",
-  );
-  setBackupImportStatus(`Hafta ${week.number} JSON olarak indirildi.`);
-}
-
-async function exportSelectedWeekCsv() {
-  const week = getBackupSelectedWeek();
-  if (!week) {
-    showAlert("Önce dışa aktarmak istediğin haftayı seçmelisin.", {
-      title: "Hafta seçilmedi",
-      type: "warning",
-    });
-    return;
-  }
-
-  const season = getSeasonById(week.seasonId);
-  const csv = buildWeekCsv(week.id);
-  downloadTextFile(
-    "﻿" + csv,
-    `fikstur-${slugify(season?.name || "sezon")}-hafta-${week.number || "x"}.csv`,
-    "text/csv;charset=utf-8",
-  );
-  setBackupImportStatus(`Hafta ${week.number} CSV olarak indirildi.`);
-}
-
-function mergeWeekBackupIntoState(payload) {
-  const next = serializeStateForBackup(state);
-  const season = payload.season || null;
-  const week = payload.week || null;
-  if (!week) throw new Error("Hafta bilgisi bulunamadı.");
-
-  let targetSeasonId = season?.id || null;
-  if (season) {
-    const existingSeason = next.seasons.find(
-      (item) => normalizeText(item.name) === normalizeText(season.name || ""),
-    );
-    if (existingSeason) {
-      targetSeasonId = existingSeason.id;
-    } else {
-      targetSeasonId = season.id || uid("season");
-      next.seasons.push({ ...season, id: targetSeasonId });
-    }
-  }
-
-  let targetWeekId = week.id || uid("week");
-  const existingWeek = next.weeks.find(
-    (item) =>
-      String(item.seasonId) === String(targetSeasonId) &&
-      Number(item.number) === Number(week.number),
-  );
-  if (existingWeek) {
-    targetWeekId = existingWeek.id;
-  } else {
-    next.weeks.push({ ...week, id: targetWeekId, seasonId: targetSeasonId });
-  }
-
-  (payload.teams || []).forEach((team) => {
-    if (
-      !next.teams.some(
-        (item) =>
-          String(item.seasonId) === String(targetSeasonId) &&
-          normalizeText(item.name) === normalizeText(team.name || ""),
-      )
-    ) {
-      next.teams.push({
-        ...team,
-        id: team.id || uid("team"),
-        seasonId: targetSeasonId,
-      });
-    }
-  });
-
-  (payload.players || []).forEach((player) => {
-    if (!next.players.some((item) => String(item.id) === String(player.id))) {
-      next.players.push({ ...player });
-    }
-  });
-
-  const incomingMatches = (payload.matches || []).map((match) => ({
-    ...match,
-  }));
-  const incomingPredictions = (payload.predictions || []).map((pred) => ({
-    ...pred,
-  }));
-  const matchIdMap = new Map();
-
-  const removedMatchIds = new Set(
-    next.matches
-      .filter((match) => String(match.weekId) === String(targetWeekId))
-      .map((match) => String(match.id)),
-  );
-
-  next.matches = next.matches.filter(
-    (match) => String(match.weekId) !== String(targetWeekId),
-  );
-  next.predictions = next.predictions.filter(
-    (pred) => !removedMatchIds.has(String(pred.matchId)),
-  );
-
-  incomingMatches.forEach((match) => {
-    const newId = uid("match");
-    matchIdMap.set(String(match.id), newId);
-    next.matches.push({
-      ...match,
-      id: newId,
-      seasonId: targetSeasonId,
-      weekId: targetWeekId,
-    });
-  });
-
-  incomingPredictions.forEach((pred) => {
-    const mappedMatchId = matchIdMap.get(String(pred.matchId));
-    if (!mappedMatchId) return;
-    next.predictions.push({
-      ...pred,
-      id: pred.id || uid("pred"),
-      matchId: mappedMatchId,
-    });
-  });
-
-  next.settings.activeSeasonId =
-    targetSeasonId || next.settings.activeSeasonId || null;
-  next.settings.activeWeekId = targetWeekId;
-  return next;
 }
 
 async function importData(file) {
@@ -1095,8 +1114,8 @@ async function importData(file) {
 
       if (parsed?.type === "full-backup" && parsed?.data) {
         nextState = parsed.data;
-      } else if (parsed?.type === "week-backup" && parsed?.week) {
-        nextState = mergeWeekBackupIntoState(parsed);
+      } else if (parsed?.type === "season-full-backup" && (parsed?.firebaseData?.appState || parsed?.data)) {
+        nextState = mergeSeasonBackupIntoState(parsed);
       } else if (
         parsed?.seasons ||
         parsed?.matches ||
@@ -1108,7 +1127,11 @@ async function importData(file) {
         throw new Error("Geçersiz yedek formatı.");
       }
 
-      await applyImportedState(nextState, { syncFirebase: true });
+      const isSeasonFullBackup = parsed?.type === "season-full-backup" && parsed?.firebaseData;
+      await applyImportedState(nextState, { syncFirebase: !isSeasonFullBackup });
+      if (isSeasonFullBackup) {
+        await restoreFirebaseSeasonBackupData(parsed.firebaseData);
+      }
       setBackupImportStatus("Yedek başarıyla yüklendi.");
       showAlert("Yedek başarıyla yüklendi ve Firebase ile eşitlendi.", {
         title: "İşlem tamam",
@@ -1135,36 +1158,39 @@ function setBackupImportStatus(message) {
 }
 
 function renderBackupPanel() {
-  const select = document.getElementById("backupWeekSelect");
-  const summary = document.getElementById("backupWeekSummary");
-  if (!select || !summary) return;
+  const seasonSelect = document.getElementById("backupSeasonSelect");
+  const seasonSummary = document.getElementById("backupSeasonSummary");
+  if (!seasonSelect || !seasonSummary) return;
 
-  const seasonId = getActiveSeasonId();
-  const season = getSeasonById(seasonId);
-  const weeks = getWeeksBySeasonId(seasonId);
-  const selectedWeekId =
-    select.value || state.settings.activeWeekId || weeks[0]?.id || "";
+  if (seasonSelect) {
+    const selectedSeasonId =
+      seasonSelect.value || state.settings.activeSeasonId || state.seasons?.[0]?.id || "";
+    seasonSelect.innerHTML = state.seasons?.length
+      ? state.seasons
+          .map(
+            (item) =>
+              `<option value="${item.id}" ${String(item.id) === String(selectedSeasonId) ? "selected" : ""}>${item.name || "İsimsiz sezon"}</option>`,
+          )
+          .join("")
+      : '<option value="">Sezon bulunamadı</option>';
 
-  select.innerHTML = weeks.length
-    ? weeks
-        .map(
-          (week) =>
-            `<option value="${week.id}" ${String(week.id) === String(selectedWeekId) ? "selected" : ""}>Hafta ${week.number}</option>`,
-        )
-        .join("")
-    : '<option value="">Hafta bulunamadı</option>';
+    const backupSeason = selectedSeasonId ? getSeasonById(selectedSeasonId) : null;
+    const seasonMatches = backupSeason ? getMatchesBySeasonId(backupSeason.id) : [];
+    const seasonWeeks = backupSeason ? getWeeksBySeasonId(backupSeason.id) : [];
+    const seasonMatchIds = new Set(seasonMatches.map((match) => String(match.id)));
+    const seasonPredictionCount = state.predictions.filter((pred) =>
+      seasonMatchIds.has(String(pred.matchId)),
+    ).length;
+    const seasonTeamCount = backupSeason
+      ? state.teams.filter((team) => String(team.seasonId) === String(backupSeason.id)).length
+      : 0;
 
-  const activeWeek = selectedWeekId ? getWeekById(selectedWeekId) : null;
-  const matches = activeWeek ? getMatchesByWeekId(activeWeek.id) : [];
-  const matchIds = new Set(matches.map((match) => String(match.id)));
-  const predictionCount = state.predictions.filter((pred) =>
-    matchIds.has(String(pred.matchId)),
-  ).length;
-
-  summary.textContent = activeWeek
-    ? `${season?.name || "Sezon seçilmedi"} • Hafta ${activeWeek.number} • ${matches.length} maç • ${predictionCount} tahmin`
-    : "Önce aktif sezonda bir hafta oluşturmalısın.";
-
+    if (seasonSummary) {
+      seasonSummary.textContent = backupSeason
+        ? `${backupSeason.name} • ${seasonWeeks.length} hafta • ${seasonMatches.length} maç • ${seasonTeamCount} takım • ${seasonPredictionCount} tahmin`
+        : "Dışa aktarmak için sezon seçmelisin.";
+    }
+  }
   setBackupImportStatus(
     document.getElementById("backupImportStatus")?.textContent || "Hazır.",
   );
@@ -2180,8 +2206,7 @@ function bindEvents() {
   on("addPlayerBtn", "click", (event) => addPlayer(event.currentTarget));
   on("addWeekBtn", "click", addWeek);
   on("addMatchBtn", "click", addMatch);
-  on("exportWeekCsvBtn", "click", exportSelectedWeekCsv);
-  on("exportWeekJsonBtn", "click", exportSelectedWeekJson);
+  on("exportSeasonBackupBtn", "click", exportSelectedSeasonBackup);
   on("exportFullBackupBtn", "click", exportFullBackup);
   on("apiImportFixturesBtn", "click", () => importFixturesFromApi(false));
   on("apiUpdateResultsBtn", "click", () => importFixturesFromApi(true));
@@ -2328,10 +2353,7 @@ function bindEvents() {
   ].forEach((id) => {
     on(id, "change", (e) => setActiveWeek(e.target.value));
   });
-  on("backupWeekSelect", "change", (e) => {
-    const weekId = e.target.value;
-    if (weekId) state.settings.activeWeekId = weekId;
-    saveState();
+ on("backupSeasonSelect", "change", () => {
     renderBackupPanel();
   });
 }
@@ -2603,10 +2625,7 @@ window.addEventListener("online", () => {
 bindEvents();
 ensureHeaderSyncButtons();
 ensureAvatarDirectoryReady();
-if (isAuthenticated() && typeof forceDefaultLandingAfterLogin === "function") {
-  forceDefaultLandingAfterLogin("page-load");
-  saveState(true);
-}
+
 if (typeof suspendViewportPersistence === "function") {
   suspendViewportPersistence(900);
 }
@@ -2641,14 +2660,6 @@ if (isAuthenticated()) {
     suppressOverlay: true,
   })
     .then(async () => {
-      if (typeof forceDefaultLandingAfterLogin === "function") {
-        forceDefaultLandingAfterLogin("session-restore-after-hydration");
-        saveState(true);
-        switchTab("dashboard", {
-          skipPersistPrevious: true,
-          skipViewportRestore: true,
-        });
-      }
       if ((state.settings.currentTab || "dashboard") === "dashboard") {
         await maybeAutoSyncResults();
         renderDashboardSyncCard();

@@ -145,6 +145,29 @@ window.removeSeason = async function (id) {
         remoteMatchIdsToDelete.has(String(pred.matchId || "").trim()),
       );
 
+      const seasonDeleteContext = {
+        seasonId: String(id || ""),
+        seasonName: String(season.name || ""),
+        matchIds: remoteMatchIdsToDelete,
+        weekIds: new Set(getWeeksBySeasonId(id).map((week) => String(week.id))),
+      };
+
+      const deleteSeasonRelatedRows = async (path) => {
+        const map = (await firebaseRead(path).catch(() => null)) || {};
+        const rows = firebaseSnapshotToArray(map);
+        for (const row of rows) {
+          const related =
+            typeof isSeasonRelatedBackupRecord === "function"
+              ? isSeasonRelatedBackupRecord(row, seasonDeleteContext)
+              : normalizeText(row.season || row.sezon || row.seasonName || "") ===
+                  normalizeText(season.name || "") ||
+                remoteMatchIdsToDelete.has(String(row.matchId || row.localMatchId || "").trim());
+          if (!related) continue;
+          const rowKey = sanitizeFirebaseKey(row._firebaseKey || row.id || "");
+          if (rowKey) await firebaseRemove(`${path}/${rowKey}`);
+        }
+      };
+
       for (const match of remoteMatchesToDelete) {
         const matchKey = sanitizeFirebaseKey(
           match.id || match.sheetMatchId || match.macId || "",
@@ -158,6 +181,14 @@ window.removeSeason = async function (id) {
         );
         if (predKey) await firebaseRemove(`predictions/${predKey}`);
       }
+
+      await Promise.all([
+        deleteSeasonRelatedRows("predictionLogs"),
+        deleteSeasonRelatedRows("settings/auditLogs"),
+        deleteSeasonRelatedRows("notificationLogs"),
+        deleteSeasonRelatedRows("adminNotificationQueue"),
+        deleteSeasonRelatedRows("sentNotifications"),
+      ]);
 
       for (const user of remoteUsers) {
         const seasonStates = normalizeSeasonStateMap(

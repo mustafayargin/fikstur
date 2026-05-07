@@ -124,14 +124,17 @@ function dedupeFirebasePredictionRows(rows = []) {
 async function firebaseRead(path) {
   const db = getFirebaseDb();
   if (!db) throw new Error("Firebase henüz yapılandırılmadı.");
-  const snapshot = await db.ref(path).get();
+  const safePath = String(path ?? "").trim();
+  const snapshot = await (safePath ? db.ref(safePath) : db.ref()).get();
   return snapshot.exists() ? snapshot.val() : null;
 }
 
 async function firebaseWrite(path, value) {
   const db = getFirebaseDb();
   if (!db) throw new Error("Firebase henüz yapılandırılmadı.");
-  await db.ref(path).set(value);
+  const safePath = String(path ?? "").trim();
+  if (!safePath) throw new Error("Firebase yazma yolu boş olamaz.");
+  await db.ref(safePath).set(value);
   return true;
 }
 
