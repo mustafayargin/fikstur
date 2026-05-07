@@ -34,7 +34,6 @@ messaging.onBackgroundMessage((payload) => {
       "Yeni bildirimin var.",
     icon: "./icons/icon-192.png",
     badge: "./icons/icon-192.png",
-    image: "/icons/icon-512.png",
     data: {
       url: payload?.data?.url || "./index.html",
       ...(payload?.data || {}),
