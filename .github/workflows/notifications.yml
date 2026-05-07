@@ -86,54 +86,167 @@ jobs:
             };
 
           const SITE_URL = "https://mustafayargin.github.io/";
-          
-          const sendToTokens = async (tokens, title, body) => {
-            const safeTitle = String(title || "Skor Avcıları");
-            const safeBody = String(body || "Yeni bildirimin var.");
-          
-            const message = {
-              notification: {
-                title: safeTitle,
-                body: safeBody
-              },
-              data: {
-                title: safeTitle,
-                body: safeBody,
-                url: SITE_URL
-              },
-              webpush: {
-                notification: {
-                  title: safeTitle,
-                  body: safeBody,
-                  icon: "/icons/icon-192.png",
-                  badge: "/icons/icon-192.png",
-                  image: "/icons/icon-512.png",
-                  requireInteraction: false
-                },
-                fcmOptions: {
-                  link: SITE_URL
-                }
-              },
-              tokens
-            };
-          
-            return await withTimeout(
-              admin.messaging().sendEachForMulticast(message),
-              30000,
-              "FCM bildirim gönderimi"
-            );
+
+          const INVALID_TOKEN_ERROR_CODES = new Set([
+            "messaging/registration-token-not-registered",
+            "messaging/invalid-registration-token"
+          ]);
+
+          const chunkArray = (items, size) => {
+            const chunks = [];
+            for (let i = 0; i < items.length; i += size) {
+              chunks.push(items.slice(i, i + size));
+            }
+            return chunks;
           };
 
-            const [tokensSnap, usersSnap, matchesSnap, sentSnap, queueSnap] = await Promise.all([
+          const normalizeTokenRecord = (key, value) => {
+            if (!value) return null;
+
+            if (typeof value === "string") {
+              return { key, token: value };
+            }
+
+            if (typeof value === "object" && value.token) {
+              return { key, ...value, token: String(value.token) };
+            }
+
+            return null;
+          };
+
+          const cleanupFailedTokens = async (response, sentTokens, tokenRecords) => {
+            const failedTokens = [];
+
+            (response?.responses || []).forEach((item, index) => {
+              const code = item?.error?.code;
+              if (code && INVALID_TOKEN_ERROR_CODES.has(code)) {
+                const badToken = sentTokens[index];
+                if (badToken) failedTokens.push(badToken);
+              }
+            });
+
+            const uniqueFailedTokens = [...new Set(failedTokens)];
+            if (uniqueFailedTokens.length === 0) return 0;
+
+            const failedTokenSet = new Set(uniqueFailedTokens);
+            const updates = {};
+
+            tokenRecords.forEach((record) => {
+              if (record?.key && failedTokenSet.has(record.token)) {
+                updates[`fcmTokens/${record.key}`] = null;
+              }
+            });
+
+            const deleteCount = Object.keys(updates).length;
+            if (deleteCount === 0) return 0;
+
+            await db.ref().update(updates);
+            console.log(`Geçersiz FCM token temizlendi: ${deleteCount}`);
+            return deleteCount;
+          };
+
+          const cleanupOldNotificationRecords = async (queueData, logData) => {
+            const cutoffMs = Date.now() - 30 * 24 * 60 * 60 * 1000;
+            const updates = {};
+
+            const isOld = (value) => {
+              const time = new Date(value || "").getTime();
+              return Number.isFinite(time) && time < cutoffMs;
+            };
+
+            Object.entries(queueData || {}).forEach(([id, item]) => {
+              if (!item) return;
+              const status = String(item.status || "");
+              const dateValue = item.finishedAt || item.updatedAt || item.createdAt;
+              if (["sent", "error", "cancelled"].includes(status) && isOld(dateValue)) {
+                updates[`adminNotificationQueue/${id}`] = null;
+              }
+            });
+
+            Object.entries(logData || {}).forEach(([id, item]) => {
+              if (!item) return;
+              const dateValue = item.createdAt || item.finishedAt || item.updatedAt || item.sentAt;
+              if (isOld(dateValue)) {
+                updates[`notificationLogs/${id}`] = null;
+              }
+            });
+
+            const deleteCount = Object.keys(updates).length;
+            if (deleteCount === 0) return 0;
+
+            await db.ref().update(updates);
+            console.log(`Eski bildirim kayıtları temizlendi: ${deleteCount}`);
+            return deleteCount;
+          };
+          
+          const sendToTokens = async (tokens, title, body, tokenRecords) => {
+            const safeTitle = String(title || "Skor Avcıları");
+            const safeBody = String(body || "Yeni bildirimin var.");
+            const safeTokens = [...new Set((tokens || []).filter(Boolean).map(String))];
+
+            if (safeTokens.length === 0) {
+              return { successCount: 0, failureCount: 0, responses: [] };
+            }
+
+            const responses = [];
+            let successCount = 0;
+            let failureCount = 0;
+
+            for (const tokenChunk of chunkArray(safeTokens, 500)) {
+              const message = {
+                notification: {
+                  title: safeTitle,
+                  body: safeBody
+                },
+                data: {
+                  title: safeTitle,
+                  body: safeBody,
+                  url: SITE_URL
+                },
+                webpush: {
+                  notification: {
+                    title: safeTitle,
+                    body: safeBody,
+                    icon: "/icons/icon-192.png",
+                    badge: "/icons/icon-192.png",
+                    image: "/icons/icon-512.png",
+                    requireInteraction: false
+                  },
+                  fcmOptions: {
+                    link: SITE_URL
+                  }
+                },
+                tokens: tokenChunk
+              };
+
+              const chunkResponse = await withTimeout(
+                admin.messaging().sendEachForMulticast(message),
+                30000,
+                "FCM bildirim gönderimi"
+              );
+
+              await cleanupFailedTokens(chunkResponse, tokenChunk, tokenRecords);
+
+              successCount += chunkResponse.successCount || 0;
+              failureCount += chunkResponse.failureCount || 0;
+              responses.push(...(chunkResponse.responses || []));
+            }
+
+            return { successCount, failureCount, responses };
+          };
+
+            const [tokensSnap, usersSnap, matchesSnap, sentSnap, queueSnap, logsSnap] = await Promise.all([
               db.ref("fcmTokens").once("value"),
               db.ref("users").once("value"),
               db.ref("matches").once("value"),
               db.ref("sentNotifications").once("value"),
-              db.ref("adminNotificationQueue").once("value")
+              db.ref("adminNotificationQueue").once("value"),
+              db.ref("notificationLogs").once("value")
             ]);
 
-            const tokenRecords = Object.values(tokensSnap.val() || {})
-              .filter(i => i?.token);
+            const tokenRecords = Object.entries(tokensSnap.val() || {})
+              .map(([key, value]) => normalizeTokenRecord(key, value))
+              .filter(Boolean);
 
             const usersData = usersSnap.val() || {};
             const activeUserIds = new Set(
@@ -164,6 +277,11 @@ jobs:
             const matches = Object.entries(matchesSnap.val() || {});
             const sentData = sentSnap.val() || {};
             const queueData = queueSnap.val() || {};
+            const logData = logsSnap.val() || {};
+
+            if (process.env.TEST_MODE === "normal") {
+              await cleanupOldNotificationRecords(queueData, logData);
+            }
 
             console.log(`Token: ${tokens.length} | Maç: ${matches.length}`);
 
@@ -176,7 +294,8 @@ jobs:
               const res = await sendToTokens(
                 tokens,
                 "⚽ Skor Avcıları Test",
-                "Test bildirimi aktif! 🔥"
+                "Test bildirimi aktif! 🔥",
+                tokenRecords
               );
 
               console.log("Test sonucu:", res.successCount, "başarılı.");
@@ -210,7 +329,8 @@ jobs:
                   res = await sendToTokens(
                     targetTokens,
                     item.title || "Skor Avcıları",
-                    item.message || "Yeni bildirimin var."
+                    item.message || "Yeni bildirimin var.",
+                    tokenRecords
                   );
                 }
 
@@ -291,7 +411,8 @@ jobs:
                   const res = await sendToTokens(
                     tokens,
                     `📅 ${weekNo}. hafta açıldı!`,
-                    "😅 Tahminlerini girmeyi unutma! ⚽"
+                    "😅 Tahminlerini girmeyi unutma! ⚽",
+                    tokenRecords
                   );
 
                   console.log("Yeni hafta bildirim sonucu:", res.successCount, "başarılı.");
@@ -324,7 +445,8 @@ jobs:
                     const res = await sendToTokens(
                       tokens,
                       "⚽ Maçlar başlamak üzere!",
-                      `Tahminlerini unutma! Maçlar ${type === "3h" ? "3 saat" : "2 saat"} içinde başlıyor.`
+                      `Tahminlerini unutma! Maçlar ${type === "3h" ? "3 saat" : "2 saat"} içinde başlıyor.`,
+                      tokenRecords
                     );
 
                     console.log("Maç hatırlatıcı sonucu:", res.successCount, "başarılı.");
