@@ -109,6 +109,27 @@ let predictionIndexCache = null;
 let predictionIndexCacheSource = null;
 let predictionIndexCacheLength = -1;
 
+function getPredictionTimestampValue(pred = {}) {
+  const raw =
+    pred.updatedAt ||
+    pred.guncellemeTarihi ||
+    pred.createdAt ||
+    pred.tarih ||
+    pred.timestamp ||
+    0;
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) ? parsed : Number(raw || 0) || 0;
+}
+
+function isPredictionRecordNewer(next = {}, current = {}) {
+  const nextTime = getPredictionTimestampValue(next);
+  const currentTime = getPredictionTimestampValue(current);
+  if (nextTime !== currentTime) return nextTime > currentTime;
+  if (next.remoteId && !current.remoteId) return true;
+  if (next.id && !current.id) return true;
+  return true;
+}
+
 function getPredictionIndexMap() {
   if (
     predictionIndexCache &&
@@ -121,7 +142,10 @@ function getPredictionIndexMap() {
   const map = new Map();
   state.predictions.forEach((pred) => {
     const key = `${normalizeEntityId(pred.matchId)}__${normalizeEntityId(pred.playerId)}`;
-    map.set(key, pred);
+    const current = map.get(key);
+    if (!current || isPredictionRecordNewer(pred, current)) {
+      map.set(key, pred);
+    }
   });
 
   predictionIndexCache = map;
@@ -132,6 +156,12 @@ function getPredictionIndexMap() {
 
 function getPredictionCacheKey(matchId, playerId) {
   return `${normalizeEntityId(matchId)}__${normalizeEntityId(playerId)}`;
+}
+
+function invalidatePredictionIndexCache() {
+  predictionIndexCache = null;
+  predictionIndexCacheSource = null;
+  predictionIndexCacheLength = -1;
 }
 
 function createEmptyPredictionRecord(matchId, playerId) {
@@ -236,6 +266,34 @@ function clearLocalPredictionRecord(matchId, playerId) {
         normalizeEntityId(pred.playerId) === normalizedPlayerId
       ),
   );
+  invalidatePredictionIndexCache();
+}
+
+function compactLocalPredictionRecords() {
+  if (!Array.isArray(state.predictions) || !state.predictions.length) return;
+
+  const map = new Map();
+  state.predictions.forEach((pred) => {
+    const matchId = normalizeEntityId(pred.matchId || pred.localMatchId);
+    const playerId = normalizeEntityId(pred.playerId || pred.kullaniciId || pred.userId);
+    if (!matchId || !playerId) return;
+
+    pred.matchId = matchId;
+    pred.playerId = playerId;
+    pred.localMatchId = pred.localMatchId || matchId;
+
+    const key = `${matchId}__${playerId}`;
+    const current = map.get(key);
+    if (!current || isPredictionRecordNewer(pred, current)) {
+      map.set(key, pred);
+    }
+  });
+
+  if (map.size !== state.predictions.length) {
+    state.predictions = Array.from(map.values());
+    invalidatePredictionIndexCache();
+    saveState(true);
+  }
 }
 function getMatchesBySeasonId(seasonId) {
   return state.matches.filter((m) => m.seasonId === seasonId);
@@ -383,11 +441,34 @@ function teamLogoHtml(teamName, seasonId, extraClass = "") {
   `;
 }
 
+function parseMatchDateTimestamp(value) {
+  if (!value) return NaN;
+  if (value instanceof Date) return value.getTime();
+
+  const raw = String(value).trim();
+  if (!raw) return NaN;
+
+  const isoLocal = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})/);
+  if (isoLocal) {
+    const [, y, m, d, h, min] = isoLocal;
+    return new Date(Number(y), Number(m) - 1, Number(d), Number(h), Number(min), 0, 0).getTime();
+  }
+
+  const trLocal = raw.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})(?:\s+(\d{1,2}):(\d{2}))?/);
+  if (trLocal) {
+    const [, d, m, y, h = "0", min = "0"] = trLocal;
+    return new Date(Number(y), Number(m) - 1, Number(d), Number(h), Number(min), 0, 0).getTime();
+  }
+
+  const parsed = new Date(raw).getTime();
+  return Number.isNaN(parsed) ? NaN : parsed;
+}
+
 function formatDate(date) {
   if (!date) return "Tarih yok";
-  const d = new Date(date);
-  if (Number.isNaN(d.getTime())) return "Tarih yok";
-  return d.toLocaleString("tr-TR", {
+  const ts = parseMatchDateTimestamp(date);
+  if (Number.isNaN(ts)) return "Tarih yok";
+  return new Date(ts).toLocaleString("tr-TR", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -429,7 +510,7 @@ function getWeekPredictionLockTimestamp(weekId) {
   if (!matches.length) return null;
 
   const datedMatches = matches
-    .map((item) => new Date(item.date).getTime())
+    .map((item) => parseMatchDateTimestamp(item.date))
     .filter((ts) => !Number.isNaN(ts))
     .sort((a, b) => a - b);
 
@@ -438,7 +519,60 @@ function getWeekPredictionLockTimestamp(weekId) {
 }
 
 let predictionLockTimerInterval = null;
+let predictionRevealRefreshTimer = null;
 let predictionLockRerenderPending = false;
+const predictionRevealSignatureCache = {};
+
+function getPredictionRevealSignature(weekId) {
+  if (!weekId) return "";
+  return isWeekStartedForPredictionReveal(weekId) ? "week-started" : "week-hidden";
+}
+
+function refreshPredictionViewsAfterRevealChange(weekId) {
+  if (!weekId || predictionLockRerenderPending) return;
+
+  const nextSignature = getPredictionRevealSignature(weekId);
+  if (predictionRevealSignatureCache[weekId] === nextSignature) return;
+
+  predictionRevealSignatureCache[weekId] = nextSignature;
+  predictionLockRerenderPending = true;
+
+  setTimeout(() => {
+    predictionLockRerenderPending = false;
+    if ((state.settings.currentTab || "dashboard") === "predictions" &&
+        typeof renderPredictions === "function") {
+      renderPredictions();
+    }
+    if (typeof renderDashboard === "function") renderDashboard();
+  }, 0);
+}
+
+function clearPredictionRevealRefreshTimer() {
+  if (predictionRevealRefreshTimer) {
+    clearTimeout(predictionRevealRefreshTimer);
+    predictionRevealRefreshTimer = null;
+  }
+}
+
+function schedulePredictionRevealRefresh(weekId) {
+  clearPredictionRevealRefreshTimer();
+  if (!weekId) return;
+
+  const now = Date.now();
+  const nextRevealTs = getMatchesByWeekId(weekId)
+    .map((match) => parseMatchDateTimestamp(match.date))
+    .filter((ts) => !Number.isNaN(ts) && ts > now)
+    .sort((a, b) => a - b)[0];
+
+  if (!nextRevealTs) return;
+
+  const delay = Math.min(Math.max(nextRevealTs - now + 750, 1000), 2147483647);
+  predictionRevealRefreshTimer = setTimeout(() => {
+    predictionRevealRefreshTimer = null;
+    if (typeof renderPredictions === "function") renderPredictions();
+    if (typeof renderDashboard === "function") renderDashboard();
+  }, delay);
+}
 
 function clearPredictionLockTimer() {
   if (predictionLockTimerInterval) {
@@ -469,10 +603,14 @@ function renderPredictionLockBanner(weekId) {
   clearPredictionLockTimer();
 
   if (!weekId) {
+    clearPredictionRevealRefreshTimer();
     banner.className = "prediction-lock-banner is-hidden";
     banner.innerHTML = "";
     return;
   }
+
+  schedulePredictionRevealRefresh(weekId);
+  predictionRevealSignatureCache[weekId] = getPredictionRevealSignature(weekId);
 
   const lockTs = getWeekPredictionLockTimestamp(weekId);
   if (lockTs === null) {
@@ -496,6 +634,7 @@ function renderPredictionLockBanner(weekId) {
         banner.innerHTML =
           "<strong>🔒 Tahminler kilitlendi</strong><span>Bu hafta için yeni tahmin ve silme işlemleri kapalı.</span>";
       }
+      refreshPredictionViewsAfterRevealChange(weekId);
       return;
     }
 
@@ -514,6 +653,7 @@ function renderPredictionLockBanner(weekId) {
     }
 
     banner.innerHTML = `<strong>⏳ Tahmin vermek için kalan süre: ${countdown}</strong><span>Haftanın ilk maçına 10 dk kala tüm tahminler otomatik kilitlenir.</span>${notificationButton}`;
+    refreshPredictionViewsAfterRevealChange(weekId);
   };
 
   updateBanner();
@@ -528,9 +668,66 @@ function isMatchLocked(match) {
   if (weekLockTs !== null) return Date.now() >= weekLockTs;
 
   if (!match.date) return false;
-  const ts = new Date(match.date).getTime();
+  const ts = parseMatchDateTimestamp(match.date);
   if (Number.isNaN(ts)) return false;
   return Date.now() >= ts;
+}
+
+function isMatchStartedForPredictionReveal(match) {
+  if (!match) return false;
+  if (match.played) return true;
+
+  const visual = typeof getMatchVisualState === "function" ? getMatchVisualState(match) : "";
+  if (visual === "live" || visual === "played" || visual === "played-postponed") return true;
+
+  const statusText = String(match.statusText || "").toLowerCase();
+  if (
+    statusText.includes("live") ||
+    statusText.includes("in play") ||
+    statusText.includes("1st") ||
+    statusText.includes("2nd") ||
+    statusText.includes("half") ||
+    statusText.includes("devre") ||
+    statusText.includes("başladı") ||
+    statusText.includes("basladi") ||
+    statusText.includes("oynanıyor") ||
+    statusText.includes("oynaniyor")
+  ) {
+    return true;
+  }
+
+  if (!match.date) return false;
+  const ts = parseMatchDateTimestamp(match.date);
+  if (Number.isNaN(ts)) return false;
+  return Date.now() >= ts;
+}
+
+function isWeekStartedForPredictionReveal(weekId) {
+  if (!weekId) return false;
+
+  // Fair Play: Hafta tahmin kilidi geldikten sonra kimse tahmin değiştiremez.
+  // Bu yüzden diğer kullanıcıların tahminlerini açmak güvenlidir.
+  // Önceki durumda sadece maç başlangıç saati bekleniyordu; sanal/test maçlarda
+  // hafta kilitlenmiş olsa bile tahminler mobil/PC/modal tarafta gizli kalabiliyordu.
+  const weekLockTs = getWeekPredictionLockTimestamp(weekId);
+  if (weekLockTs !== null && Date.now() >= weekLockTs) return true;
+
+  return getMatchesByWeekId(weekId).some((match) =>
+    isMatchStartedForPredictionReveal(match),
+  );
+}
+
+function canRevealPredictionForViewer(match, playerId) {
+  if (getCurrentRole() === "admin") return true;
+  if (String(playerId || "") === String(getCurrentPlayerId() || "")) return true;
+  if (!match) return false;
+  return isWeekStartedForPredictionReveal(match.weekId);
+}
+
+function getHiddenPredictionNotice(match) {
+  return isMatchLocked(match)
+    ? "Kilitli · Maç başlayınca açılır"
+    : "Adil oyun · Maç başlayınca açılır";
 }
 
 function ensurePrediction(matchId, playerId) {
@@ -548,6 +745,7 @@ function ensurePrediction(matchId, playerId) {
       points: 0,
     };
     state.predictions.push(pred);
+    invalidatePredictionIndexCache();
   }
   return pred;
 }

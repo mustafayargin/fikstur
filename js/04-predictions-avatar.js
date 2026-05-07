@@ -35,6 +35,9 @@ function renderPredictions() {
   const viewportSnapshot = capturePredictionViewport();
   const container = document.getElementById("predictionsTable");
   if (!container) return;
+  if (typeof compactLocalPredictionRecords === "function") {
+    compactLocalPredictionRecords();
+  }
   const weekId = state.settings.activeWeekId;
 
   renderPredictionLockBanner(weekId);
@@ -106,6 +109,8 @@ function renderPredictions() {
           const statusText = getPredictionBaseStatus(match.id, player.id);
           const showDeleteAction = hasPrediction || pred.remoteId || isSaving;
           const showSaveAction = canEdit && shouldShowPredictionSaveAction(match.id, player.id);
+          const revealPrediction = canRevealPredictionForViewer(match, player.id);
+          const hiddenNotice = getHiddenPredictionNotice(match);
 
           const pointValue = Number(pred.points || 0);
           const showPointBadge = hasPrediction;
@@ -122,9 +127,16 @@ function renderPredictions() {
                     : "linear-gradient(135deg,#64748b,#475569)";
 
           return `
-        <div class="prediction-cell prediction-pro-cell ${hasPrediction ? "filled-prediction" : "empty-prediction"} ${pointLabel(pred.points)} ${outcomeClass} ${locked || !canEdit ? "locked-cell" : ""}${ownClass}${showPointBadge ? " has-point-badge" : ""}">
-          ${showPointBadge ? `<div class="points-badge-inline" style="background:${badgeBg};">${badgeText}</div>` : ""}
+        <div class="prediction-cell prediction-pro-cell ${hasPrediction ? "filled-prediction" : "empty-prediction"} ${pointLabel(pred.points)} ${outcomeClass} ${locked || !canEdit ? "locked-cell" : ""}${ownClass}${showPointBadge ? " has-point-badge" : ""} ${!revealPrediction ? "prediction-secret-cell" : ""}">
+          ${showPointBadge && revealPrediction ? `<div class="points-badge-inline" style="background:${badgeBg};">${badgeText}</div>` : ""}
 
+          ${!revealPrediction ? `
+            <div class="prediction-secret-box">
+              <span class="prediction-secret-lock">🔒</span>
+              <strong>${hasPrediction ? "Tahmin gizli" : "Tahmin bekleniyor"}</strong>
+              <small>${hiddenNotice}</small>
+            </div>
+          ` : `
           <div class="desktop-prediction-control">
             <div class="score-inputs compact-inputs center-mode pred-score-row">
               <input
@@ -179,6 +191,7 @@ function renderPredictions() {
           <div class="pred-status-slot">
             <div class="prediction-status-chip ${outcomeClass}" id="pred_status_${match.id}_${player.id}">${statusText}</div>
           </div>
+          `}
         </div>`;
         })
         .join("");
@@ -702,6 +715,11 @@ window.savePrediction = async function (matchId, playerId, options = {}) {
     ? calcPoints(homePred, awayPred, match.homeScore, match.awayScore)
     : 0;
   pred.username = getCurrentUsername();
+  pred.updatedAt = new Date().toISOString();
+
+  if (typeof compactLocalPredictionRecords === "function") {
+    compactLocalPredictionRecords();
+  }
 
   saveState(true);
   renderStandings();
@@ -733,6 +751,11 @@ window.savePrediction = async function (matchId, playerId, options = {}) {
 
   playerId = normalizeEntityId(playerId);
   const player = getPlayerById(playerId);
+  const actorUser = getAuthUser?.() || null;
+  const actorPlayer = typeof findPlayerForSessionUser === "function" ? findPlayerForSessionUser(actorUser) : null;
+  const actorId = String(state.settings?.auth?.playerId || actorPlayer?.id || actorUser?.id || "");
+  const actorName = String(actorPlayer?.name || actorUser?.adSoyad || actorUser?.name || actorUser?.kullaniciAdi || getCurrentUsername?.() || "");
+  const actorRole = String(getCurrentRole?.() || actorPlayer?.role || actorUser?.rol || "user").toLowerCase() === "admin" ? "admin" : "user";
   const seasonLabel = getActiveSeasonLabel();
   const weekNumber = getWeekNumberById(match.weekId);
   const recordKey = `${seasonLabel}_${weekNumber}_${playerId}_${match.id}`;
@@ -761,9 +784,21 @@ window.savePrediction = async function (matchId, playerId, options = {}) {
     awayPred,
     tahminEv: homePred,
     tahminDep: awayPred,
+    actorId,
+    actorName,
+    actorUsername: actorUser?.kullaniciAdi || getCurrentUsername?.() || "",
+    actorRole,
+    changedById: actorId,
+    changedBy: actorName,
   };
 
   try {
+    // Aynı maç/kullanıcı için eskiden sırada kalmış tahmin varsa önce temizle.
+    // Aksi halde eski kuyruk kaydı Firebase'e tekrar yazıp yeni tahmini geri alabiliyor.
+    if (typeof dequeuePredictionRetry === "function") {
+      dequeuePredictionRetry(payload);
+    }
+
     const result = await saveOnlinePrediction(payload);
 
     clearTimeout(predictionTimers[key]);
@@ -797,8 +832,12 @@ window.savePrediction = async function (matchId, playerId, options = {}) {
       result.id || result.predictionId || pred.remoteId || pred.id;
 
     dequeuePredictionRetry(payload);
+    if (typeof compactLocalPredictionRecords === "function") {
+      compactLocalPredictionRecords();
+    }
     saveState(true);
     setPredictionUiState(matchId, playerId, "saved");
+    renderPredictions();
     schedulePredictionViewportRestore(viewportSnapshot);
   } catch (error) {
     clearTimeout(predictionTimers[key]);

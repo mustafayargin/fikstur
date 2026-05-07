@@ -38,6 +38,7 @@
             <button class="nav-tab" data-tab="weeks">Haftalar</button>
             <button class="nav-tab" data-tab="matches">Maçlar</button>
             <button class="nav-tab" data-tab="predictions">Tahminler</button>
+            <button class="nav-tab" data-tab="logs">Log Ekranı</button>
             <button class="nav-tab" data-tab="standings">Puan Durumu</button>
             <button class="nav-tab" data-tab="stats">İstatistikler</button>
             <button class="nav-tab admin-only" data-tab="notifications">
@@ -626,6 +627,110 @@
           </div>
         </section>
 
+        <section class="tab-panel" id="tab-logs">
+          <div class="page-header log-page-header">
+            <div>
+              <h2>Log Ekranı</h2>
+              <p>
+                Tahmin ekleme, değiştirme ve silme hareketleri burada şeffaf şekilde görünür.
+                Normal kullanıcı kendi kayıtlarını, admin ise tüm kayıtları detaylı görür.
+              </p>
+            </div>
+            <div class="header-actions log-header-actions">
+              <span class="badge gray" id="predictionLogVisibilityBadge">Loglar hazırlanıyor</span>
+              <button class="secondary small" type="button" id="refreshPredictionLogsBtn">Yenile</button>
+              <button class="danger small" type="button" id="clearPredictionLogsBtn">Logları Temizle</button>
+            </div>
+          </div>
+
+          <section class="log-trust-grid">
+            <article class="card log-trust-card">
+              <span>Toplam kayıt</span>
+              <strong id="predictionLogTotalCount">0</strong>
+              <small>Filtrelerden sonra görünen kayıt.</small>
+            </article>
+            <article class="card log-trust-card is-admin">
+              <span>Admin işlemi</span>
+              <strong id="predictionLogAdminCount">0</strong>
+              <small>Admin tarafından yapılan müdahaleler.</small>
+            </article>
+            <article class="card log-trust-card">
+              <span>Son işlem</span>
+              <strong id="predictionLogLastAction">Yok</strong>
+              <small id="predictionLogLastDate">Henüz log kaydı görünmüyor.</small>
+            </article>
+          </section>
+
+          <section class="card prediction-log-card">
+            <div class="card-header prediction-log-head">
+              <div>
+                <h3>Tahmin İşlem Geçmişi</h3>
+                <p class="small-meta">Kullanıcı, hafta, maç, işlem tipi ve tarih aralığı ile filtrelenir.</p>
+              </div>
+            </div>
+
+            <div class="prediction-log-filters">
+              <label>
+                Kullanıcı
+                <select id="predictionLogUserFilter"></select>
+              </label>
+              <label>
+                Hafta
+                <select id="predictionLogWeekFilter"></select>
+              </label>
+              <label>
+                Maç
+                <select id="predictionLogMatchFilter"></select>
+              </label>
+              <label>
+                İşlem türü
+                <select id="predictionLogActionFilter">
+                  <option value="all">Tümü</option>
+                  <option value="create">Ekleme</option>
+                  <option value="update">Değiştirme</option>
+                  <option value="delete">Silme</option>
+                  <option value="admin">Sadece admin işlemleri</option>
+                </select>
+              </label>
+              <label>
+                Başlangıç
+                <input id="predictionLogStartDate" type="date" />
+              </label>
+              <label>
+                Bitiş
+                <input id="predictionLogEndDate" type="date" />
+              </label>
+              <button class="secondary" type="button" id="clearPredictionLogFiltersBtn">Filtreleri Temizle</button>
+            </div>
+
+            <div class="prediction-log-table-wrap">
+              <table class="prediction-log-table">
+                <thead>
+                  <tr>
+                    <th>Tarih</th>
+                    <th>Kullanıcı</th>
+                    <th>Maç / Hafta</th>
+                    <th>İşlem</th>
+                    <th>Eski</th>
+                    <th>Yeni</th>
+                    <th>Yapan</th>
+                  </tr>
+                </thead>
+                <tbody id="predictionLogBody">
+                  <tr><td colspan="7">Log kayıtları yükleniyor...</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="prediction-log-mobile-list" id="predictionLogMobileList"></div>
+
+            <div class="prediction-log-footer">
+              <span id="predictionLogPageInfo">Kayıtlar hazırlanıyor</span>
+              <div class="prediction-log-pagination" id="predictionLogPagination"></div>
+            </div>
+          </section>
+        </section>
+
         <section class="tab-panel" id="tab-standings">
           <div
             class="page-header standings-page-header standings-page-header--luxury"
@@ -796,25 +901,57 @@
 
           <section class="notification-status-grid">
             <article class="card notification-stat-card">
-              <span>Son cron kontrolü</span>
+              <span>Son gönderim / kontrol</span>
               <strong id="notificationLastCronText">Henüz kayıt yok</strong>
               <small id="notificationLastCronMeta">GitHub Action çalışınca buraya yazılacak.</small>
             </article>
             <article class="card notification-stat-card">
+              <span>Son bildirim başlığı</span>
+              <strong id="notificationLastTitleText">Henüz yok</strong>
+              <small>En son kuyruk/log kaydındaki başlık.</small>
+            </article>
+            <article class="card notification-stat-card">
               <span>Başarılı gönderim</span>
               <strong id="notificationSuccessCountText">0</strong>
-              <small>Son kayıtlardaki başarılı gönderim toplamı.</small>
+              <small>Loglarda tutulan başarılı gönderim toplamı.</small>
+            </article>
+            <article class="card notification-stat-card is-warning">
+              <span>Başarısız gönderim</span>
+              <strong id="notificationErrorCountText">0</strong>
+              <small id="notificationLastErrorText">Son hata: Yok</small>
             </article>
             <article class="card notification-stat-card">
               <span>Bekleyen bildirim</span>
               <strong id="notificationPendingCountText">0</strong>
               <small>Firebase kuyruğunda bekleyen manuel mesaj.</small>
             </article>
-            <article class="card notification-stat-card is-warning">
-              <span>Son hata</span>
-              <strong id="notificationLastErrorText">Yok</strong>
-              <small>Son hata kaydı burada görünecek.</small>
+            <article class="card notification-stat-card">
+              <span>Kayıtlı cihaz/token</span>
+              <strong id="notificationTokenCountText">0</strong>
+              <small>Bildirim izni almış cihaz kayıtları.</small>
             </article>
+            <article class="card notification-stat-card">
+              <span>Bildirim açık kullanıcı</span>
+              <strong id="notificationOpenUserCountText">0</strong>
+              <small>En az bir aktif token kaydı görünen kullanıcı.</small>
+            </article>
+            <article class="card notification-stat-card is-warning">
+              <span>Kapalı / token yok</span>
+              <strong id="notificationClosedUserCountText">0</strong>
+              <small>Bildirim izni kapalı veya cihaz kaydı olmayanlar.</small>
+            </article>
+          </section>
+
+          <section class="card notification-audience-card">
+            <div class="card-header notification-audience-head">
+              <div>
+                <h3>Kullanıcı Bildirim Durumu</h3>
+                <p class="small-meta">Kimde bildirim açık, kimin cihaz/token kaydı yok burada görünür.</p>
+              </div>
+            </div>
+            <div class="notification-audience-list" id="notificationAudienceList">
+              <div class="notification-audience-empty">Kullanıcı bildirim durumları yükleniyor...</div>
+            </div>
           </section>
 
           <section class="notification-layout">
@@ -834,25 +971,63 @@
                   <input id="manualNotificationTitle" type="text" placeholder="Örn: 8. hafta eklendi" />
                 </label>
                 <label>
+                  Bildirim ikonu
+                  <select id="manualNotificationIcon">
+                    <option value="default">🔔 Genel</option>
+                    <option value="match">⚽ Maç</option>
+                    <option value="cup">🏆 Sonuç</option>
+                    <option value="alert">🚨 Acil</option>
+                    <option value="announce">📢 Duyuru</option>
+                    <option value="star">⭐ Öne çıkan</option>
+                  </select>
+                </label>
+                <label>
                   Hedef kitle
                   <select id="manualNotificationTarget">
                     <option value="all">Tüm kullanıcılar</option>
                     <option value="active">Aktif kullanıcılar</option>
                     <option value="pending">Tahmini eksik olanlar</option>
+                    <option value="custom">Seçili kişiler</option>
                   </select>
                 </label>
               </div>
 
+              <div class="notification-custom-target-panel" id="manualNotificationCustomTargetPanel" hidden>
+                <div class="notification-custom-target-head">
+                  <div>
+                    <strong>Özel gönderim</strong>
+                    <small>Test için bildirimi sadece seçtiğin kişilere kuyruğa alır.</small>
+                  </div>
+                  <div class="notification-custom-target-actions">
+                    <button class="secondary small" type="button" id="selectAllNotificationUsersBtn">Tümünü seç</button>
+                    <button class="secondary small" type="button" id="clearNotificationUsersBtn">Temizle</button>
+                  </div>
+                </div>
+                <div class="notification-user-picker" id="manualNotificationUserPicker">
+                  <small class="notification-user-empty">Kişiler hazırlanıyor...</small>
+                </div>
+              </div>
+
               <label class="notification-message-field">
                 Mesaj metni
-                <textarea id="manualNotificationMessage" rows="7" placeholder="Kullanıcılara gidecek bildirim metnini buraya yaz..."></textarea>
+                <textarea id="manualNotificationMessage" rows="7" maxlength="300" placeholder="Kullanıcılara gidecek bildirim metnini buraya yaz..."></textarea>
+                <small class="notification-char-counter" id="manualNotificationCharCounter">0 / 300</small>
               </label>
 
-              <div class="notification-preview-box">
-                <span>Önizleme</span>
-                <p id="manualNotificationPreview">
-                  Başlık ve mesaj yazıldığında burada göndermeden önce kontrol edilecek.
-                </p>
+              <div class="notification-preview-box notification-phone-preview">
+                <div class="notification-phone-topline">
+                  <span>Telefon Önizleme</span>
+                  <small id="manualNotificationPreviewTarget">Tüm kullanıcılar</small>
+                </div>
+                <div class="notification-phone-card">
+                  <div class="notification-phone-icon" id="manualNotificationPreviewIcon">🔔</div>
+                  <div>
+                    <strong id="manualNotificationPreviewTitle">Başlık burada görünecek</strong>
+                    <p id="manualNotificationPreview">
+                      Mesaj yazıldığında telefonda nasıl görüneceğini buradan kontrol edebilirsin.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div class="notification-action-row">
@@ -883,11 +1058,19 @@
           </section>
 
           <section class="card notification-history-card">
-            <div class="card-header">
+            <div class="card-header notification-history-head">
               <div>
                 <h3>Bildirim Geçmişi</h3>
-                <p class="small-meta">Firebase kuyruğundaki manuel mesajlar ve otomatik gönderim kayıtları burada listelenir.</p>
+                <p class="small-meta">Firebase kuyruğundaki manuel mesajlar ve otomatik gönderim kayıtları burada listelenir. Sayfa başına en fazla 10 kayıt gösterilir.</p>
               </div>
+              <button class="secondary small notification-cleanup-btn" type="button" id="cleanupOldNotificationsBtn">30 günden eskileri temizle</button>
+            </div>
+            <div class="notification-filter-bar" aria-label="Bildirim geçmişi filtreleri">
+              <button type="button" class="notification-filter-btn is-active" data-notification-filter="all">Tümü</button>
+              <button type="button" class="notification-filter-btn" data-notification-filter="sent">Gönderilenler</button>
+              <button type="button" class="notification-filter-btn" data-notification-filter="pending">Bekleyenler</button>
+              <button type="button" class="notification-filter-btn" data-notification-filter="failed">Hatalılar</button>
+              <button type="button" class="notification-filter-btn" data-notification-filter="manual">Manuel</button>
             </div>
             <div class="notification-history-table-wrap">
               <table class="notification-history-table">
@@ -898,16 +1081,34 @@
                     <th>Mesaj</th>
                     <th>Hedef</th>
                     <th>Durum</th>
+                    <th>İşlem</th>
                   </tr>
                 </thead>
                 <tbody id="notificationHistoryBody">
                   <tr>
-                    <td colspan="5">Kayıtlar yükleniyor...</td>
+                    <td colspan="6">Kayıtlar yükleniyor...</td>
                   </tr>
                 </tbody>
               </table>
             </div>
+            <div class="notification-history-footer">
+              <span id="notificationHistoryPageInfo">Kayıtlar hazırlanıyor</span>
+              <div class="notification-history-pagination" id="notificationHistoryPagination"></div>
+            </div>
           </section>
+          <div class="notification-detail-modal" id="notificationDetailModal" hidden>
+            <div class="notification-detail-card" role="dialog" aria-modal="true" aria-labelledby="notificationDetailTitle">
+              <div class="notification-detail-head">
+                <div>
+                  <h3 id="notificationDetailTitle">Bildirim Detayı</h3>
+                  <p class="small-meta">Kime gitti, hata var mı ve hedef bilgisi burada görünür.</p>
+                </div>
+                <button class="secondary small" type="button" data-notification-detail-close>Kapat</button>
+              </div>
+              <div id="notificationDetailBody" class="notification-detail-body"></div>
+            </div>
+          </div>
+
         </section>
 
         <section class="tab-panel" id="tab-backup">
@@ -1103,6 +1304,9 @@
       </button>
       <button class="mobile-nav-btn" type="button" data-tab="standings">
         Puan
+      </button>
+      <button class="mobile-nav-btn" type="button" data-tab="logs">
+        Log
       </button>
       <button class="mobile-nav-btn" type="button" data-tab="stats">
         İstatistikler
@@ -1472,8 +1676,9 @@
     <script src="js/02-state-core.js"></script>
     <script src="js/03-management-ui.js"></script>
 
-    <script src="js/04-predictions-avatar.js"></script>
+    <script src="js/04-predictions-avatar.js?v=3"></script>
     <script src="js/05-actions-init.js"></script>
     <script src="js/06-notifications.js"></script>
+    <script src="js/07-prediction-logs.js"></script>
   </body>
 </html>

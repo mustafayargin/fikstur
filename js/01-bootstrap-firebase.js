@@ -87,6 +87,40 @@ function firebaseSnapshotToArray(value) {
   }));
 }
 
+function getFirebasePredictionTimestampValue(record = {}) {
+  const raw =
+    record.updatedAt ||
+    record.guncellemeTarihi ||
+    record.createdAt ||
+    record.tarih ||
+    record.timestamp ||
+    0;
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) ? parsed : Number(raw || 0) || 0;
+}
+
+function getFirebasePredictionCanonicalKey(record = {}) {
+  const matchId = String(record.matchId || record.localMatchId || "").trim();
+  const playerId = String(record.playerId || record.kullaniciId || record.userId || "").trim();
+  if (!matchId || !playerId) return "";
+  return makePredictionRecordId(matchId, playerId);
+}
+
+function dedupeFirebasePredictionRows(rows = []) {
+  const map = new Map();
+  rows.forEach((row, index) => {
+    const key = getFirebasePredictionCanonicalKey(row);
+    if (!key) return;
+    const current = map.get(key);
+    const nextTime = getFirebasePredictionTimestampValue(row);
+    const currentTime = current ? getFirebasePredictionTimestampValue(current.row) : -1;
+    if (!current || nextTime > currentTime || (nextTime === currentTime && index > current.index)) {
+      map.set(key, { row, index });
+    }
+  });
+  return Array.from(map.values()).map((item) => item.row);
+}
+
 async function firebaseRead(path) {
   const db = getFirebaseDb();
   if (!db) throw new Error("Firebase henüz yapılandırılmadı.");
@@ -200,6 +234,7 @@ async function firebaseApiGet(action, params = {}) {
             String(item.weekNo || item.haftaNo || "").trim() === haftaNo,
         );
       }
+      predictions = dedupeFirebasePredictionRows(predictions);
       return { success: true, predictions };
     }
     case "getStandings":
@@ -208,6 +243,170 @@ async function firebaseApiGet(action, params = {}) {
       throw new Error(`Firebase GET aksiyonu tanımlı değil: ${action}`);
   }
 }
+
+
+function normalizePredictionLogValue(value) {
+  if (value === undefined || value === null || value === "") return "";
+  const num = Number(value);
+  return Number.isNaN(num) ? String(value) : num;
+}
+
+function buildPredictionLogValue(record) {
+  if (!record) return null;
+  return {
+    homePred: normalizePredictionLogValue(record.homePred ?? record.tahminEv),
+    awayPred: normalizePredictionLogValue(record.awayPred ?? record.tahminDep),
+  };
+}
+
+function predictionLogValuesEqual(oldValue, newValue) {
+  if (!oldValue && !newValue) return true;
+  if (!oldValue || !newValue) return false;
+  return (
+    String(oldValue.homePred ?? "") === String(newValue.homePred ?? "") &&
+    String(oldValue.awayPred ?? "") === String(newValue.awayPred ?? "")
+  );
+}
+
+function resolvePredictionLogActor(payload = {}) {
+  const actorId = String(
+    payload.actorId ||
+      payload.changedById ||
+      state.settings?.auth?.playerId ||
+      getAuthUser()?.playerId ||
+      getAuthUser()?.id ||
+      "",
+  );
+  const actorUser = actorId ? getPlayerById(actorId) : null;
+  const authUser = getAuthUser?.() || null;
+  const role = String(
+    payload.actorRole || actorUser?.rol || authUser?.rol || getCurrentRole?.() || "user",
+  ).toLowerCase();
+  return {
+    id: actorId,
+    name: String(
+      payload.actorName ||
+        actorUser?.name ||
+        authUser?.adSoyad ||
+        authUser?.name ||
+        payload.changedBy ||
+        payload.kullaniciAdi ||
+        "Bilinmeyen kullanıcı",
+    ),
+    username: String(payload.actorUsername || authUser?.kullaniciAdi || getCurrentUsername?.() || ""),
+    role: role === "admin" ? "admin" : "user",
+  };
+}
+
+async function writePredictionLogEntry({ actionType, predictionId, oldRecord, newRecord, payload = {} }) {
+  try {
+    if (!isFirebaseReady()) return false;
+    const oldValue = buildPredictionLogValue(oldRecord);
+    const newValue = buildPredictionLogValue(newRecord);
+    if (actionType !== "delete" && predictionLogValuesEqual(oldValue, newValue)) {
+      return false;
+    }
+
+    const actor = resolvePredictionLogActor(payload);
+    const targetPlayerId = String(newRecord?.playerId || oldRecord?.playerId || payload.playerId || "");
+    const targetPlayer = targetPlayerId ? getPlayerById(targetPlayerId) : null;
+    const matchId = String(newRecord?.matchId || oldRecord?.matchId || payload.matchId || "");
+    const match = (state.matches || []).find((item) => String(item.id) === matchId);
+    const createdAt = new Date().toISOString();
+    const logId = sanitizeFirebaseKey(`${Date.now()}_${Math.random().toString(36).slice(2, 9)}`);
+
+    const logRecord = {
+      id: logId,
+      actionType,
+      actionLabel:
+        actionType === "create"
+          ? "Tahmin eklendi"
+          : actionType === "update"
+            ? "Tahmin değiştirildi"
+            : "Tahmin silindi",
+      predictionId,
+      matchId,
+      matchLabel: String(
+        payload.matchLabel ||
+          (match ? `${match.homeTeam || "Ev sahibi"} - ${match.awayTeam || "Deplasman"}` : "Maç bilgisi yok"),
+      ),
+      homeTeam: String(newRecord?.homeTeam || oldRecord?.homeTeam || match?.homeTeam || ""),
+      awayTeam: String(newRecord?.awayTeam || oldRecord?.awayTeam || match?.awayTeam || ""),
+      weekId: String(newRecord?.weekId || oldRecord?.weekId || payload.weekId || match?.weekId || ""),
+      weekNo: String(newRecord?.weekNo || newRecord?.haftaNo || oldRecord?.weekNo || oldRecord?.haftaNo || payload.weekNo || payload.haftaNo || ""),
+      seasonId: String(newRecord?.seasonId || oldRecord?.seasonId || payload.seasonId || match?.seasonId || ""),
+      season: String(newRecord?.season || newRecord?.sezon || oldRecord?.season || oldRecord?.sezon || payload.season || payload.sezon || ""),
+      targetPlayerId,
+      targetPlayerName: String(newRecord?.playerName || oldRecord?.playerName || targetPlayer?.name || payload.adSoyad || payload.kullaniciAdi || "Bilinmeyen kişi"),
+      actorId: actor.id,
+      actorName: actor.name,
+      actorUsername: actor.username,
+      actorRole: actor.role,
+      isAdminAction: actor.role === "admin",
+      oldValue,
+      newValue,
+      createdAt,
+      source: "firebase-client",
+    };
+    try {
+      await firebaseWrite(`predictionLogs/${logId}`, logRecord);
+    } catch (primaryError) {
+      console.warn("predictionLogs yolu yazılamadı, settings/auditLogs deneniyor:", primaryError);
+      await firebaseWrite(`settings/auditLogs/${logId}`, logRecord);
+    }
+    return true;
+  } catch (error) {
+    console.warn("Tahmin log kaydı yazılamadı:", error);
+    return false;
+  }
+}
+
+async function writeAppAuditLogEntry({ actionType, actionLabel, detail = "", oldValue = null, newValue = null, entityType = "system", entityId = "" } = {}) {
+  try {
+    if (!isFirebaseReady()) return false;
+    const actor = resolvePredictionLogActor({});
+    const createdAt = new Date().toISOString();
+    const logId = sanitizeFirebaseKey(`${Date.now()}_${Math.random().toString(36).slice(2, 9)}`);
+    const logRecord = {
+      id: logId,
+      actionType: String(actionType || "system"),
+      actionLabel: String(actionLabel || "Sistem işlemi"),
+      predictionId: "",
+      matchId: "",
+      matchLabel: String(detail || "Genel işlem"),
+      homeTeam: "",
+      awayTeam: "",
+      weekId: "",
+      weekNo: "",
+      seasonId: "",
+      season: "",
+      targetPlayerId: "",
+      targetPlayerName: entityType === "prediction" ? "Tahmin" : "Sistem",
+      actorId: actor.id,
+      actorName: actor.name,
+      actorUsername: actor.username,
+      actorRole: actor.role,
+      isAdminAction: actor.role === "admin",
+      oldValue,
+      newValue,
+      entityType: String(entityType || "system"),
+      entityId: String(entityId || ""),
+      createdAt,
+      source: "firebase-client",
+    };
+    try {
+      await firebaseWrite(`predictionLogs/${logId}`, logRecord);
+    } catch (primaryError) {
+      console.warn("predictionLogs yolu yazılamadı, settings/auditLogs deneniyor:", primaryError);
+      await firebaseWrite(`settings/auditLogs/${logId}`, logRecord);
+    }
+    return true;
+  } catch (error) {
+    console.warn("Genel log kaydı yazılamadı:", error);
+    return false;
+  }
+}
+window.writeAppAuditLogEntry = writeAppAuditLogEntry;
 
 async function firebaseApiPost(action, payload = {}) {
   switch (action) {
@@ -392,36 +591,122 @@ async function firebaseApiPost(action, payload = {}) {
       return { success: true };
     }
     case "savePrediction": {
-      const id = sanitizeFirebaseKey(
-        payload.predictionId ||
-          payload.id ||
-          makePredictionRecordId(payload.matchId, payload.playerId),
+      const normalizedMatchId = String(payload.matchId || "");
+      const normalizedPlayerId = String(payload.playerId || payload.kullaniciId || "");
+      const canonicalId = sanitizeFirebaseKey(
+        makePredictionRecordId(normalizedMatchId, normalizedPlayerId),
       );
+      const requestedId = sanitizeFirebaseKey(
+        payload.predictionId || payload.id || canonicalId,
+      );
+      const id = canonicalId || requestedId;
+      let currentRecord = null;
+      let duplicatePredictionIds = [];
+
+      try {
+        const allPredictions = (await firebaseRead("predictions")) || {};
+        duplicatePredictionIds = Object.entries(allPredictions)
+          .filter(([existingId, item]) => {
+            const sameMatch = String(item?.matchId || item?.localMatchId || "") === normalizedMatchId;
+            const samePlayer =
+              String(item?.playerId || item?.kullaniciId || item?.userId || "") ===
+              normalizedPlayerId;
+            return sameMatch && samePlayer && sanitizeFirebaseKey(existingId) !== id;
+          })
+          .map(([existingId]) => sanitizeFirebaseKey(existingId));
+
+        currentRecord =
+          allPredictions[id] ||
+          allPredictions[requestedId] ||
+          Object.entries(allPredictions).find(([existingId, item]) => {
+            const sameMatch = String(item?.matchId || item?.localMatchId || "") === normalizedMatchId;
+            const samePlayer =
+              String(item?.playerId || item?.kullaniciId || item?.userId || "") ===
+              normalizedPlayerId;
+            return sameMatch && samePlayer;
+          })?.[1] ||
+          null;
+      } catch (error) {
+        console.warn("Eski tahmin okunamadı, kayıt yine de yapılacak:", error);
+      }
+
       const record = {
         ...payload,
         id,
+        predictionId: id,
         season: payload.season || payload.sezon || "",
         sezon: payload.sezon || payload.season || "",
         weekNo: payload.weekNo || payload.haftaNo || "",
         haftaNo: payload.haftaNo || payload.weekNo || "",
-        playerId: String(payload.playerId || payload.kullaniciId || ""),
-        matchId: String(payload.matchId || ""),
+        playerId: normalizedPlayerId,
+        kullaniciId: normalizedPlayerId,
+        matchId: normalizedMatchId,
+        localMatchId: normalizedMatchId,
         homePred: payload.homePred,
         awayPred: payload.awayPred,
         tahminEv: payload.tahminEv ?? payload.homePred,
         tahminDep: payload.tahminDep ?? payload.awayPred,
         updatedAt: new Date().toISOString(),
       };
+
       await firebaseWrite(`predictions/${id}`, record);
+
+      for (const duplicateId of duplicatePredictionIds) {
+        if (duplicateId && duplicateId !== id) {
+          await firebaseRemove(`predictions/${duplicateId}`);
+        }
+      }
+
+      await writePredictionLogEntry({
+        actionType: currentRecord ? "update" : "create",
+        predictionId: id,
+        oldRecord: currentRecord,
+        newRecord: record,
+        payload,
+      });
       return { success: true, id, predictionId: id };
     }
     case "deletePrediction": {
+      const normalizedMatchId = String(payload.matchId || "");
+      const normalizedPlayerId = String(payload.playerId || payload.kullaniciId || "");
       const id = sanitizeFirebaseKey(
         payload.predictionId ||
           payload.id ||
-          makePredictionRecordId(payload.matchId, payload.playerId),
+          makePredictionRecordId(normalizedMatchId, normalizedPlayerId),
       );
-      await firebaseRemove(`predictions/${id}`);
+      let currentRecord = null;
+      let idsToDelete = [id];
+      try {
+        const allPredictions = (await firebaseRead("predictions")) || {};
+        const duplicateIds = Object.entries(allPredictions)
+          .filter(([existingId, item]) => {
+            const sameMatch = String(item?.matchId || item?.localMatchId || "") === normalizedMatchId;
+            const samePlayer =
+              String(item?.playerId || item?.kullaniciId || item?.userId || "") ===
+              normalizedPlayerId;
+            return sameMatch && samePlayer;
+          })
+          .map(([existingId]) => sanitizeFirebaseKey(existingId));
+        idsToDelete = Array.from(new Set([...idsToDelete, ...duplicateIds])).filter(Boolean);
+        currentRecord =
+          allPredictions[id] ||
+          duplicateIds.map((duplicateId) => allPredictions[duplicateId]).find(Boolean) ||
+          null;
+      } catch (error) {
+        console.warn("Silinecek tahmin okunamadı, silme yine de yapılacak:", error);
+      }
+      for (const deleteId of idsToDelete) {
+        await firebaseRemove(`predictions/${deleteId}`);
+      }
+      if (currentRecord) {
+        await writePredictionLogEntry({
+          actionType: "delete",
+          predictionId: id,
+          oldRecord: currentRecord,
+          newRecord: null,
+          payload,
+        });
+      }
       return { success: true, id };
     }
     default:
@@ -1441,8 +1726,20 @@ function persistPendingPredictionQueue(queue) {
   updateAdminSyncPanel();
 }
 
-function getPredictionQueueKey(item) {
-  return [item.season, item.weekNo, item.playerId, item.matchId].join("__");
+function getPredictionQueueKey(item = {}) {
+  const season = item.season ?? item.sezon ?? item.seasonLabel ?? "";
+  const weekNo = item.weekNo ?? item.haftaNo ?? item.weekNumber ?? "";
+  const playerId = normalizeEntityId(item.playerId ?? item.kullaniciId ?? "");
+  const matchId = normalizeEntityId(item.matchId ?? item.localMatchId ?? item.sheetMatchId ?? "");
+  return [season, weekNo, playerId, matchId].map((value) => String(value ?? "")).join("__");
+}
+
+function isSamePredictionQueueTarget(a = {}, b = {}) {
+  const aMatch = normalizeEntityId(a.matchId ?? a.localMatchId ?? a.sheetMatchId ?? "");
+  const bMatch = normalizeEntityId(b.matchId ?? b.localMatchId ?? b.sheetMatchId ?? "");
+  const aPlayer = normalizeEntityId(a.playerId ?? a.kullaniciId ?? "");
+  const bPlayer = normalizeEntityId(b.playerId ?? b.kullaniciId ?? "");
+  return !!aMatch && !!bMatch && !!aPlayer && !!bPlayer && aMatch === bMatch && aPlayer === bPlayer;
 }
 
 function getPredictionQueueAction(item) {
@@ -1451,7 +1748,9 @@ function getPredictionQueueAction(item) {
 
 function enqueuePredictionRetry(payload) {
   const queue = getPendingPredictionQueue().filter(
-    (item) => getPredictionQueueKey(item) !== getPredictionQueueKey(payload),
+    (item) =>
+      getPredictionQueueKey(item) !== getPredictionQueueKey(payload) &&
+      !isSamePredictionQueueTarget(item, payload),
   );
   queue.push({ ...payload, queuedAt: new Date().toISOString() });
   persistPendingPredictionQueue(queue);
@@ -1459,7 +1758,9 @@ function enqueuePredictionRetry(payload) {
 
 function dequeuePredictionRetry(payload) {
   const queue = getPendingPredictionQueue().filter(
-    (item) => getPredictionQueueKey(item) !== getPredictionQueueKey(payload),
+    (item) =>
+      getPredictionQueueKey(item) !== getPredictionQueueKey(payload) &&
+      !isSamePredictionQueueTarget(item, payload),
   );
   persistPendingPredictionQueue(queue);
 }
@@ -2686,15 +2987,29 @@ function upsertLocalPredictionRecord({
   points,
   remoteId = null,
   username = "",
+  updatedAt = "",
 }) {
-  if (!matchId || !playerId) return null;
-  let pred = getPrediction(matchId, playerId);
+  const normalizedMatchId = normalizeEntityId(matchId);
+  const normalizedPlayerId = normalizeEntityId(playerId);
+  if (!normalizedMatchId || !normalizedPlayerId) return null;
+
+  const duplicates = state.predictions.filter(
+    (item) =>
+      normalizeEntityId(item.matchId || item.localMatchId) === normalizedMatchId &&
+      normalizeEntityId(item.playerId || item.kullaniciId || item.userId) === normalizedPlayerId,
+  );
+
+  let pred = duplicates[0] || null;
+  duplicates.slice(1).forEach((item) => {
+    if (isPredictionRecordNewer(item, pred)) pred = item;
+  });
+
   if (!pred) {
     pred = {
-      id: remoteId || uid("pred"),
+      id: remoteId || makePredictionRecordId(normalizedMatchId, normalizedPlayerId),
       remoteId: remoteId || null,
-      matchId,
-      playerId,
+      matchId: normalizedMatchId,
+      playerId: normalizedPlayerId,
       homePred: "",
       awayPred: "",
       points: 0,
@@ -2702,12 +3017,26 @@ function upsertLocalPredictionRecord({
     state.predictions.push(pred);
   }
 
-  pred.id = remoteId || pred.id || uid("pred");
+  pred.id = remoteId || pred.id || makePredictionRecordId(normalizedMatchId, normalizedPlayerId);
   pred.remoteId = remoteId || pred.remoteId || null;
+  pred.matchId = normalizedMatchId;
+  pred.playerId = normalizedPlayerId;
+  pred.localMatchId = normalizedMatchId;
   pred.homePred = parseNumberOrEmpty(homePred);
   pred.awayPred = parseNumberOrEmpty(awayPred);
   pred.points = Number(points || 0);
+  pred.updatedAt = updatedAt || new Date().toISOString();
   if (username) pred.username = username;
+
+  state.predictions = state.predictions.filter(
+    (item) =>
+      item === pred ||
+      !(
+        normalizeEntityId(item.matchId || item.localMatchId) === normalizedMatchId &&
+        normalizeEntityId(item.playerId || item.kullaniciId || item.userId) === normalizedPlayerId
+      ),
+  );
+  invalidatePredictionIndexCache();
   return pred;
 }
 
@@ -2809,6 +3138,40 @@ function normalizeOnlinePredictionRows(payload) {
   return [];
 }
 
+function getPredictionRowTimestampValue(row = {}) {
+  const raw =
+    row.updatedAt ||
+    row.guncellemeTarihi ||
+    row.createdAt ||
+    row.tarih ||
+    row.timestamp ||
+    "";
+  const time = Date.parse(raw);
+  return Number.isFinite(time) ? time : 0;
+}
+
+function getCanonicalPredictionRowId(row = {}) {
+  const matchId = resolveMatchIdFromOnlineRow(row);
+  const playerId = resolvePlayerIdFromOnlineRow(row);
+  if (!matchId || !playerId) return null;
+  return `${matchId}__${playerId}`;
+}
+
+function dedupeOnlinePredictionRows(rows = []) {
+  const map = new Map();
+  rows.forEach((row, index) => {
+    const key = getCanonicalPredictionRowId(row);
+    if (!key) return;
+    const current = map.get(key);
+    const nextScore = getPredictionRowTimestampValue(row);
+    const currentScore = current ? getPredictionRowTimestampValue(current.row) : -1;
+    if (!current || nextScore >= currentScore || index > current.index) {
+      map.set(key, { row, index });
+    }
+  });
+  return Array.from(map.values()).map((item) => item.row);
+}
+
 function getUnsyncedPredictionDraftsForScope(seasonId, weekId = null) {
   const scopedMatchIds = new Set(
     weekId
@@ -2854,7 +3217,7 @@ async function syncOnlinePredictions(options = {}) {
       seasonLabel || "",
       weekNumber || "",
     );
-    const rows = normalizeOnlinePredictionRows(response);
+    const rows = dedupeOnlinePredictionRows(normalizeOnlinePredictionRows(response));
     const localDrafts = seasonId
       ? getUnsyncedPredictionDraftsForScope(seasonId, weekId || null)
       : [];
@@ -2899,12 +3262,17 @@ async function syncOnlinePredictions(options = {}) {
         remoteId:
           row.id || row.predictionId || row.kayitId || row.tahminId || null,
         username: row.kullaniciAdi || row.username || "",
+        updatedAt: row.updatedAt || row.guncellemeTarihi || row.createdAt || row.tarih || "",
       });
     });
 
     localDrafts.forEach((draft) => {
       upsertLocalPredictionRecord(draft);
     });
+
+    if (typeof compactLocalPredictionRecords === "function") {
+      compactLocalPredictionRecords();
+    }
 
     recalculateAllPoints();
     saveState(true);
@@ -4484,13 +4852,17 @@ function buildDashboardMatchModalBody(match) {
         pred && (pred.homePred !== "" || pred.awayPred !== "")
           ? `${pred.homePred !== "" ? pred.homePred : "-"} - ${pred.awayPred !== "" ? pred.awayPred : "-"}`
           : "--";
+      const revealPrediction = canRevealPredictionForViewer(match, player.id);
+      const hasPrediction = !!(pred && (pred.homePred !== "" || pred.awayPred !== ""));
       return {
         player,
         pred,
         tone,
-        label,
-        value,
-        points: Number(pred?.points || 0),
+        label: !revealPrediction && hasPrediction ? "Tahmin girildi" : label,
+        value: revealPrediction ? value : hasPrediction ? "🔒 Gizli" : "--",
+        points: revealPrediction ? Number(pred?.points || 0) : 0,
+        revealPrediction,
+        hasPrediction,
       };
     })
     .sort(
@@ -4514,7 +4886,7 @@ function buildDashboardMatchModalBody(match) {
       ${rows
         .map(
           (row) => `
-        <div class="dashboard-detail-row ${row.tone}">
+        <div class="dashboard-detail-row ${row.tone} ${!row.revealPrediction && row.hasPrediction ? "dashboard-secret-row" : ""}">
           <div class="dashboard-detail-row__user">
             <span class="dashboard-avatar-chip ${row.tone}">${createGenericAvatarMarkup(row.player, "dashboard-inline-avatar")}</span>
             <div>
@@ -4523,7 +4895,7 @@ function buildDashboardMatchModalBody(match) {
             </div>
           </div>
           <div class="dashboard-detail-row__score">${escapeHtml(row.value)}</div>
-          <div class="dashboard-detail-row__points">${row.pred && row.pred.homePred !== "" && row.pred.awayPred !== "" ? `${row.points}p` : "--"}</div>
+          <div class="dashboard-detail-row__points">${row.revealPrediction && row.pred && row.pred.homePred !== "" && row.pred.awayPred !== "" ? `${row.points}p` : row.hasPrediction ? "🔒" : "--"}</div>
         </div>
       `,
         )
@@ -4568,6 +4940,7 @@ function renderMobilePredictions(container, matches) {
     .map((match) => {
       const locked = isMatchLocked(match);
       const lockedForUi = locked && !isAdmin;
+      const predictionRevealOpen = isWeekStartedForPredictionReveal(match.weekId);
       const badge = getMatchBadge(match);
       const visual = getMatchVisualState(match);
 
@@ -4580,6 +4953,7 @@ function renderMobilePredictions(container, matches) {
             ${match.played ? `<span class="result-chip premium-result-chip">Skor ${match.homeScore}-${match.awayScore}</span>` : locked ? `<span class="result-chip warning-chip premium-result-chip">Kapandı</span>` : `<span class="result-chip premium-result-chip soft-chip">Açık</span>`}
           </div>
         </div>
+        ${!isAdmin && !predictionRevealOpen ? `<div class="mobile-fairplay-notice">🔒 Diğer kullanıcıların tahminleri maç başlayınca açılır.</div>` : ""}
         <div class="mobile-user-predictions compact-mobile-user-predictions">${players
           .map((player) => {
             const pred =
@@ -4611,6 +4985,9 @@ function renderMobilePredictions(container, matches) {
               canEdit && shouldShowPredictionSaveAction(match.id, player.id);
 
             if (!isOwnPlayer && !isAdmin) {
+              if (!canRevealPredictionForViewer(match, player.id)) {
+                return "";
+              }
               return `
               <div class="mobile-other-prediction premium-user-card compact-user-row compact-user-row--lean ${pointLabel(pred.points)} ${outcomeClass} ${statusClass}">
                 <div class="compact-user-main">

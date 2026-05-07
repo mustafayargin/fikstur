@@ -51,6 +51,12 @@ function renderCurrentTabOnly(
       if (typeof renderNotificationCenter === "function") renderNotificationCenter();
       break;
 
+    case "logs":
+      if (typeof renderPredictionLogs === "function") {
+        renderPredictionLogs({ force: true });
+      }
+      break;
+
     case "backup":
       renderBackupPanel();
       break;
@@ -176,6 +182,16 @@ async function addSeason() {
         });
       }
       await hydrateFromFirebaseRealtime("season-add");
+      if (typeof window.writeAppAuditLogEntry === "function") {
+        window.writeAppAuditLogEntry({
+          actionType: "season_create",
+          actionLabel: "Sezon eklendi",
+          detail: `${name} sezonu eklendi`,
+          entityType: "season",
+          entityId: seasonId,
+          newValue: { season: name, leagueName },
+        });
+      }
     } catch (error) {
       state.seasons = state.seasons.filter((item) => item.id !== seasonId);
       state.players = state.players.map((player) => {
@@ -488,6 +504,17 @@ function addWeek() {
   state.settings.activeWeekId = week.id;
   document.getElementById("weekNumber").value = "";
   saveState();
+  if (typeof window.writeAppAuditLogEntry === "function") {
+    const season = getSeasonById(seasonId);
+    window.writeAppAuditLogEntry({
+      actionType: "week_create",
+      actionLabel: "Hafta eklendi",
+      detail: `${season?.name || "Sezon"} · ${number}. hafta eklendi`,
+      entityType: "week",
+      entityId: week.id,
+      newValue: { season: season?.name || "", weekNo: number, status },
+    });
+  }
   renderAll();
 }
 
@@ -546,6 +573,18 @@ function addMatch() {
   document.getElementById("awayTeam").value = "";
   document.getElementById("matchDate").value = "";
   saveState();
+  if (typeof window.writeAppAuditLogEntry === "function") {
+    const season = getSeasonById(seasonId);
+    const week = state.weeks.find((item) => String(item.id) === String(weekId));
+    window.writeAppAuditLogEntry({
+      actionType: "match_create",
+      actionLabel: "Maç eklendi",
+      detail: `${homeTeam} - ${awayTeam} maçı eklendi (${season?.name || "Sezon"}, ${week?.number || "?"}. hafta)`,
+      entityType: "match",
+      entityId: newMatch.id,
+      newValue: { homeTeam, awayTeam, date, season: season?.name || "", weekNo: week?.number || "" },
+    });
+  }
   renderAll();
 }
 
