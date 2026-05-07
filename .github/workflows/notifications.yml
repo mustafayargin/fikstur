@@ -85,22 +85,44 @@ jobs:
               return Promise.race([promise, timeoutPromise]);
             };
 
-            const sendToTokens = async (tokens, title, body) => {
-              const message = {
-                data: {
-                  title,
-                  body,
-                  url: "./index.html"
+          const SITE_URL = "https://mustafayargin.github.io/";
+          
+          const sendToTokens = async (tokens, title, body) => {
+            const safeTitle = String(title || "Skor Avcıları");
+            const safeBody = String(body || "Yeni bildirimin var.");
+          
+            const message = {
+              notification: {
+                title: safeTitle,
+                body: safeBody
+              },
+              data: {
+                title: safeTitle,
+                body: safeBody,
+                url: SITE_URL
+              },
+              webpush: {
+                notification: {
+                  title: safeTitle,
+                  body: safeBody,
+                  icon: "/icons/icon-192.png",
+                  badge: "/icons/icon-192.png",
+                  image: "/icons/icon-512.png",
+                  requireInteraction: false
                 },
-                tokens
-              };
-
-              return await withTimeout(
-                admin.messaging().sendEachForMulticast(message),
-                30000,
-                "FCM bildirim gönderimi"
-              );
+                fcmOptions: {
+                  link: SITE_URL
+                }
+              },
+              tokens
             };
+          
+            return await withTimeout(
+              admin.messaging().sendEachForMulticast(message),
+              30000,
+              "FCM bildirim gönderimi"
+            );
+          };
 
             const [tokensSnap, usersSnap, matchesSnap, sentSnap, queueSnap] = await Promise.all([
               db.ref("fcmTokens").once("value"),
