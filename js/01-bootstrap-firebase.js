@@ -4789,25 +4789,37 @@ function renderDashboardMatchCards(container, matches) {
             minute: "2-digit",
           });
 
-      const avatars = predictions
-        .slice(0, 5)
-        .map(({ player, pred }) => {
-          const tone = getDashboardPredictionTone(pred, match);
-          return `<span class="dashboard-avatar-chip ${tone}" title="${escapeHtml(player.name)}">${createGenericAvatarMarkup(player, "dashboard-inline-avatar")}</span>`;
-        })
-        .join("");
+          const avatars = predictions
+            .map(({ player, pred }) => {
+              const tone = getDashboardPredictionTone(pred, match);
+              return `
+              <button
+                type="button"
+                class="dashboard-avatar-chip ${tone}"
+                title="${escapeHtml(player.name)}"
+                onclick="event.stopPropagation(); handleDashboardAvatarTap(event, '${match.id}', '${player.id}');"            >
+                ${createGenericAvatarMarkup(player, "dashboard-inline-avatar")}
+              </button>
+              `;            })
+            .join("");
 
       return `
-        <article class="dashboard-match-card is-${visual} ${coverageClass} ${match.played ? "is-played" : ""} ${visual === "postponed" ? "postponed-row" : ""} ${visual === "played-postponed" ? "rescheduled-played-row" : ""}" onclick="openDashboardMatchModal('${match.id}')">
+      <article class="dashboard-match-card is-${visual} ${coverageClass} ${match.played ? "is-played" : ""} ${visual === "postponed" ? "postponed-row" : ""} ${visual === "played-postponed" ? "rescheduled-played-row" : ""}">
           <div class="dashboard-match-card__glow"></div>
 
-          <div class="dashboard-match-card__top">
+          <div
+  class="dashboard-match-card__top dashboard-match-open-zone"
+  onclick="openDashboardMatchModal('${match.id}')"
+>
             <div class="dashboard-card-topline">
               <span class="badge ${badge.cls}">${badge.text}<span class="badge-time">• ${timeText}</span></span>
             </div>
           </div>
 
-          <div class="dashboard-match-card__body">
+          <div
+  class="dashboard-match-card__body dashboard-match-open-zone"
+  onclick="openDashboardMatchModal('${match.id}')"
+>
             <div class="dashboard-team dashboard-team--home">
               ${teamLogoHtml(match.homeTeam, match.seasonId)}
               <strong>${escapeHtml(match.homeTeam)}</strong>
@@ -4906,7 +4918,165 @@ function buildDashboardMatchModalBody(match) {
     </div>
   `;
 }
+function buildDashboardPlayerWeekModalBody(match, player) {
+  const weekMatches = getMatchesByWeekId(match.weekId);
+  const supportedTeam = getPlayerSupportedTeamName(player) || "Takım seçilmedi";
 
+  const weekRows = weekMatches.map((weekMatch) => {
+    const pred = getPrediction(weekMatch.id, player.id);
+    const hasPrediction = !!(
+      pred &&
+      pred.homePred !== "" &&
+      pred.awayPred !== ""
+    );
+    const revealPrediction = canRevealPredictionForViewer(weekMatch, player.id);
+    const tone = getDashboardPredictionTone(pred, weekMatch);
+    const label = getDashboardPredictionLabel(pred, weekMatch);
+
+    return {
+      match: weekMatch,
+      pred,
+      hasPrediction,
+      revealPrediction,
+      tone,
+      label,
+    };
+  });
+
+  const predictedCount = weekRows.filter((row) => row.hasPrediction).length;
+  const missingCount = Math.max(weekRows.length - predictedCount, 0);
+  const exactCount = weekRows.filter(
+    (row) => row.match.played && Number(row.pred?.points || 0) >= 3,
+  ).length;
+  const closeCount = weekRows.filter(
+    (row) => row.match.played && Number(row.pred?.points || 0) === 1,
+  ).length;
+  const missCount = weekRows.filter(
+    (row) =>
+      row.match.played &&
+      row.hasPrediction &&
+      Number(row.pred?.points || 0) === 0,
+  ).length;
+  const weeklyPoint = weekRows.reduce(
+    (sum, row) => sum + Number(row.match.played ? row.pred?.points || 0 : 0),
+    0,
+  );
+
+  return `
+    <div class="dashboard-player-profile-modal">
+      <div class="dashboard-player-profile-head">
+        <div class="dashboard-player-profile-avatar">
+          ${createGenericAvatarMarkup(player, "dashboard-player-profile-avatar-img")}
+        </div>
+
+        <div class="dashboard-player-profile-info">
+          <strong>${escapeHtml(player.name)}</strong>
+          <span>${teamLogoHtml(supportedTeam, getActiveSeasonId())} ${escapeHtml(supportedTeam)}</span>
+        </div>
+
+        <div class="dashboard-player-profile-score">
+          <strong>${weeklyPoint}p</strong>
+          <span>Haftalık</span>
+        </div>
+      </div>
+
+      <div class="dashboard-player-profile-stats">
+        <div><span>Tahmin</span><strong>${predictedCount}/${weekRows.length}</strong></div>
+        <div><span>Eksik</span><strong>${missingCount}</strong></div>
+        <div><span>Tam</span><strong>${exactCount}</strong></div>
+        <div><span>Yakın</span><strong>${closeCount}</strong></div>
+        <div><span>Kaçtı</span><strong>${missCount}</strong></div>
+      </div>
+
+      <div class="dashboard-player-profile-list">
+        ${weekRows
+          .map((row) => {
+            const scoreText =
+              row.hasPrediction && row.revealPrediction
+                ? `${row.pred.homePred} - ${row.pred.awayPred}`
+                : row.hasPrediction
+                  ? "🔒 Maç başlayınca görünür"
+                  : "Tahmin yok";
+
+            const pointText =
+              row.hasPrediction && row.revealPrediction && row.match.played
+                ? `${Number(row.pred.points || 0)}p`
+                : row.hasPrediction && !row.revealPrediction
+                  ? "🔒"
+                  : "--";
+
+            return `
+              <div class="dashboard-player-profile-match ${row.tone}">
+                <div class="dashboard-player-profile-teams">
+                  <strong>${escapeHtml(row.match.homeTeam)} - ${escapeHtml(row.match.awayTeam)}</strong>
+                  <span>${formatDate(row.match.date)}</span>
+                </div>
+
+                <div class="dashboard-player-profile-prediction">
+                  <strong>${escapeHtml(scoreText)}</strong>
+                  <span>${escapeHtml(row.revealPrediction ? row.label : row.hasPrediction ? "Gizli tahmin" : "Eksik")}</span>
+                </div>
+
+                <div class="dashboard-player-profile-points">${pointText}</div>
+              </div>
+            `;
+          })
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+let dashboardSelectedAvatarKey = "";
+
+window.handleDashboardAvatarTap = function (event, matchId, playerId) {
+  const chip = event.currentTarget;
+  const key = `${matchId}-${playerId}`;
+  const isMobile = window.matchMedia("(max-width: 640px)").matches;
+
+  if (!isMobile) {
+    openDashboardPlayerWeekModal(matchId, playerId);
+    return;
+  }
+
+  if (
+    dashboardSelectedAvatarKey === key &&
+    chip.classList.contains("is-selected")
+  ) {
+    dashboardSelectedAvatarKey = "";
+    chip.classList.remove("is-selected");
+    openDashboardPlayerWeekModal(matchId, playerId);
+    return;
+  }
+
+  document
+    .querySelectorAll(".dashboard-avatar-chip.is-selected")
+    .forEach((item) => item.classList.remove("is-selected"));
+
+  dashboardSelectedAvatarKey = key;
+  chip.classList.add("is-selected");
+};
+window.openDashboardPlayerWeekModal = function (matchId, playerId) {
+  const modal = document.getElementById("dashboardMatchModal");
+  const title = document.getElementById("dashboardMatchModalTitle");
+  const meta = document.getElementById("dashboardMatchModalMeta");
+  const body = document.getElementById("dashboardMatchModalBody");
+
+  const match = state.matches.find(
+    (item) => String(item.id) === String(matchId),
+  );
+  const player = state.players.find(
+    (item) => String(item.id) === String(playerId),
+  );
+
+  if (!modal || !title || !meta || !body || !match || !player) return;
+
+  title.textContent = `${player.name} profili`;
+  meta.textContent = `${formatDate(match.date)} haftası tahmin özeti`;
+  body.innerHTML = buildDashboardPlayerWeekModalBody(match, player);
+
+  modal.classList.remove("hidden");
+  document.body.classList.add("dashboard-modal-open");
+};
 window.openDashboardMatchModal = function (matchId) {
   const modal = document.getElementById("dashboardMatchModal");
   const title = document.getElementById("dashboardMatchModalTitle");
