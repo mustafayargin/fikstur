@@ -10768,6 +10768,7 @@ body.dashboard-modal-open {
   font-size: clamp(1.08rem, 2.9vw, 1.45rem);
   line-height: 1.45;
   text-wrap: balance;
+
 }
 
 @media (max-width: 640px) {
@@ -16005,4 +16006,408 @@ body[data-role="user"] #tab-players .page-header p {
 
 .dashboard-match-open-zone:active {
   transform: scale(0.995);
+}
+/* Lig puan durumu modalı */
+.league-standings-trigger-btn {
+  white-space: nowrap;
+}
+
+.league-standings-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(2, 6, 23, 0.72);
+  backdrop-filter: blur(14px);
+}
+
+.league-standings-modal.hidden {
+  display: none;
+}
+
+.league-standings-modal-card {
+  width: min(560px, 100%);
+  max-height: min(720px, 92vh);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 28px;
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.96));
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.38);
+}
+
+.league-standings-modal-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 20px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.league-standings-kicker {
+  display: inline-flex;
+  margin-bottom: 5px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #93c5fd;
+}
+
+.league-standings-modal-head h3 {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 20px;
+}
+
+.league-standings-modal-head p {
+  margin: 5px 0 0;
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+.league-standings-close {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 0;
+  font-size: 24px;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+}
+
+#leagueStandingsModalBody {
+  padding: 12px;
+  overflow: auto;
+  max-height: calc(92vh - 118px);
+}
+
+.league-standings-table-shell {
+  display: grid;
+  gap: 6px;
+}
+
+.league-standings-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 38px 48px 48px;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.045);
+  color: #e5e7eb;
+  font-size: 13px;
+}
+
+.league-standings-head-row {
+  min-height: 32px;
+  background: transparent;
+  border-color: transparent;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.league-standings-row.is-europe {
+  border-left: 3px solid rgba(34, 197, 94, 0.8);
+}
+
+.league-standings-row.is-danger {
+  border-left: 3px solid rgba(248, 113, 113, 0.75);
+}
+
+.league-standings-rank,
+.league-standings-points {
+  font-weight: 900;
+  color: #f8fafc;
+}
+
+.league-standings-team {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.league-standings-team strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.league-standings-logo,
+.league-standings-logo .team-logo-img,
+.league-standings-logo .team-logo {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+}
+
+@media (max-width: 768px) {
+  .prediction-header-actions {
+    gap: 8px;
+  }
+
+  .league-standings-modal {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .league-standings-modal-card {
+    width: 100%;
+    max-height: none;
+    min-height: 100vh;
+    border-radius: 0;
+  }
+
+  #leagueStandingsModalBody {
+    max-height: calc(100vh - 112px);
+  }
+
+  .league-standings-row {
+    grid-template-columns: 28px minmax(0, 1fr) 32px 42px 44px;
+    min-height: 38px;
+    padding: 6px 8px;
+    gap: 6px;
+    font-size: 12px;
+  }
+
+  .league-standings-team strong {
+    font-size: 12px;
+  }
+
+  .league-standings-logo,
+  .league-standings-logo .team-logo-img,
+  .league-standings-logo .team-logo {
+    width: 22px;
+    height: 22px;
+    flex-basis: 22px;
+  }
+}
+
+/* === FIX: okunaklı lig puan durumu + sabit puan butonu === */
+#pullLeagueStandingsBtn.league-standings-trigger-btn {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 1200;
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: 999px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(147, 197, 253, 0.18);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.96), rgba(14, 165, 233, 0.92));
+  color: #ffffff;
+  font-weight: 900;
+}
+
+#pullLeagueStandingsBtn.league-standings-trigger-btn::before {
+  content: "📊";
+  margin-right: 7px;
+}
+
+.league-standings-modal-card {
+  width: min(640px, 100%);
+}
+
+.league-standings-row {
+  grid-template-columns: 34px minmax(0, 1fr) 38px 46px 42px;
+  gap: 10px;
+  min-height: 46px;
+  padding: 7px 12px;
+}
+
+.league-standings-team {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.league-standings-team strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.15;
+}
+
+.league-standings-logo,
+.league-standings-logo .team-logo,
+.league-standings-logo .team-logo-img,
+.league-standings-team img.team-logo-img {
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  min-height: 30px !important;
+  max-width: 30px !important;
+  max-height: 30px !important;
+  flex: 0 0 30px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  object-fit: contain !important;
+}
+
+.league-standings-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  #pullLeagueStandingsBtn.league-standings-trigger-btn {
+    right: 14px;
+    bottom: 82px;
+    min-height: 44px;
+    padding: 0 15px;
+    font-size: 13px;
+  }
+
+  .league-standings-modal-card {
+    min-height: 100dvh;
+  }
+
+  #leagueStandingsModalBody {
+    padding: 8px;
+    max-height: calc(100dvh - 112px);
+  }
+
+  .league-standings-modal-head {
+    padding: 16px 14px 12px;
+  }
+
+  .league-standings-modal-head h3 {
+    font-size: 17px;
+  }
+
+  .league-standings-modal-head p {
+    font-size: 11px;
+  }
+
+  .league-standings-table-shell {
+    gap: 5px;
+  }
+
+  .league-standings-row {
+    grid-template-columns: 26px minmax(0, 1fr) 28px 38px 34px;
+    gap: 7px;
+    min-height: 40px;
+    padding: 6px 8px;
+    border-radius: 13px;
+    font-size: 12px;
+  }
+
+  .league-standings-head-row {
+    min-height: 28px;
+    font-size: 10px;
+  }
+
+  .league-standings-team {
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 7px;
+  }
+
+  .league-standings-team strong {
+    font-size: 11.5px;
+  }
+
+  .league-standings-logo,
+  .league-standings-logo .team-logo,
+  .league-standings-logo .team-logo-img,
+  .league-standings-team img.team-logo-img {
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px !important;
+    min-height: 24px !important;
+    max-width: 24px !important;
+    max-height: 24px !important;
+    flex-basis: 24px !important;
+  }
+}
+
+
+/* Karşılama kartı ayarları */
+.welcome-settings-card { overflow: hidden; }
+.welcome-settings-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+  gap: 18px;
+  align-items: start;
+}
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.35);
+}
+.toggle-row input { width: auto; }
+.welcome-admin-preview-box {
+  margin-top: 8px;
+  padding: 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(250, 204, 21, 0.28);
+  background:
+    radial-gradient(circle at top, rgba(250, 204, 21, 0.18), transparent 34%),
+    rgba(15, 23, 42, 0.72);
+  text-align: center;
+  min-height: 240px;
+}
+.welcome-admin-preview-box img,
+.welcome-card__media img {
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  background: rgba(2, 6, 23, 0.35);
+  border-radius: 20px;
+  margin-bottom: 14px;
+  border: 1px solid rgba(255,255,255,0.12);
+}
+.welcome-admin-preview-box img.is-contain,
+.welcome-card__media img.is-contain { object-fit: contain; }
+.welcome-admin-preview-box img.is-cover,
+.welcome-card__media img.is-cover { object-fit: cover; }
+.welcome-card__media { width: 100%; }
+.welcome-card__close { margin-top: 14px; }
+.welcome-card:has(.welcome-card__media:not(.hidden)) .welcome-card__avatar { display: none; }
+@media (max-width: 780px) {
+  .welcome-settings-grid { grid-template-columns: 1fr; }
+  .welcome-admin-preview-box img,
+  .welcome-card__media img { max-height: 180px; }
+}
+#welcomeMessageInput {
+  background: rgba(15, 23, 42, 0.92);
+  color: #ffffff;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  border-radius: 10px;
+}
+
+#welcomeMessageInput:focus {
+  background: rgba(15, 23, 42, 0.98);
+  color: #ffffff;
+  border-color: rgba(245, 158, 11, 0.9);
+  outline: 2px solid rgba(245, 158, 11, 0.35);
+}
+
+#welcomeMessageInput::selection {
+  background: rgba(245, 158, 11, 0.35);
+  color: #ffffff;
+}
+/* Geçici olarak puan çek barını gizle silinecek*/
+#pullLeagueStandingsBtn,
+.league-standings-trigger-btn {
+  display: none !important;
 }

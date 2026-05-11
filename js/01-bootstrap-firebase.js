@@ -186,10 +186,28 @@ async function ensureFirebaseDefaults() {
       createdAt: new Date().toISOString(),
       defaultUsersSeeded: true,
       seasonsMeta: [],
+      welcomeCard: {
+        enabled: true,
+        title: "Hoş geldin!",
+        message: "İyi haftalar, bol şans! ✨",
+        imageFile: "",
+        imageFit: "cover",
+        showOnce: false,
+        updatedAt: new Date().toISOString(),
+      },
     });
   } else if (!Array.isArray(settings.seasonsMeta)) {
     await firebaseUpdate("settings", {
       seasonsMeta: [],
+      welcomeCard: {
+        enabled: true,
+        title: "Hoş geldin!",
+        message: "İyi haftalar, bol şans! ✨",
+        imageFile: "",
+        imageFit: "cover",
+        showOnce: false,
+        updatedAt: new Date().toISOString(),
+      },
     });
   }
 
@@ -2582,6 +2600,10 @@ async function syncSeasonRegistryFromFirebase() {
   state.settings.resultsAutoSyncInProgressAt = Number(
     settings.resultsAutoSyncInProgressAt || 0,
   );
+  state.settings.leagueStandingsCache = settings.leagueStandingsCache || state.settings.leagueStandingsCache || {};
+  state.settings.welcomeCard = normalizeWelcomeCardSettings(
+    settings.welcomeCard || state.settings.welcomeCard,
+  );
   const seasonList = rawList.map(normalizeSeasonRegistryItem).filter(Boolean);
   const remoteIds = new Set(seasonList.map((item) => String(item.id)));
 
@@ -3445,6 +3467,50 @@ async function hydrateOnlineStateForSession(options = {}) {
 
 let welcomeOverlayTimer = null;
 
+function normalizeWelcomeCardSettings(raw = {}) {
+  const fallback = {
+    enabled: true,
+    title: "Hoş geldin!",
+    message: "İyi haftalar, bol şans! ✨",
+    imageFile: "",
+    imageFit: "cover",
+    showOnce: false,
+    updatedAt: "",
+  };
+  const next = { ...fallback, ...(raw || {}) };
+  next.enabled = next.enabled !== false;
+  next.showOnce = next.showOnce === true;
+  next.imageFit = ["contain", "cover"].includes(String(next.imageFit || "").trim()) ? String(next.imageFit).trim() : "cover";
+  next.title = String(next.title || fallback.title).trim();
+  next.message = String(next.message || fallback.message).trim();
+  next.imageFile = String(next.imageFile || "")
+    .trim()
+    .replace(/^\/+/, "")
+    .replace(/^images\/welcome\//i, "");
+  next.updatedAt = String(next.updatedAt || "");
+  return next;
+}
+
+function getWelcomeCardSettings() {
+  state.settings.welcomeCard = normalizeWelcomeCardSettings(
+    state.settings?.welcomeCard || {},
+  );
+  return state.settings.welcomeCard;
+}
+
+function getWelcomeImageSrc(imageFile = "") {
+  const clean = String(imageFile || "").trim().replace(/^\/+/, "");
+  if (!clean) return "";
+  if (/^(https?:|data:|blob:)/i.test(clean)) return clean;
+  if (/^images\/welcome\//i.test(clean)) return clean;
+  return `images/welcome/${clean}`;
+}
+
+function getWelcomeSeenKey(config = getWelcomeCardSettings()) {
+  const stamp = config.updatedAt || `${config.title}|${config.message}|${config.imageFile}`;
+  return `fikstur_welcome_seen_${btoa(unescape(encodeURIComponent(stamp))).replace(/=+$/g, "")}`;
+}
+
 function getWelcomeDisplayName(user = getAuthUser()) {
   return String(
     getCurrentPlayer?.()?.name ||
@@ -3476,15 +3542,36 @@ function hideWelcomeOverlay(immediate = false) {
 }
 
 function showWelcomeOverlay(user = getAuthUser(), options = {}) {
+  let config = normalizeWelcomeCardSettings(options.config || getWelcomeCardSettings());
+  const customWelcomeEnabled = config.enabled || options.force;
+  if (!customWelcomeEnabled) {
+    config = {
+      ...config,
+      title: "",
+      message: "",
+      imageFile: "",
+      showOnce: false,
+      imageFit: "cover",
+    };
+  }
+  if (config.showOnce && !options.force) {
+    const seenKey = getWelcomeSeenKey(config);
+    if (localStorage.getItem(seenKey) === "1") return;
+    localStorage.setItem(seenKey, "1");
+  }
+
   const overlay = document.getElementById("welcomeOverlay");
   const avatar = document.getElementById("welcomeAvatar");
   const title = document.getElementById("welcomeTitle");
   const message = document.getElementById("welcomeMessage");
+  const mediaWrap = document.getElementById("welcomeMediaWrap");
+  const image = document.getElementById("welcomeImage");
   if (!overlay || !avatar || !title || !message) return;
 
   const displayName = getWelcomeDisplayName(user) || "Hoş geldin";
   const shortName = displayName.split(/\s+/).filter(Boolean)[0] || displayName;
-  const welcomeLines = [
+  // Eski motivasyon sistemi (karşılama kartı kapalıysa çalışır)
+const welcomeLines = [
     "İyi haftalar, bol şans! ✨",
     "Yeni haftada güzel tahminler seni bekliyor. ⚽",
     "Hazırsan başlayalım, şans seninle olsun. 🌟",
@@ -3492,6 +3579,7 @@ function showWelcomeOverlay(user = getAuthUser(), options = {}) {
   ];
   const selectedMessage =
     options.message ||
+    config.message ||
     welcomeLines[Math.floor(Math.random() * welcomeLines.length)];
 
   const avatarSource =
@@ -3503,8 +3591,19 @@ function showWelcomeOverlay(user = getAuthUser(), options = {}) {
       : `<span class="app-avatar welcome-hero-avatar"><span class="app-avatar-fallback">${escapeHtml(shortName.charAt(0) || "?")}</span></span>`;
 
   avatar.innerHTML = avatarSource;
-  title.textContent = `Hoş geldin, ${shortName}!`;
+  title.textContent = config.title || `Hoş geldin, ${shortName}!`;
   message.textContent = selectedMessage;
+
+  const imageSrc = getWelcomeImageSrc(config.imageFile);
+  if (image && mediaWrap && imageSrc) {
+    image.src = imageSrc;
+    image.classList.toggle("is-contain", config.imageFit === "contain");
+    image.classList.toggle("is-cover", config.imageFit !== "contain");
+    image.onerror = () => mediaWrap.classList.add("hidden");
+    mediaWrap.classList.remove("hidden");
+  } else if (mediaWrap) {
+    mediaWrap.classList.add("hidden");
+  }
 
   overlay.classList.remove("hidden");
   overlay.setAttribute("aria-hidden", "false");
@@ -4366,7 +4465,7 @@ function applyRolePermissions() {
   const currentTab = state.settings.currentTab || "dashboard";
   if (
     role !== "admin" &&
-    ["backup", "notifications", "seasons", "weeks", "matches"].includes(currentTab)
+    ["backup", "notifications", "seasons", "weeks", "matches", "settings"].includes(currentTab)
   ) {
     switchTab("dashboard");
     return;
@@ -4374,7 +4473,7 @@ function applyRolePermissions() {
 
   document
     .querySelectorAll(
-      "#tab-seasons button, #tab-seasons input, #tab-seasons select, #tab-weeks button, #tab-weeks input, #tab-weeks select, #tab-matches button, #tab-matches input, #tab-matches select, #tab-players button, #tab-players input, #tab-players select, #tab-notifications button, #tab-notifications input, #tab-notifications select, #tab-notifications textarea, #tab-backup button, #tab-backup input, #tab-backup select",
+      "#tab-seasons button, #tab-seasons input, #tab-seasons select, #tab-weeks button, #tab-weeks input, #tab-weeks select, #tab-matches button, #tab-matches input, #tab-matches select, #tab-players button, #tab-players input, #tab-players select, #tab-notifications button, #tab-notifications input, #tab-notifications select, #tab-notifications textarea, #tab-backup button, #tab-backup input, #tab-backup select, #tab-settings button, #tab-settings input, #tab-settings select, #tab-settings textarea",
     )
     .forEach((el) => {
       if (role === "admin" && authReady) {
@@ -5276,7 +5375,8 @@ document.addEventListener("click", (event) => {
   if (!overlay || overlay.classList.contains("hidden")) return;
   if (
     event.target === overlay ||
-    event.target?.closest?.(".welcome-overlay__backdrop")
+    event.target?.closest?.(".welcome-overlay__backdrop") ||
+    event.target?.closest?.("#welcomeCloseBtn")
   ) {
     hideWelcomeOverlay();
   }

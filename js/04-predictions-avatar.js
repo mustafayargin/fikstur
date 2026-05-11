@@ -2171,3 +2171,214 @@ function capturePageViewport() {
   };
 }
 
+
+/* Lig puan durumu - apisiz maç sonuçlarından hesaplanır */
+function getLeagueStandingsCacheKey(seasonId) {
+  return String(seasonId || getActiveSeasonId() || "default");
+}
+
+function normalizeLeagueStandingNumber(value) {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : 0;
+}
+
+function buildLeagueStandingsFromResults(seasonId = getActiveSeasonId()) {
+  const activeSeasonId = String(seasonId || "");
+  const teamNames = new Set();
+
+  state.teams
+    .filter((team) => String(team.seasonId || "") === activeSeasonId)
+    .forEach((team) => team.name && teamNames.add(String(team.name).trim()));
+
+  state.matches
+    .filter((match) => String(match.seasonId || "") === activeSeasonId)
+    .forEach((match) => {
+      if (match.homeTeam) teamNames.add(String(match.homeTeam).trim());
+      if (match.awayTeam) teamNames.add(String(match.awayTeam).trim());
+    });
+
+  const tableMap = new Map();
+  [...teamNames].filter(Boolean).forEach((teamName) => {
+    tableMap.set(teamName, {
+      teamName,
+      played: 0,
+      won: 0,
+      drawn: 0,
+      lost: 0,
+      goalsFor: 0,
+      goalsAgainst: 0,
+      goalDiff: 0,
+      points: 0,
+    });
+  });
+
+  const playedMatches = state.matches.filter((match) => {
+    if (String(match.seasonId || "") !== activeSeasonId) return false;
+    if (!match.played) return false;
+    const homeScore = Number(match.homeScore);
+    const awayScore = Number(match.awayScore);
+    return Number.isFinite(homeScore) && Number.isFinite(awayScore);
+  });
+
+  playedMatches.forEach((match) => {
+    const homeName = String(match.homeTeam || "").trim();
+    const awayName = String(match.awayTeam || "").trim();
+    if (!homeName || !awayName) return;
+
+    if (!tableMap.has(homeName)) tableMap.set(homeName, { teamName: homeName, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDiff: 0, points: 0 });
+    if (!tableMap.has(awayName)) tableMap.set(awayName, { teamName: awayName, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDiff: 0, points: 0 });
+
+    const home = tableMap.get(homeName);
+    const away = tableMap.get(awayName);
+    const homeScore = Number(match.homeScore);
+    const awayScore = Number(match.awayScore);
+
+    home.played += 1;
+    away.played += 1;
+    home.goalsFor += homeScore;
+    home.goalsAgainst += awayScore;
+    away.goalsFor += awayScore;
+    away.goalsAgainst += homeScore;
+
+    if (homeScore > awayScore) {
+      home.won += 1;
+      away.lost += 1;
+      home.points += 3;
+    } else if (homeScore < awayScore) {
+      away.won += 1;
+      home.lost += 1;
+      away.points += 3;
+    } else {
+      home.drawn += 1;
+      away.drawn += 1;
+      home.points += 1;
+      away.points += 1;
+    }
+  });
+
+  const rows = Array.from(tableMap.values()).map((row) => ({
+    ...row,
+    goalDiff: row.goalsFor - row.goalsAgainst,
+  }));
+
+  rows.sort(
+    (a, b) =>
+      b.points - a.points ||
+      b.goalDiff - a.goalDiff ||
+      b.goalsFor - a.goalsFor ||
+      a.teamName.localeCompare(b.teamName, "tr"),
+  );
+
+  return rows.map((row, index) => ({ ...row, rank: index + 1 }));
+}
+
+function getCachedLeagueStandings(seasonId = getActiveSeasonId()) {
+  const cache = state.settings.leagueStandingsCache || {};
+  const saved = cache[getLeagueStandingsCacheKey(seasonId)];
+  return saved && Array.isArray(saved.rows) ? saved : null;
+}
+
+async function persistLeagueStandingsCache(seasonId, rows) {
+  const key = getLeagueStandingsCacheKey(seasonId);
+  if (!state.settings.leagueStandingsCache) state.settings.leagueStandingsCache = {};
+  const payload = {
+    seasonId: String(seasonId || ""),
+    updatedAt: new Date().toISOString(),
+    rows,
+  };
+  state.settings.leagueStandingsCache[key] = payload;
+  saveState();
+
+  if (typeof isFirebaseReady === "function" && isFirebaseReady() && typeof firebaseUpdate === "function") {
+    await firebaseUpdate("settings", {
+      leagueStandingsCache: state.settings.leagueStandingsCache,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  return payload;
+}
+
+function renderLeagueStandingsModal(payload) {
+  const modal = document.getElementById("leagueStandingsModal");
+  const title = document.getElementById("leagueStandingsModalTitle");
+  const meta = document.getElementById("leagueStandingsModalMeta");
+  const body = document.getElementById("leagueStandingsModalBody");
+  if (!modal || !body) return;
+
+  const season = getSeasonById(payload?.seasonId || getActiveSeasonId());
+  const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+  const playedTotal = rows.reduce((sum, row) => sum + normalizeLeagueStandingNumber(row.played), 0) / 2;
+  const updatedText = payload?.updatedAt
+    ? new Date(payload.updatedAt).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" })
+    : "Henüz güncellenmedi";
+
+  if (title) title.textContent = `${season?.name || "Aktif sezon"} Puan Durumu`;
+  if (meta) meta.textContent = `${Math.round(playedTotal)} oynanmış maçtan hesaplandı • Son çekim: ${updatedText}`;
+
+  if (!rows.length) {
+    body.innerHTML = createEmptyState("Henüz oynanmış maç sonucu yok. Skorlar geldikçe burada lig puan durumu oluşacak.");
+  } else {
+    body.innerHTML = `
+      <div class="league-standings-table-shell">
+        <div class="league-standings-row league-standings-head-row">
+          <span>#</span>
+          <span>Takım</span>
+          <span>O</span>
+          <span>Av</span>
+          <span>P</span>
+        </div>
+        ${rows
+          .map((row) => `
+            <div class="league-standings-row ${row.rank <= 4 ? "is-europe" : ""} ${row.rank >= rows.length - 3 ? "is-danger" : ""}">
+              <span class="league-standings-rank">${row.rank}</span>
+              <span class="league-standings-team">
+                ${teamLogoHtml(row.teamName, payload?.seasonId || getActiveSeasonId(), "league-standings-logo")}
+                <strong>${escapeHtml(row.teamName)}</strong>
+              </span>
+              <span>${normalizeLeagueStandingNumber(row.played)}</span>
+              <span>${normalizeLeagueStandingNumber(row.goalDiff) > 0 ? "+" : ""}${normalizeLeagueStandingNumber(row.goalDiff)}</span>
+              <span class="league-standings-points">${normalizeLeagueStandingNumber(row.points)}</span>
+            </div>
+          `)
+          .join("")}
+      </div>
+    `;
+    hydrateTeamLogosIn(body);
+  }
+
+  modal.classList.remove("hidden");
+  modal.setAttribute("aria-hidden", "false");
+}
+
+function closeLeagueStandingsModal() {
+  const modal = document.getElementById("leagueStandingsModal");
+  if (!modal) return;
+  modal.classList.add("hidden");
+  modal.setAttribute("aria-hidden", "true");
+}
+
+async function pullLeagueStandingsFromCurrentResults(buttonOrEvent) {
+  const actionButton = getActionButtonFromArg(buttonOrEvent);
+  const seasonId = getActiveSeasonId();
+  if (!seasonId) {
+    return showAlert("Önce aktif sezon seçmelisin.", { title: "Eksik seçim", type: "warning" });
+  }
+
+  setAsyncButtonState(actionButton, "loading", { loading: "Çekiliyor..." });
+  try {
+    const rows = buildLeagueStandingsFromResults(seasonId);
+    const playedTeamRows = rows.filter((row) => normalizeLeagueStandingNumber(row.played) > 0);
+    const payload = await persistLeagueStandingsCache(seasonId, rows);
+    renderLeagueStandingsModal(payload);
+    setAsyncButtonState(actionButton, "success", { success: "Çekildi" });
+    if (!playedTeamRows.length) {
+      showAlert("Puan durumu hazırlandı ama henüz oynanmış maç sonucu bulunamadı.", { title: "Bilgi", type: "info" });
+    }
+  } catch (error) {
+    const cached = getCachedLeagueStandings(seasonId);
+    if (cached) renderLeagueStandingsModal(cached);
+    setAsyncButtonState(actionButton, "error", { error: "Hata" });
+    showAlert(error?.message || "Puan durumu çekilirken hata oluştu.", { title: "Hata", type: "error" });
+  }
+}

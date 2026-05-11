@@ -61,6 +61,10 @@ function renderCurrentTabOnly(
       renderBackupPanel();
       break;
 
+    case "settings":
+      renderWelcomeSettingsPanel();
+      break;
+
     default:
       renderDashboardOverview();
       renderMatches("dashboardMatches", state.settings.activeWeekId);
@@ -588,10 +592,92 @@ function addMatch() {
   renderAll();
 }
 
+
+function setWelcomeSettingsStatus(message, type = "") {
+  const el = document.getElementById("welcomeSettingsStatus");
+  if (!el) return;
+  el.textContent = message;
+  el.classList.toggle("success", type === "success");
+  el.classList.toggle("error", type === "error");
+}
+
+function readWelcomeSettingsForm() {
+  return normalizeWelcomeCardSettings({
+    enabled: document.getElementById("welcomeEnabled")?.checked ?? true,
+    title: document.getElementById("welcomeTitleInput")?.value || "Hoş geldin!",
+    message: document.getElementById("welcomeMessageInput")?.value || "İyi haftalar, bol şans! ✨",
+    imageFile: document.getElementById("welcomeImageInput")?.value || "",
+    imageFit: document.getElementById("welcomeImageFitSelect")?.value || "cover",
+    showOnce: document.getElementById("welcomeShowOnce")?.checked ?? false,
+    updatedAt: state.settings?.welcomeCard?.updatedAt || "",
+  });
+}
+
+function updateWelcomeSettingsPreview(config = readWelcomeSettingsForm()) {
+  const title = document.getElementById("welcomeAdminPreviewTitle");
+  const message = document.getElementById("welcomeAdminPreviewMessage");
+  const image = document.getElementById("welcomeAdminPreviewImage");
+  if (image) {
+    image.classList.toggle("is-contain", config.imageFit === "contain");
+    image.classList.toggle("is-cover", config.imageFit !== "contain");
+  }
+  if (title) title.textContent = config.title || "Hoş geldin!";
+  if (message) message.textContent = config.message || "İyi haftalar, bol şans! ✨";
+  if (image) {
+    const src = getWelcomeImageSrc(config.imageFile);
+    image.src = src || "";
+    image.classList.toggle("hidden", !src);
+  }
+}
+
+function renderWelcomeSettingsPanel() {
+  const config = getWelcomeCardSettings();
+  const enabled = document.getElementById("welcomeEnabled");
+  const title = document.getElementById("welcomeTitleInput");
+  const message = document.getElementById("welcomeMessageInput");
+  const image = document.getElementById("welcomeImageInput");
+  const imageFit = document.getElementById("welcomeImageFitSelect");
+  const showOnce = document.getElementById("welcomeShowOnce");
+  if (!enabled || !title || !message || !image || !imageFit || !showOnce) return;
+  enabled.checked = config.enabled;
+  title.value = config.title;
+  message.value = config.message;
+  image.value = config.imageFile;
+  imageFit.value = config.imageFit || "cover";
+  showOnce.checked = config.showOnce;
+  updateWelcomeSettingsPreview(config);
+}
+
+async function saveWelcomeSettingsFromPanel() {
+  if (getCurrentRole() !== "admin") return;
+  const config = {
+    ...readWelcomeSettingsForm(),
+    updatedAt: new Date().toISOString(),
+  };
+  state.settings.welcomeCard = config;
+  saveState(true);
+  try {
+    if (typeof firebaseUpdate === "function" && typeof isFirebaseReady === "function" && isFirebaseReady()) {
+      await firebaseUpdate("settings", { welcomeCard: config, updatedAt: new Date().toISOString() });
+    }
+    renderWelcomeSettingsPanel();
+    setWelcomeSettingsStatus("Karşılama kartı ayarları kaydedildi.", "success");
+  } catch (error) {
+    console.error("Karşılama kartı kaydetme hatası:", error);
+    setWelcomeSettingsStatus("Yerel kayıt alındı ama Firebase'e yazılamadı.", "error");
+  }
+}
+
+function previewWelcomeSettingsFromPanel() {
+  const config = readWelcomeSettingsForm();
+  updateWelcomeSettingsPreview(config);
+  showWelcomeOverlay(getAuthUser?.(), { config, force: true, duration: 5000 });
+}
+
 function switchTab(tabName, options = {}) {
   if (
     getCurrentRole() !== "admin" &&
-    ["backup", "notifications", "seasons", "weeks", "matches"].includes(tabName)
+    ["backup", "notifications", "seasons", "weeks", "matches", "settings"].includes(tabName)
   ) {
     tabName = "dashboard";
   }
@@ -2219,6 +2305,11 @@ function bindEvents() {
   on("adminSyncToggleBtn", "click", toggleAdminSyncOverview);
   on("firebaseAdminRefreshBtn", "click", refreshFirebaseAdminPanel);
   on("firebaseAdminTestBtn", "click", testFirebaseAdminConnection);
+  on("pullLeagueStandingsBtn", "click", pullLeagueStandingsFromCurrentResults);
+  on("leagueStandingsModalClose", "click", closeLeagueStandingsModal);
+  on("leagueStandingsModal", "click", (event) => {
+    if (event.target?.id === "leagueStandingsModal") closeLeagueStandingsModal();
+  });
   on("toggleShareModeBtn", "click", togglePredictionShareMode);
   document.addEventListener("click", (event) => {
     const syncBtn = event.target.closest('[data-role="global-sync-btn"]');
@@ -2238,6 +2329,12 @@ function bindEvents() {
     document.getElementById("championModal")?.classList.add("hidden"),
   );
   on("resetBtn", "click", handleDangerousReset);
+  on("saveWelcomeSettingsBtn", "click", saveWelcomeSettingsFromPanel);
+  on("previewWelcomeSettingsBtn", "click", previewWelcomeSettingsFromPanel);
+  ["welcomeEnabled", "welcomeTitleInput", "welcomeMessageInput", "welcomeImageInput", "welcomeImageFitSelect", "welcomeShowOnce"].forEach((id) => {
+    on(id, "input", () => updateWelcomeSettingsPreview());
+    on(id, "change", () => updateWelcomeSettingsPreview());
+  });
   on(
     "importFile",
     "change",

@@ -47,6 +47,9 @@
             <button class="nav-tab admin-only" data-tab="backup">
               Yedekleme
             </button>
+            <button class="nav-tab admin-only" data-tab="settings">
+              Ayarlar
+            </button>
           </nav>
         </div>
       </aside>
@@ -555,6 +558,13 @@
                 <select id="predictionSeasonSelect"></select>
                 <select id="predictionWeekSelect"></select>
               </div>
+              <button
+                id="pullLeagueStandingsBtn"
+                type="button"
+                class="secondary league-standings-trigger-btn"
+              >
+                Puanları Çek
+              </button>
               <button
                 id="toggleShareModeBtn"
                 type="button"
@@ -1296,6 +1306,80 @@
             </section>
           </div>
         </section>
+
+        <section class="tab-panel admin-only" id="tab-settings">
+          <div class="page-header">
+            <div>
+              <h2>Ayarlar</h2>
+              <p>Giriş sonrası çıkan karşılama kartını buradan yönet.</p>
+            </div>
+          </div>
+
+          <section class="card welcome-settings-card admin-only">
+            <div class="card-header">
+              <div>
+                <h3>Karşılama Kartı</h3>
+                <p class="small-meta">
+                  Görselleri ana klasörde <strong>images/welcome/</strong> içine koy. Buraya sadece dosya adını yazman yeterli.
+                </p>
+              </div>
+            </div>
+
+            <div class="welcome-settings-grid">
+              <div class="form-grid">
+                <label class="toggle-row" for="welcomeEnabled">
+                  <input type="checkbox" id="welcomeEnabled" />
+                  <span>Karşılama kartı Aç / Kapat</span>
+                </label>
+
+                <div class="field">
+                  <label for="welcomeTitleInput">Başlık</label>
+                  <input type="text" id="welcomeTitleInput" placeholder="Galatasaray Şampiyon!" />
+                </div>
+
+                <div class="field">
+                  <label for="welcomeMessageInput">Açıklama</label>
+                  <textarea id="welcomeMessageInput" rows="4" placeholder="Sezonun şampiyonu Galatasaray oldu!"></textarea>
+                </div>
+
+                <div class="field">
+                  <label for="welcomeImageInput">Görsel dosya adı</label>
+                  <input type="text" id="welcomeImageInput" placeholder="galatasaray-sampiyon.png" />
+                  <div class="small-meta">Örnek yol: images/welcome/galatasaray-sampiyon.png</div>
+                </div>
+
+                <div class="field">
+                  <label for="welcomeImageFitSelect">Görsel görünümü</label>
+                  <select id="welcomeImageFitSelect">
+                    <option value="cover">Kapla / kırp</option>
+                    <option value="contain">Tam sığdır</option>
+                  </select>
+                  <div class="small-meta">Şampiyonluk afişi gibi geniş görseller için "Tam sığdır" daha iyi olur.</div>
+                </div>
+
+                <label class="toggle-row" for="welcomeShowOnce">
+                  <input type="checkbox" id="welcomeShowOnce" />
+                  <span>Aynı duyuruyu kullanıcıya sadece 1 kere göster</span>
+                </label>
+
+                <div class="inline-actions">
+                  <button type="button" id="saveWelcomeSettingsBtn">Kaydet</button>
+                  <button type="button" class="secondary" id="previewWelcomeSettingsBtn">Önizle</button>
+                </div>
+                <div class="status-note" id="welcomeSettingsStatus">Hazır.</div>
+              </div>
+
+              <div class="welcome-admin-preview" id="welcomeAdminPreview">
+                <div class="small-meta">Kart önizlemesi</div>
+                <div class="welcome-admin-preview-box">
+                  <img id="welcomeAdminPreviewImage" alt="Karşılama görseli" />
+                  <h3 id="welcomeAdminPreviewTitle">Hoş geldin!</h3>
+                  <p id="welcomeAdminPreviewMessage">İyi haftalar, bol şans! ✨</p>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
       </main>
     </div>
 
@@ -1375,6 +1459,13 @@
           >
             Yedekleme
           </button>
+          <button
+            class="mobile-admin-menu-item"
+            type="button"
+            data-tab="settings"
+          >
+            Ayarlar
+          </button>
         </div>
       </div>
     </div>
@@ -1449,11 +1540,15 @@
       <div class="welcome-overlay__backdrop"></div>
       <div class="welcome-card" id="welcomeCard">
         <div class="welcome-card__glow"></div>
+        <div class="welcome-card__media hidden" id="welcomeMediaWrap">
+          <img id="welcomeImage" alt="Karşılama görseli" />
+        </div>
         <div class="welcome-card__avatar" id="welcomeAvatar"></div>
         <h2 class="welcome-card__title" id="welcomeTitle">Hoş geldin!</h2>
         <p class="welcome-card__message" id="welcomeMessage">
           İyi haftalar, bol şans! ✨
         </p>
+        <button type="button" class="secondary welcome-card__close" id="welcomeCloseBtn">Kapat</button>
       </div>
     </div>
 
@@ -1476,6 +1571,27 @@
           <button class="secondary" id="appModalCancelBtn">Vazgeç</button>
           <button id="appModalConfirmBtn">Tamam</button>
         </div>
+      </div>
+    </div>
+
+    <div class="league-standings-modal hidden" id="leagueStandingsModal" aria-hidden="true">
+      <div class="league-standings-modal-card">
+        <div class="league-standings-modal-head">
+          <div>
+            <span class="league-standings-kicker">Lig tablosu</span>
+            <h3 id="leagueStandingsModalTitle">Puan Durumu</h3>
+            <p id="leagueStandingsModalMeta">Son oynanan maçlara göre hesaplanır.</p>
+          </div>
+          <button
+            class="league-standings-close"
+            id="leagueStandingsModalClose"
+            type="button"
+            aria-label="Puan durumunu kapat"
+          >
+            ×
+          </button>
+        </div>
+        <div id="leagueStandingsModalBody"></div>
       </div>
     </div>
     <div class="champion-modal hidden" id="championModal">

@@ -19,6 +19,16 @@ function createInitialState() {
       predictionShareFadeEmpty: false,
       resultsLastAutoSyncAt: 0,
       resultsAutoSyncInProgressAt: 0,
+      leagueStandingsCache: {},
+      welcomeCard: {
+        enabled: true,
+        title: "Hoş geldin!",
+        message: "İyi haftalar, bol şans! ✨",
+        imageFile: "",
+        imageFit: "cover",
+        showOnce: false,
+        updatedAt: "",
+      },
     },
   };
 }
