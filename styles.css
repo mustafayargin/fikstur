@@ -16369,7 +16369,7 @@ body[data-role="user"] #tab-players .page-header p {
 .welcome-admin-preview-box img,
 .welcome-card__media img {
   width: 100%;
-  max-height: 220px;
+  max-height: 420px;
   object-fit: cover;
   background: rgba(2, 6, 23, 0.35);
   border-radius: 20px;
@@ -16386,7 +16386,7 @@ body[data-role="user"] #tab-players .page-header p {
 @media (max-width: 780px) {
   .welcome-settings-grid { grid-template-columns: 1fr; }
   .welcome-admin-preview-box img,
-  .welcome-card__media img { max-height: 180px; }
+  .welcome-card__media img { max-height: 380px; }
 }
 #welcomeMessageInput {
   background: rgba(15, 23, 42, 0.92);
