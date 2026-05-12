@@ -16411,3 +16411,168 @@ body[data-role="user"] #tab-players .page-header p {
 .league-standings-trigger-btn {
   display: none !important;
 }
+/* ===== Welcome kart premium şampiyon efekti ===== */
+
+/* Kart açılış + hafif parallax hissi */
+.welcome-overlay.is-visible .welcome-card {
+  animation: welcomeCardFloatFixed 5.5s ease-in-out infinite;
+}
+
+/* Poster/resim yavaş zoom */
+.welcome-overlay.is-visible .welcome-card__media img {
+  animation: welcomePosterZoom 2s ease-in-out infinite alternate;  transform-origin: center;
+}
+
+/* GS altın parıltı efekti */
+.welcome-card::before {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  background:
+    radial-gradient(circle at 25% 20%, rgba(255, 214, 80, 0.24), transparent 18%),
+    radial-gradient(circle at 75% 30%, rgba(255, 40, 40, 0.18), transparent 16%),
+    radial-gradient(circle at 50% 85%, rgba(255, 190, 40, 0.18), transparent 20%);
+  filter: blur(8px);
+  opacity: 0.85;
+  animation: welcomeGlowMove 6s ease-in-out infinite alternate;
+  pointer-events: none;
+  z-index: 0;
+}
+/* Kupa ışığı / spot ışık */
+.welcome-card::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -18%;
+  width: 260px;
+  height: 420px;
+  transform: translateX(-50%) rotate(8deg);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 231, 130, 0.22),
+    rgba(255, 231, 130, 0.08),
+    transparent 72%
+  );
+  filter: blur(10px);
+  opacity: 0.8;
+  pointer-events: none;
+  z-index: 1;
+  animation: trophyLight 4.8s ease-in-out infinite alternate;
+}
+
+/* Başlık şampiyon animasyonu */
+.welcome-card__title {
+  background: linear-gradient(90deg, #fff7c2, #ffffff, #ffd44d, #ffffff);
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: championTitleShine 3.5s linear infinite;
+}
+
+/* Mesaj küçük giriş animasyonu */
+.welcome-card__message {
+  animation: championMessageRise 900ms ease both;
+}
+
+
+
+.welcome-card__glow::after {
+  animation-delay: 1.9s;
+  opacity: 0.65;
+  font-size: 14px;
+}
+
+/* Animasyonlar */
+@keyframes welcomeCardFloat {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+
+50% {
+  transform: translateY(-3px);
+}
+  }
+
+
+@keyframes welcomePosterZoom {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes welcomeGlowMove {
+  from {
+    transform: translate3d(-12px, -8px, 0) rotate(0deg);
+  }
+  to {
+    transform: translate3d(12px, 10px, 0) rotate(8deg);
+  }
+}
+
+@keyframes trophyLight {
+  from {
+    opacity: 0.45;
+    transform: translateX(-50%) rotate(4deg);
+  }
+  to {
+    opacity: 0.95;
+    transform: translateX(-50%) rotate(-5deg);
+  }
+}
+
+@keyframes championTitleShine {
+  to {
+    background-position: 220% center;
+  }
+}
+
+@keyframes championMessageRise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes confettiFall {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -60px) rotate(0deg);
+  }
+  12% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 260px) rotate(22deg);
+  }
+}
+
+/* Mobilde daha hafif çalışsın */
+@media (max-width: 640px) {
+  .welcome-card::after {
+    height: 320px;
+    width: 190px;
+  }
+
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .welcome-card,
+    .welcome-card::before,
+    .welcome-card::after,
+    .welcome-card__media img,
+    .welcome-card__glow::before,
+    .welcome-card__glow::after,
+    .welcome-card__title,
+    .welcome-card__message {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
