@@ -3618,7 +3618,7 @@ const welcomeLines = [
   if (welcomeOverlayTimer) window.clearTimeout(welcomeOverlayTimer);
   welcomeOverlayTimer = window.setTimeout(
     () => hideWelcomeOverlay(),
-    options.duration || 2300,
+    options.duration || 3300,
   );
 }
 
