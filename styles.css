@@ -96,8 +96,7 @@ option {
 
 .app-shell {
   display: grid;
-  grid-template-columns: clamp(210px, 22vw, 230px) minmax(0, 1fr);
-  min-height: 100vh;
+  grid-template-columns: clamp(180px, 19vw, 205px) minmax(0, 1fr);  min-height: 100vh;
   align-items: start;
 }
 
@@ -120,7 +119,14 @@ option {
   overflow-y: auto;
   overflow-x: hidden;
 }
+.sidebar {
+  scrollbar-width: none;
+}
 
+.sidebar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
 .content {
   min-width: 0;
 }
@@ -154,17 +160,26 @@ option {
 
 .nav-tabs {
   display: grid;
-  gap: 8px;
-  margin-top: 18px;
+  gap: 6px;
+  margin-top: 14px;
 }
 
 .nav-tab {
   text-align: left;
-  padding: 12px 14px;
+
+  padding: 9px 12px;
+
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.15;
+
   background: rgba(255, 255, 255, 0.03);
   color: var(--text);
+
   border: 1px solid transparent;
-  border-radius: 14px;
+  border-radius: 12px;
+
+  min-height: 4px;
 }
 
 .nav-tab.active {
@@ -7126,9 +7141,8 @@ body.dashboard-modal-open {
 
 #tab-dashboard .dashboard-stats-grid--compact,
 #tab-dashboard .stats-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 0;
+  display: none !important;
+
 }
 
 #tab-dashboard .stat-card {
@@ -10671,7 +10685,7 @@ body.dashboard-modal-open {
 .welcome-card {
   position: relative;
   width: min(100%, 520px);
-  min-height: 360px;
+  min-height: 560px;
   padding: 42px 28px 34px;
   border-radius: 34px;
   overflow: hidden;
@@ -10682,13 +10696,10 @@ body.dashboard-modal-open {
   text-align: center;
   gap: 20px;
   background:
-    radial-gradient(
-      circle at 50% 32%,
-      rgba(56, 228, 212, 0.18),
-      transparent 24%
-    ),
+    radial-gradient(circle at 50% 18%, rgba(56, 228, 212, 0.16), transparent 30%),
+    radial-gradient(circle at 0% 0%, rgba(250, 204, 21, 0.10), transparent 28%),
     linear-gradient(180deg, rgba(7, 26, 52, 0.96), rgba(3, 13, 30, 0.98));
-  border: 1px solid rgba(122, 213, 255, 0.18);
+  border: 1px solid rgba(122, 213, 255, 0.22);
   box-shadow:
     0 22px 70px rgba(0, 0, 0, 0.48),
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
@@ -16368,8 +16379,8 @@ body[data-role="user"] #tab-players .page-header p {
 }
 .welcome-admin-preview-box img,
 .welcome-card__media img {
-  width: 100%;
-  max-height: 420px;
+  width: 320px;
+  max-height: 400px;
   object-fit: cover;
   background: rgba(2, 6, 23, 0.35);
   border-radius: 20px;
@@ -16574,5 +16585,143 @@ body[data-role="user"] #tab-players .page-header p {
     .welcome-card__message {
       animation: none !important;
       transition: none !important;
+    }
+  }
+
+
+  /* Hoş geldin kartı - büyük kare profil görseli */
+  .welcome-card__avatar {
+    width: auto !important;
+    height: auto !important;
+  
+    padding: 0 !important;
+    margin: 0 auto !important;
+  
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  
+    overflow: visible !important;
+  }
+  
+  .welcome-card__avatar .app-avatar {
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 24px !important;
+    overflow: hidden !important;
+    border: 3px solid rgba(255, 255, 255, 0.14) !important;
+  }
+  
+  .welcome-card__avatar .welcome-profile-image,
+  .welcome-card__avatar .app-avatar-image,
+  .welcome-card__avatar img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    border-radius: 22px !important;
+  }
+  
+  .welcome-card__title {
+    font-size: clamp(2rem, 4.6vw, 2.8rem) !important;
+    line-height: 0.98 !important;
+    margin-top: 4px !important;
+  }
+  
+  .welcome-card__message {
+    font-size: clamp(0.95rem, 2.2vw, 1.08rem) !important;
+    line-height: 1.5 !important;
+    max-width: 360px !important;
+  }
+  
+  @media (max-width: 640px) {
+    .welcome-card {
+      width: min(100%, 350px) !important;
+      min-height: auto !important;
+      padding: 20px 18px 24px !important;
+      gap: 16px !important;
+    }
+  
+    .welcome-card__avatar {
+      width: 285px !important;
+      height: 285px !important;
+      border-radius: 26px !important;
+    }
+  
+    .welcome-card__avatar .app-avatar,
+    .welcome-card__avatar .welcome-profile-image,
+    .welcome-card__avatar .app-avatar-image,
+    .welcome-card__avatar img {
+      border-radius: 20px !important;
+    }
+  
+    .welcome-card__title {
+      font-size: 2.15rem !important;
+    }
+  
+    .welcome-card__message {
+      font-size: 0.95rem !important;
+      max-width: 280px !important;
+    }
+  }/* ===== Hoş geldin kartı görselini tamamen temizle ===== */
+
+  .welcome-card__avatar {
+    width: 285px !important;
+    height: 285px !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    border-radius: 26px !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+  }
+  
+  .welcome-card__avatar::before,
+  .welcome-card__avatar .app-avatar::before,
+  .welcome-card__avatar .app-avatar::after {
+    display: none !important;
+    content: none !important;
+  }
+  
+  .welcome-card__avatar .app-avatar {
+    width: 100% !important;
+    height: 100% !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 26px !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+  }
+  
+  .welcome-card__avatar img,
+  .welcome-card__avatar .app-avatar-image,
+  .welcome-card__avatar .welcome-profile-image {
+    width: auto !important;
+    height: 330px !important;
+    max-width: 100% !important;
+  
+    display: block !important;
+    margin: 0 auto !important;
+  
+    object-fit: contain !important;
+    object-position: center center !important;
+  
+    border-radius: 50px !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
+  
+    box-shadow:
+      0 20px 45px rgba(0,0,0,0.34),
+      0 0 28px rgba(56,189,248,0.08) !important;
+  
+    background: transparent !important;
+  }
+  @media (max-width: 640px) {
+    .welcome-card__avatar img,
+    .welcome-card__avatar .app-avatar-image,
+    .welcome-card__avatar .welcome-profile-image {
+      height: 300px !important;
+      width: auto !important;
+      max-width: 100% !important;
     }
   }

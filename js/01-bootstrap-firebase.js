@@ -3525,7 +3525,7 @@ function getWelcomeDisplayName(user = getAuthUser()) {
 }
 
 function hideWelcomeOverlay(immediate = false) {
-  const overlay = document.getElementById("welcomeOverlay");
+   const overlay = document.getElementById("welcomeOverlay");
   if (!overlay) return;
   if (welcomeOverlayTimer) {
     window.clearTimeout(welcomeOverlayTimer);
@@ -3538,7 +3538,7 @@ function hideWelcomeOverlay(immediate = false) {
     finish();
   } else {
     window.setTimeout(finish, 280);
-  }
+  } 
 }
 
 function showWelcomeOverlay(user = getAuthUser(), options = {}) {
@@ -3582,15 +3582,43 @@ const welcomeLines = [
     config.message ||
     welcomeLines[Math.floor(Math.random() * welcomeLines.length)];
 
-  const avatarSource =
-    typeof createGenericAvatarMarkup === "function"
-      ? createGenericAvatarMarkup(
-          getCurrentPlayer?.() || user || { name: shortName },
-          "welcome-hero-avatar",
-        )
-      : `<span class="app-avatar welcome-hero-avatar"><span class="app-avatar-fallback">${escapeHtml(shortName.charAt(0) || "?")}</span></span>`;
+    const welcomePlayer = getCurrentPlayer?.() || user || { name: shortName };
 
-  avatar.innerHTML = avatarSource;
+    const welcomeImageName = `${String(shortName || "")
+      .trim()
+      .toLocaleLowerCase("tr-TR")
+      .replace(/ğ/g, "g")
+      .replace(/ü/g, "u")
+      .replace(/ş/g, "s")
+      .replace(/ı/g, "i")
+      .replace(/ö/g, "o")
+      .replace(/ç/g, "c")
+      .replace(/\s+/g, "-")}.png`;
+
+    const welcomeCleanImageName = String(welcomeImageName || "")
+      .trim()
+      .replace(/^\/+/, "")
+      .replace(/^avatars\//i, "")
+      .replace(/^images\/welcome\//i, "")
+      .replace(/^images\//i, "");
+
+    const welcomeAvatarSrc = getWelcomeImageSrc(welcomeCleanImageName);
+
+    const avatarSource = `
+      <span class="app-avatar welcome-hero-avatar">
+      <img
+      class="welcome-profile-image"
+      src="${escapeHtml(welcomeAvatarSrc)}"
+          alt="${escapeHtml(String(welcomePlayer.name || shortName || "Profil"))}"
+          loading="lazy"
+          decoding="async"
+          onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';"
+        >
+        <span class="app-avatar-fallback" style="display:none">${escapeHtml(shortName.charAt(0) || "?")}</span>
+      </span>
+    `;
+
+    avatar.innerHTML = avatarSource;
   title.textContent = config.title || `Hoş geldin, ${shortName}!`;
   message.textContent = selectedMessage;
 
@@ -3611,15 +3639,12 @@ const welcomeLines = [
     overlay.classList.add("is-visible");
   });
 
-  if (typeof refreshAvatarImages === "function") {
-    refreshAvatarImages(overlay);
-  }
-
+/*hoşgeldin kartı kaybolsun diye
   if (welcomeOverlayTimer) window.clearTimeout(welcomeOverlayTimer);
   welcomeOverlayTimer = window.setTimeout(
     () => hideWelcomeOverlay(),
-    options.duration || 3300,
-  );
+    options.duration || 4300,
+  );*/
 }
 
 function updateSessionCard() {
