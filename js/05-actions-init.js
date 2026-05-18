@@ -2232,7 +2232,7 @@ function bindEvents() {
       const { matchId, playerId } = target.dataset;
       if (!matchId || !playerId) return;
       delete target.dataset.pointerPressed;
-      window.queuePredictionSave(matchId, playerId, true);
+      window.handlePredictionSaveButtonClick?.(matchId, playerId);
     },
     true,
   );
@@ -2246,7 +2246,7 @@ function bindEvents() {
       e.stopPropagation();
       const { matchId, playerId } = target.dataset;
       if (!matchId || !playerId) return;
-      window.queuePredictionSave(matchId, playerId, true);
+      window.handlePredictionSaveButtonClick?.(matchId, playerId);
     },
     true,
   );
@@ -2262,7 +2262,7 @@ function bindEvents() {
         if (e.cancelable) e.preventDefault();
         e.stopPropagation();
         delete target.dataset.pointerPressed;
-        window.queuePredictionSave(matchId, playerId, true);
+        window.handlePredictionSaveButtonClick?.(matchId, playerId);
       }
     },
     true,
@@ -2282,7 +2282,7 @@ function bindEvents() {
       const { matchId, playerId } = target.dataset;
       if (!matchId || !playerId) return;
 
-      window.queuePredictionSave(matchId, playerId, true);
+      window.handlePredictionSaveButtonClick?.(matchId, playerId);
     },
     true,
   );

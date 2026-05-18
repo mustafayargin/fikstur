@@ -27,28 +27,63 @@
 
           <nav class="nav-tabs" id="navTabs">
             <button class="nav-tab active" data-tab="dashboard">
-              Genel Bakış
+              <span class="nav-tab-icon">🏠</span>
+              <span>Genel Bakış</span>
             </button>
+          
             <button class="nav-tab" data-tab="seasons">
-              Sezonlar & Takımlar
+              <span class="nav-tab-icon">🗓️</span>
+              <span>Sezonlar & Takımlar</span>
             </button>
+          
             <button class="nav-tab admin-only" data-tab="players">
-              Kişiler
+              <span class="nav-tab-icon">👥</span>
+              <span>Kişiler</span>
             </button>
-            <button class="nav-tab" data-tab="weeks">Haftalar</button>
-            <button class="nav-tab" data-tab="matches">Maçlar</button>
-            <button class="nav-tab" data-tab="predictions">Tahminler</button>
-            <button class="nav-tab" data-tab="logs">Log Ekranı</button>
-            <button class="nav-tab" data-tab="standings">Puan Durumu</button>
-            <button class="nav-tab" data-tab="stats">İstatistikler</button>
+          
+            <button class="nav-tab" data-tab="weeks">
+              <span class="nav-tab-icon">📅</span>
+              <span>Haftalar</span>
+            </button>
+          
+            <button class="nav-tab" data-tab="matches">
+              <span class="nav-tab-icon">⚽</span>
+              <span>Maçlar</span>
+            </button>
+          
+            <button class="nav-tab" data-tab="predictions">
+              <span class="nav-tab-icon">🎯</span>
+              <span>Tahminler</span>
+            </button>
+          
+            <button class="nav-tab" data-tab="logs">
+              <span class="nav-tab-icon">📋</span>
+              <span>Log Ekranı</span>
+            </button>
+          
+            <button class="nav-tab" data-tab="standings">
+              <span class="nav-tab-icon">🏆</span>
+              <span>Puan Durumu</span>
+            </button>
+          
+            <button class="nav-tab" data-tab="stats">
+              <span class="nav-tab-icon">📊</span>
+              <span>İstatistikler</span>
+            </button>
+          
             <button class="nav-tab admin-only" data-tab="notifications">
-              Bildirim Merkezi
+              <span class="nav-tab-icon">🔔</span>
+              <span>Bildirim Merkezi</span>
             </button>
+          
             <button class="nav-tab admin-only" data-tab="backup">
-              Yedekleme
+              <span class="nav-tab-icon">💾</span>
+              <span>Yedekleme</span>
             </button>
+          
             <button class="nav-tab admin-only" data-tab="settings">
-              Ayarlar
+              <span class="nav-tab-icon">⚙️</span>
+              <span>Ayarlar</span>
             </button>
           </nav>
         </div>
@@ -642,14 +677,29 @@
             <div>
               <h2>Log Ekranı</h2>
               <p>
-                Tahmin ekleme, değiştirme ve silme hareketleri burada şeffaf şekilde görünür.
-                Normal kullanıcı kendi kayıtlarını, admin ise tüm kayıtları detaylı görür.
+                Tahmin ekleme, değiştirme ve silme hareketleri burada şeffaf
+                şekilde görünür. Normal kullanıcı kendi kayıtlarını, admin ise
+                tüm kayıtları detaylı görür.
               </p>
             </div>
             <div class="header-actions log-header-actions">
-              <span class="badge gray" id="predictionLogVisibilityBadge">Loglar hazırlanıyor</span>
-              <button class="secondary small" type="button" id="refreshPredictionLogsBtn">Yenile</button>
-              <button class="danger small" type="button" id="clearPredictionLogsBtn">Logları Temizle</button>
+              <span class="badge gray" id="predictionLogVisibilityBadge"
+                >Loglar hazırlanıyor</span
+              >
+              <button
+                class="secondary small"
+                type="button"
+                id="refreshPredictionLogsBtn"
+              >
+                Yenile
+              </button>
+              <button
+                class="danger small"
+                type="button"
+                id="clearPredictionLogsBtn"
+              >
+                Logları Temizle
+              </button>
             </div>
           </div>
 
@@ -667,7 +717,9 @@
             <article class="card log-trust-card">
               <span>Son işlem</span>
               <strong id="predictionLogLastAction">Yok</strong>
-              <small id="predictionLogLastDate">Henüz log kaydı görünmüyor.</small>
+              <small id="predictionLogLastDate"
+                >Henüz log kaydı görünmüyor.</small
+              >
             </article>
           </section>
 
@@ -675,7 +727,10 @@
             <div class="card-header prediction-log-head">
               <div>
                 <h3>Tahmin İşlem Geçmişi</h3>
-                <p class="small-meta">Kullanıcı, hafta, maç, işlem tipi ve tarih aralığı ile filtrelenir.</p>
+                <p class="small-meta">
+                  Kullanıcı, hafta, maç, işlem tipi ve tarih aralığı ile
+                  filtrelenir.
+                </p>
               </div>
             </div>
 
@@ -710,7 +765,13 @@
                 Bitiş
                 <input id="predictionLogEndDate" type="date" />
               </label>
-              <button class="secondary" type="button" id="clearPredictionLogFiltersBtn">Filtreleri Temizle</button>
+              <button
+                class="secondary"
+                type="button"
+                id="clearPredictionLogFiltersBtn"
+              >
+                Filtreleri Temizle
+              </button>
             </div>
 
             <div class="prediction-log-table-wrap">
@@ -727,16 +788,24 @@
                   </tr>
                 </thead>
                 <tbody id="predictionLogBody">
-                  <tr><td colspan="7">Log kayıtları yükleniyor...</td></tr>
+                  <tr>
+                    <td colspan="7">Log kayıtları yükleniyor...</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
 
-            <div class="prediction-log-mobile-list" id="predictionLogMobileList"></div>
+            <div
+              class="prediction-log-mobile-list"
+              id="predictionLogMobileList"
+            ></div>
 
             <div class="prediction-log-footer">
               <span id="predictionLogPageInfo">Kayıtlar hazırlanıyor</span>
-              <div class="prediction-log-pagination" id="predictionLogPagination"></div>
+              <div
+                class="prediction-log-pagination"
+                id="predictionLogPagination"
+              ></div>
             </div>
           </section>
         </section>
@@ -893,19 +962,22 @@
           </section>
         </section>
 
-
         <section class="tab-panel admin-only" id="tab-notifications">
           <div class="page-header notification-page-header">
             <div>
               <h2>Bildirim Merkezi</h2>
               <p>
-                Otomatik cron bildirimlerini takip et, manuel mesaj taslağı hazırla
-                ve gönderim geçmişini tek ekrandan kontrol et.
+                Otomatik cron bildirimlerini takip et, manuel mesaj taslağı
+                hazırla ve gönderim geçmişini tek ekrandan kontrol et.
               </p>
             </div>
             <div class="header-actions notification-header-actions">
-              <span class="badge gray" id="notificationFirebaseStatusBadge">Firebase kontrol ediliyor</span>
-              <span class="badge warn" id="notificationQueueStatusBadge">Kuyruk hazırlanıyor</span>
+              <span class="badge gray" id="notificationFirebaseStatusBadge"
+                >Firebase kontrol ediliyor</span
+              >
+              <span class="badge warn" id="notificationQueueStatusBadge"
+                >Kuyruk hazırlanıyor</span
+              >
             </div>
           </div>
 
@@ -913,7 +985,9 @@
             <article class="card notification-stat-card">
               <span>Son gönderim / kontrol</span>
               <strong id="notificationLastCronText">Henüz kayıt yok</strong>
-              <small id="notificationLastCronMeta">GitHub Action çalışınca buraya yazılacak.</small>
+              <small id="notificationLastCronMeta"
+                >GitHub Action çalışınca buraya yazılacak.</small
+              >
             </article>
             <article class="card notification-stat-card">
               <span>Son bildirim başlığı</span>
@@ -956,11 +1030,19 @@
             <div class="card-header notification-audience-head">
               <div>
                 <h3>Kullanıcı Bildirim Durumu</h3>
-                <p class="small-meta">Kimde bildirim açık, kimin cihaz/token kaydı yok burada görünür.</p>
+                <p class="small-meta">
+                  Kimde bildirim açık, kimin cihaz/token kaydı yok burada
+                  görünür.
+                </p>
               </div>
             </div>
-            <div class="notification-audience-list" id="notificationAudienceList">
-              <div class="notification-audience-empty">Kullanıcı bildirim durumları yükleniyor...</div>
+            <div
+              class="notification-audience-list"
+              id="notificationAudienceList"
+            >
+              <div class="notification-audience-empty">
+                Kullanıcı bildirim durumları yükleniyor...
+              </div>
             </div>
           </section>
 
@@ -970,7 +1052,8 @@
                 <div>
                   <h3>Manuel Bildirim Hazırla</h3>
                   <p class="small-meta">
-                    Mesajı Firebase kuyruğuna alır. Cron-job saatte bir GitHub Action çalıştırınca otomatik gönderilir.
+                    Mesajı Firebase kuyruğuna alır. Cron-job saatte bir GitHub
+                    Action çalıştırınca otomatik gönderilir.
                   </p>
                 </div>
               </div>
@@ -978,7 +1061,11 @@
               <div class="notification-form-grid">
                 <label>
                   Bildirim başlığı
-                  <input id="manualNotificationTitle" type="text" placeholder="Örn: 8. hafta eklendi" />
+                  <input
+                    id="manualNotificationTitle"
+                    type="text"
+                    placeholder="Örn: 8. hafta eklendi"
+                  />
                 </label>
                 <label>
                   Bildirim ikonu
@@ -1002,47 +1089,98 @@
                 </label>
               </div>
 
-              <div class="notification-custom-target-panel" id="manualNotificationCustomTargetPanel" hidden>
+              <div
+                class="notification-custom-target-panel"
+                id="manualNotificationCustomTargetPanel"
+                hidden
+              >
                 <div class="notification-custom-target-head">
                   <div>
                     <strong>Özel gönderim</strong>
-                    <small>Test için bildirimi sadece seçtiğin kişilere kuyruğa alır.</small>
+                    <small
+                      >Test için bildirimi sadece seçtiğin kişilere kuyruğa
+                      alır.</small
+                    >
                   </div>
                   <div class="notification-custom-target-actions">
-                    <button class="secondary small" type="button" id="selectAllNotificationUsersBtn">Tümünü seç</button>
-                    <button class="secondary small" type="button" id="clearNotificationUsersBtn">Temizle</button>
+                    <button
+                      class="secondary small"
+                      type="button"
+                      id="selectAllNotificationUsersBtn"
+                    >
+                      Tümünü seç
+                    </button>
+                    <button
+                      class="secondary small"
+                      type="button"
+                      id="clearNotificationUsersBtn"
+                    >
+                      Temizle
+                    </button>
                   </div>
                 </div>
-                <div class="notification-user-picker" id="manualNotificationUserPicker">
-                  <small class="notification-user-empty">Kişiler hazırlanıyor...</small>
+                <div
+                  class="notification-user-picker"
+                  id="manualNotificationUserPicker"
+                >
+                  <small class="notification-user-empty"
+                    >Kişiler hazırlanıyor...</small
+                  >
                 </div>
               </div>
 
               <label class="notification-message-field">
                 Mesaj metni
-                <textarea id="manualNotificationMessage" rows="7" maxlength="300" placeholder="Kullanıcılara gidecek bildirim metnini buraya yaz..."></textarea>
-                <small class="notification-char-counter" id="manualNotificationCharCounter">0 / 300</small>
+                <textarea
+                  id="manualNotificationMessage"
+                  rows="7"
+                  maxlength="300"
+                  placeholder="Kullanıcılara gidecek bildirim metnini buraya yaz..."
+                ></textarea>
+                <small
+                  class="notification-char-counter"
+                  id="manualNotificationCharCounter"
+                  >0 / 300</small
+                >
               </label>
 
               <div class="notification-preview-box notification-phone-preview">
                 <div class="notification-phone-topline">
                   <span>Telefon Önizleme</span>
-                  <small id="manualNotificationPreviewTarget">Tüm kullanıcılar</small>
+                  <small id="manualNotificationPreviewTarget"
+                    >Tüm kullanıcılar</small
+                  >
                 </div>
                 <div class="notification-phone-card">
-                  <div class="notification-phone-icon" id="manualNotificationPreviewIcon">🔔</div>
+                  <div
+                    class="notification-phone-icon"
+                    id="manualNotificationPreviewIcon"
+                  >
+                    🔔
+                  </div>
                   <div>
-                    <strong id="manualNotificationPreviewTitle">Başlık burada görünecek</strong>
+                    <strong id="manualNotificationPreviewTitle"
+                      >Başlık burada görünecek</strong
+                    >
                     <p id="manualNotificationPreview">
-                      Mesaj yazıldığında telefonda nasıl görüneceğini buradan kontrol edebilirsin.
+                      Mesaj yazıldığında telefonda nasıl görüneceğini buradan
+                      kontrol edebilirsin.
                     </p>
                   </div>
                 </div>
               </div>
 
               <div class="notification-action-row">
-                <button class="secondary" type="button" id="saveManualNotificationDraftBtn">Taslak Kaydet</button>
-                <button type="button" id="queueManualNotificationBtn">Bildirim Kuyruğuna Al</button>
+                <button
+                  class="secondary"
+                  type="button"
+                  id="saveManualNotificationDraftBtn"
+                >
+                  Taslak Kaydet
+                </button>
+                <button type="button" id="queueManualNotificationBtn">
+                  Bildirim Kuyruğuna Al
+                </button>
               </div>
             </article>
 
@@ -1059,9 +1197,22 @@
               <article class="card notification-mini-card">
                 <h3>Bağlantı Durumu</h3>
                 <div class="notification-connection-list">
-                  <div><span>Cron-job.org</span><strong id="notificationCronStatus">Saatlik aktif</strong></div>
-                  <div><span>GitHub Action</span><strong id="notificationGithubStatus">notifications.yml</strong></div>
-                  <div><span>Firebase kayıtları</span><strong id="notificationFirebaseStatus">Kontrol ediliyor</strong></div>
+                  <div>
+                    <span>Cron-job.org</span
+                    ><strong id="notificationCronStatus">Saatlik aktif</strong>
+                  </div>
+                  <div>
+                    <span>GitHub Action</span
+                    ><strong id="notificationGithubStatus"
+                      >notifications.yml</strong
+                    >
+                  </div>
+                  <div>
+                    <span>Firebase kayıtları</span
+                    ><strong id="notificationFirebaseStatus"
+                      >Kontrol ediliyor</strong
+                    >
+                  </div>
                 </div>
               </article>
             </aside>
@@ -1071,16 +1222,59 @@
             <div class="card-header notification-history-head">
               <div>
                 <h3>Bildirim Geçmişi</h3>
-                <p class="small-meta">Firebase kuyruğundaki manuel mesajlar ve otomatik gönderim kayıtları burada listelenir. Sayfa başına en fazla 10 kayıt gösterilir.</p>
+                <p class="small-meta">
+                  Firebase kuyruğundaki manuel mesajlar ve otomatik gönderim
+                  kayıtları burada listelenir. Sayfa başına en fazla 10 kayıt
+                  gösterilir.
+                </p>
               </div>
-              <button class="secondary small notification-cleanup-btn" type="button" id="cleanupOldNotificationsBtn">30 günden eskileri temizle</button>
+              <button
+                class="secondary small notification-cleanup-btn"
+                type="button"
+                id="cleanupOldNotificationsBtn"
+              >
+                30 günden eskileri temizle
+              </button>
             </div>
-            <div class="notification-filter-bar" aria-label="Bildirim geçmişi filtreleri">
-              <button type="button" class="notification-filter-btn is-active" data-notification-filter="all">Tümü</button>
-              <button type="button" class="notification-filter-btn" data-notification-filter="sent">Gönderilenler</button>
-              <button type="button" class="notification-filter-btn" data-notification-filter="pending">Bekleyenler</button>
-              <button type="button" class="notification-filter-btn" data-notification-filter="failed">Hatalılar</button>
-              <button type="button" class="notification-filter-btn" data-notification-filter="manual">Manuel</button>
+            <div
+              class="notification-filter-bar"
+              aria-label="Bildirim geçmişi filtreleri"
+            >
+              <button
+                type="button"
+                class="notification-filter-btn is-active"
+                data-notification-filter="all"
+              >
+                Tümü
+              </button>
+              <button
+                type="button"
+                class="notification-filter-btn"
+                data-notification-filter="sent"
+              >
+                Gönderilenler
+              </button>
+              <button
+                type="button"
+                class="notification-filter-btn"
+                data-notification-filter="pending"
+              >
+                Bekleyenler
+              </button>
+              <button
+                type="button"
+                class="notification-filter-btn"
+                data-notification-filter="failed"
+              >
+                Hatalılar
+              </button>
+              <button
+                type="button"
+                class="notification-filter-btn"
+                data-notification-filter="manual"
+              >
+                Manuel
+              </button>
             </div>
             <div class="notification-history-table-wrap">
               <table class="notification-history-table">
@@ -1102,23 +1296,47 @@
               </table>
             </div>
             <div class="notification-history-footer">
-              <span id="notificationHistoryPageInfo">Kayıtlar hazırlanıyor</span>
-              <div class="notification-history-pagination" id="notificationHistoryPagination"></div>
+              <span id="notificationHistoryPageInfo"
+                >Kayıtlar hazırlanıyor</span
+              >
+              <div
+                class="notification-history-pagination"
+                id="notificationHistoryPagination"
+              ></div>
             </div>
           </section>
-          <div class="notification-detail-modal" id="notificationDetailModal" hidden>
-            <div class="notification-detail-card" role="dialog" aria-modal="true" aria-labelledby="notificationDetailTitle">
+          <div
+            class="notification-detail-modal"
+            id="notificationDetailModal"
+            hidden
+          >
+            <div
+              class="notification-detail-card"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="notificationDetailTitle"
+            >
               <div class="notification-detail-head">
                 <div>
                   <h3 id="notificationDetailTitle">Bildirim Detayı</h3>
-                  <p class="small-meta">Kime gitti, hata var mı ve hedef bilgisi burada görünür.</p>
+                  <p class="small-meta">
+                    Kime gitti, hata var mı ve hedef bilgisi burada görünür.
+                  </p>
                 </div>
-                <button class="secondary small" type="button" data-notification-detail-close>Kapat</button>
+                <button
+                  class="secondary small"
+                  type="button"
+                  data-notification-detail-close
+                >
+                  Kapat
+                </button>
               </div>
-              <div id="notificationDetailBody" class="notification-detail-body"></div>
+              <div
+                id="notificationDetailBody"
+                class="notification-detail-body"
+              ></div>
             </div>
           </div>
-
         </section>
 
         <section class="tab-panel" id="tab-backup">
@@ -1256,13 +1474,12 @@
           </section>
 
           <div class="dashboard-grid backup-layout backup-layout-redesign">
-
             <section class="card stack-actions backup-main-card">
               <div class="card-header"><h3>Sezon Yedeği</h3></div>
               <div class="status-note">
                 Seçili sezonu; sezon bilgisi, haftalar, takımlar, maçlar,
-                tahminler, kullanıcı sezon bilgileri ve ilgili Firebase kayıtlarıyla
-                tek JSON dosyası olarak indirir.
+                tahminler, kullanıcı sezon bilgileri ve ilgili Firebase
+                kayıtlarıyla tek JSON dosyası olarak indirir.
               </div>
               <label for="backupSeasonSelect">Sezon seç</label>
               <select id="backupSeasonSelect"></select>
@@ -1270,7 +1487,9 @@
                 Sezon bilgisi hazırlanıyor...
               </div>
               <div class="backup-action-grid single-col">
-                <button id="exportSeasonBackupBtn">Seçili Sezonu JSON Yedekle</button>
+                <button id="exportSeasonBackupBtn">
+                  Seçili Sezonu JSON Yedekle
+                </button>
               </div>
             </section>
 
@@ -1320,7 +1539,8 @@
               <div>
                 <h3>Karşılama Kartı</h3>
                 <p class="small-meta">
-                  Görselleri ana klasörde <strong>images/welcome/</strong> içine koy. Buraya sadece dosya adını yazman yeterli.
+                  Görselleri ana klasörde <strong>images/welcome/</strong> içine
+                  koy. Buraya sadece dosya adını yazman yeterli.
                 </p>
               </div>
             </div>
@@ -1334,18 +1554,32 @@
 
                 <div class="field">
                   <label for="welcomeTitleInput">Başlık</label>
-                  <input type="text" id="welcomeTitleInput" placeholder="Galatasaray Şampiyon!" />
+                  <input
+                    type="text"
+                    id="welcomeTitleInput"
+                    placeholder="Galatasaray Şampiyon!"
+                  />
                 </div>
 
                 <div class="field">
                   <label for="welcomeMessageInput">Açıklama</label>
-                  <textarea id="welcomeMessageInput" rows="4" placeholder="Sezonun şampiyonu Galatasaray oldu!"></textarea>
+                  <textarea
+                    id="welcomeMessageInput"
+                    rows="4"
+                    placeholder="Sezonun şampiyonu Galatasaray oldu!"
+                  ></textarea>
                 </div>
 
                 <div class="field">
                   <label for="welcomeImageInput">Görsel dosya adı</label>
-                  <input type="text" id="welcomeImageInput" placeholder="galatasaray-sampiyon.png" />
-                  <div class="small-meta">Örnek yol: images/welcome/galatasaray-sampiyon.png</div>
+                  <input
+                    type="text"
+                    id="welcomeImageInput"
+                    placeholder="galatasaray-sampiyon.png"
+                  />
+                  <div class="small-meta">
+                    Örnek yol: images/welcome/galatasaray-sampiyon.png
+                  </div>
                 </div>
 
                 <div class="field">
@@ -1354,7 +1588,10 @@
                     <option value="cover">Kapla / kırp</option>
                     <option value="contain">Tam sığdır</option>
                   </select>
-                  <div class="small-meta">Şampiyonluk afişi gibi geniş görseller için "Tam sığdır" daha iyi olur.</div>
+                  <div class="small-meta">
+                    Şampiyonluk afişi gibi geniş görseller için "Tam sığdır"
+                    daha iyi olur.
+                  </div>
                 </div>
 
                 <label class="toggle-row" for="welcomeShowOnce">
@@ -1363,8 +1600,16 @@
                 </label>
 
                 <div class="inline-actions">
-                  <button type="button" id="saveWelcomeSettingsBtn">Kaydet</button>
-                  <button type="button" class="secondary" id="previewWelcomeSettingsBtn">Önizle</button>
+                  <button type="button" id="saveWelcomeSettingsBtn">
+                    Kaydet
+                  </button>
+                  <button
+                    type="button"
+                    class="secondary"
+                    id="previewWelcomeSettingsBtn"
+                  >
+                    Önizle
+                  </button>
                 </div>
                 <div class="status-note" id="welcomeSettingsStatus">Hazır.</div>
               </div>
@@ -1374,7 +1619,9 @@
                 <div class="welcome-admin-preview-box">
                   <img id="welcomeAdminPreviewImage" alt="Karşılama görseli" />
                   <h3 id="welcomeAdminPreviewTitle">Hoş geldin!</h3>
-                  <p id="welcomeAdminPreviewMessage">İyi haftalar, bol şans! ✨</p>
+                  <p id="welcomeAdminPreviewMessage">
+                    İyi haftalar, bol şans! ✨
+                  </p>
                 </div>
               </div>
             </div>
@@ -1382,89 +1629,90 @@
         </section>
       </main>
     </div>
-
     <nav class="mobile-bottom-nav" id="mobileBottomNav">
       <button class="mobile-nav-btn active" type="button" data-tab="dashboard">
-        Genel
+        <span class="mobile-nav-icon">🏠</span>
+        <span>Genel</span>
       </button>
+    
       <button class="mobile-nav-btn" type="button" data-tab="predictions">
-        Tahminler
+        <span class="mobile-nav-icon">⚽</span>
+        <span>Tahmin</span>
       </button>
+    
       <button class="mobile-nav-btn" type="button" data-tab="standings">
-        Puan
+        <span class="mobile-nav-icon">🏆</span>
+        <span>Puan</span>
       </button>
-      <button class="mobile-nav-btn" type="button" data-tab="logs">
-        Log
+    
+      <!-- Normal kullanıcıda görünür -->
+      <button class="mobile-nav-btn user-only" type="button" data-tab="stats">
+        <span class="mobile-nav-icon">📊</span>
+        <span>İstatistik</span>
       </button>
-      <button class="mobile-nav-btn" type="button" data-tab="stats">
-        İstatistikler
-      </button>
+    
+      <!-- Admin kullanıcısında görünür -->
       <button
         class="mobile-nav-btn admin-only"
         type="button"
         id="mobileAdminMenuBtn"
       >
-        Menü
+        <span class="mobile-nav-icon">☰</span>
+        <span>Menü</span>
       </button>
     </nav>
-
+    
     <div class="mobile-admin-menu-sheet" id="mobileAdminMenuSheet" hidden>
-      <div
-        class="mobile-admin-menu-backdrop"
-        id="mobileAdminMenuBackdrop"
-      ></div>
+      <div class="mobile-admin-menu-backdrop" id="mobileAdminMenuBackdrop"></div>
+    
       <div class="mobile-admin-menu-panel">
         <div class="mobile-admin-menu-header">
           <h3>Admin Menü</h3>
-          <button class="secondary" type="button" id="mobileAdminMenuCloseBtn">
+    
+          <button
+            class="secondary small"
+            type="button"
+            id="mobileAdminMenuCloseBtn"
+          >
             Kapat
           </button>
         </div>
+    
         <div class="mobile-admin-menu-grid">
-          <button
-            class="mobile-admin-menu-item"
-            type="button"
-            data-tab="seasons"
-          >
-            Sezonlar
+          <button class="mobile-admin-menu-item" type="button" data-tab="stats">
+            📊 İstatistikler
           </button>
-          <button
-            class="mobile-admin-menu-item"
-            type="button"
-            data-tab="players"
-          >
-            Kişiler
+    
+          <button class="mobile-admin-menu-item" type="button" data-tab="seasons">
+            🗓️ Sezonlar
           </button>
+    
+          <button class="mobile-admin-menu-item" type="button" data-tab="players">
+            👥 Kişiler
+          </button>
+    
           <button class="mobile-admin-menu-item" type="button" data-tab="weeks">
-            Haftalar
+            📅 Haftalar
           </button>
-          <button
-            class="mobile-admin-menu-item"
-            type="button"
-            data-tab="matches"
-          >
-            Maçlar
+    
+          <button class="mobile-admin-menu-item" type="button" data-tab="matches">
+            ⚽ Maçlar
           </button>
+    
           <button
             class="mobile-admin-menu-item"
             type="button"
             data-tab="notifications"
           >
-            Bildirimler
+            🔔 Bildirimler
           </button>
-          <button
-            class="mobile-admin-menu-item"
-            type="button"
-            data-tab="backup"
-          >
-            Yedekleme
+    
+          <button class="mobile-admin-menu-item" type="button" data-tab="backup">
+            💾 Yedekleme
           </button>
-          <button
-            class="mobile-admin-menu-item"
-            type="button"
-            data-tab="settings"
-          >
-            Ayarlar
+    
+          <button class="mobile-admin-menu-item" type="button" data-tab="settings">
+            ⚙️ Ayarlar
           </button>
         </div>
       </div>
@@ -1498,6 +1746,8 @@
         >
           Şifre Değiştir
         </button>
+        <button class="mobile-nav-btn" type="button" data-tab="logs">Log</button>
+
         <button class="danger full" type="button" id="mobileLogoutBtn">
           Çıkış Yap
         </button>
@@ -1548,7 +1798,13 @@
         <p class="welcome-card__message" id="welcomeMessage">
           İyi haftalar, bol şans! ✨
         </p>
-        <button type="button" class="secondary welcome-card__close" id="welcomeCloseBtn">Kapat</button>
+        <button
+          type="button"
+          class="secondary welcome-card__close"
+          id="welcomeCloseBtn"
+        >
+          Kapat
+        </button>
       </div>
     </div>
 
@@ -1574,13 +1830,19 @@
       </div>
     </div>
 
-    <div class="league-standings-modal hidden" id="leagueStandingsModal" aria-hidden="true">
+    <div
+      class="league-standings-modal hidden"
+      id="leagueStandingsModal"
+      aria-hidden="true"
+    >
       <div class="league-standings-modal-card">
         <div class="league-standings-modal-head">
           <div>
             <span class="league-standings-kicker">Lig tablosu</span>
             <h3 id="leagueStandingsModalTitle">Puan Durumu</h3>
-            <p id="leagueStandingsModalMeta">Son oynanan maçlara göre hesaplanır.</p>
+            <p id="leagueStandingsModalMeta">
+              Son oynanan maçlara göre hesaplanır.
+            </p>
           </div>
           <button
             class="league-standings-close"

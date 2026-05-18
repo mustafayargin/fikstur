@@ -5307,10 +5307,10 @@ function renderMobilePredictions(container, matches) {
 
               <div class="score-inputs compact-inputs center-mode premium-score-inputs premium-score-inputs--compact pred-score-row own-pred-score-row">
                 <input
-                  type="number"
-                  min="0"
+                  type="text"
                   inputmode="numeric"
-                  value="${pred.homePred}"
+                  pattern="[0-9]*"
+                  value="${getPredictionRenderValue(match.id, player.id, "home", pred.homePred)}"
                   id="pred_home_${match.id}_${player.id}"
                   data-pred-role="input"
                   data-match-id="${match.id}"
@@ -5319,10 +5319,10 @@ function renderMobilePredictions(container, matches) {
                 />
                 <span class="premium-dash">-</span>
                 <input
-                  type="number"
-                  min="0"
+                  type="text"
                   inputmode="numeric"
-                  value="${pred.awayPred}"
+                  pattern="[0-9]*"
+                  value="${getPredictionRenderValue(match.id, player.id, "away", pred.awayPred)}"
                   id="pred_away_${match.id}_${player.id}"
                   data-pred-role="input"
                   data-match-id="${match.id}"

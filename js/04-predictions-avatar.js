@@ -31,6 +31,187 @@ function desktopPredictionMatchCell(match) {
   `;
 }
 
+
+function renderFocusedUserPredictions(container, matches) {
+  if (!container) return;
+  const currentPlayerId = getCurrentPlayerId();
+  const currentPlayer = getPlayerById(currentPlayerId);
+  const isAdmin = getCurrentRole() === "admin";
+
+  if (!currentPlayerId || !currentPlayer) {
+    container.innerHTML = createEmptyState("Bu sayfada tahmin girmek için kullanıcı eşleşmesi bulunamadı.");
+    return;
+  }
+
+  const editableMatches = matches.filter(Boolean);
+  const completedCount = editableMatches.filter((match) => {
+    const pred = getPrediction(match.id, currentPlayerId);
+    return !!(pred && pred.homePred !== "" && pred.awayPred !== "");
+  }).length;
+  const openCount = editableMatches.filter((match) => !isMatchLocked(match) || isAdmin).length;
+  const pendingCount = Math.max(editableMatches.length - completedCount, 0);
+
+  const cards = editableMatches
+    .map((match) => {
+      const locked = isMatchLocked(match);
+      const lockedForUi = locked && !isAdmin;
+      const pred =
+        getPrediction(match.id, currentPlayerId) ||
+        createEmptyPredictionRecord(match.id, currentPlayerId);
+      const hasPrediction = pred.homePred !== "" || pred.awayPred !== "";
+      const hasFullPrediction = pred.homePred !== "" && pred.awayPred !== "";
+      const canEdit = canEditPrediction(currentPlayerId, match.seasonId);
+      const badge = getMatchBadge(match);
+      const visual = getMatchVisualState(match);
+      const outcomeClass = getPredictionOutcomeClass(pred, match);
+      const statusText = getPredictionBaseStatus(match.id, currentPlayerId);
+      const uiKey = getPredictionUiKey(match.id, currentPlayerId);
+      const uiState = predictionUiState[uiKey] || "idle";
+      const isSaving = uiState === "saving";
+      const toastInfo = getPredictionToastInfo(match.id, currentPlayerId);
+      const showDeleteAction = hasPrediction || pred.remoteId || isSaving;
+      const showSaveAction =
+        canEdit && shouldShowPredictionSaveAction(match.id, currentPlayerId);
+
+      const sceneSlug =
+        typeof slugifyTeamName === "function"
+          ? slugifyTeamName(match.homeTeam)
+          : String(match.homeTeam || "")
+              .toLowerCase()
+              .replaceAll("ı", "i")
+              .replaceAll("ğ", "g")
+              .replaceAll("ü", "u")
+              .replaceAll("ş", "s")
+              .replaceAll("ö", "o")
+              .replaceAll("ç", "c")
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/^-+|-+$/g, "");
+
+              const sceneUrl = `images/match-scenes/${sceneSlug || "default"}.png`;
+              const sceneFallbackUrl = `images/match-scenes/default.png`;      return `
+      <article
+        class="prediction-scene-card ${match.played ? "is-played" : ""} ${lockedForUi ? "is-locked" : "is-open"} ${hasFullPrediction ? "has-prediction" : "needs-prediction"} ${visual === "postponed" ? "postponed-row" : ""} ${visual === "played-postponed" ? "rescheduled-played-row" : ""}"
+        style="--match-scene-bg: url('${sceneUrl}'), url('${sceneFallbackUrl}');"      >
+        <div class="prediction-scene-overlay"></div>
+
+        <span class="badge prediction-scene-badge ${badge.cls}">${badge.text}</span>
+
+        <div class="prediction-scene-inner">
+          <div class="prediction-scene-team prediction-scene-team--home">
+            
+          <div class="prediction-scene-logo">
+              ${teamLogoHtml(match.homeTeam, match.seasonId)}
+            </div>
+            <strong title="${escapeHtml(match.homeTeam)}">${escapeHtml(match.homeTeam)}</strong>
+          
+            </div>
+            <div class="prediction-match-time-bar">
+            <span>${formatDate(match.date)}</span>
+          </div>
+          <div class="prediction-glass-panel">
+
+            <div class="prediction-score-control ${outcomeClass}">
+              <input
+                type="text"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                value="${getPredictionRenderValue(match.id, currentPlayerId, "home", pred.homePred)}"
+                id="pred_home_${match.id}_${currentPlayerId}"
+                data-pred-role="input"
+                data-match-id="${match.id}"
+                data-player-id="${currentPlayerId}"
+                aria-label="${escapeHtml(match.homeTeam)} tahmini"
+                ${lockedForUi || !canEdit ? "disabled" : ""}
+              />
+              <span>:</span>
+              <input
+                type="text"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                value="${getPredictionRenderValue(match.id, currentPlayerId, "away", pred.awayPred)}"
+                id="pred_away_${match.id}_${currentPlayerId}"
+                data-pred-role="input"
+                data-match-id="${match.id}"
+                data-player-id="${currentPlayerId}"
+                aria-label="${escapeHtml(match.awayTeam)} tahmini"
+                ${lockedForUi || !canEdit ? "disabled" : ""}
+              />
+            </div>
+
+            <div class="prediction-scene-actions">
+              ${lockedForUi ? `<div class="focused-lock-warning">🔒 Kilitli</div>` : ""}
+              ${
+                canEdit
+                  ? `
+                <button
+                class="prediction-mobile-save-btn focused-save-btn ${
+                  hasPrediction ? "is-update" : "is-create"
+                } ${showSaveAction ? "" : "is-hidden"}"                  type="button"
+                  id="pred_btn_${match.id}_${currentPlayerId}"
+                  data-pred-role="save-btn"
+                  data-match-id="${match.id}"
+                  data-player-id="${currentPlayerId}"
+                  ${lockedForUi ? "disabled" : ""}
+                  >${
+                    lockedForUi ? "🔒 Kilitli" : hasPrediction ? " " : " "
+                  }</button>
+                <button
+                  class="prediction-delete-btn focused-delete-btn ${showDeleteAction ? "" : "is-hidden"}"
+                  type="button"
+                  id="pred_delete_${match.id}_${currentPlayerId}"
+                  data-pred-role="delete-btn"
+                  data-match-id="${match.id}"
+                  data-player-id="${currentPlayerId}"
+                  title="Tahmini sil"
+                  ${lockedForUi ? "disabled" : ""}
+                >×</button>
+              `
+                  : ""
+              }
+            </div>
+
+            <div class="prediction-status-chip ${outcomeClass}" id="pred_status_${match.id}_${currentPlayerId}">
+              ${statusText}
+            </div>
+            <div
+              class="prediction-card-toast ${toastInfo ? "is-visible" : ""}"
+              id="pred_toast_${match.id}_${currentPlayerId}"
+              data-toast-type="${toastInfo?.type || "idle"}"
+            >${toastInfo ? escapeHtml(toastInfo.message) : ""}</div>
+          </div>
+
+          <div class="prediction-scene-team prediction-scene-team--away">
+            <div class="prediction-scene-logo">
+              ${teamLogoHtml(match.awayTeam, match.seasonId)}
+            </div>
+            <strong title="${escapeHtml(match.awayTeam)}">${escapeHtml(match.awayTeam)}</strong>
+          </div>
+        </div>
+      </article>`;
+    })
+    .join("");
+
+  container.innerHTML = `
+    <section class="focused-predictions-shell">
+      <div class="focused-predictions-hero">
+        <div>
+          <span class="focused-eyebrow">Benim Tahminlerim</span>
+          <h2>${escapeHtml(currentPlayer.name || "Kullanıcı")}</h2>
+          <p>Bu ekranda sadece kendi tahminlerini girersin. Diğer tahminler maç başlayınca Genel Bakış’ta görünür.</p>
+        </div>
+        <div class="focused-summary">
+          <span><strong>${completedCount}</strong> Girildi</span>
+          <span><strong>${pendingCount}</strong> Bekliyor</span>
+          <span><strong>${openCount}</strong> Açık maç</span>
+        </div>
+      </div>
+      <div class="focused-prediction-list">${cards}</div>
+    </section>`;
+
+  hydrateTeamLogosIn(container);
+  bindPredictionActionElements(container);
+}
+
 function renderPredictions() {
   const viewportSnapshot = capturePredictionViewport();
   const container = document.getElementById("predictionsTable");
@@ -55,6 +236,16 @@ function renderPredictions() {
     container.innerHTML = createEmptyState(
       "Tahmin girmek için en az bir hafta, bir maç ve bir kişi olmalı.",
     );
+    schedulePredictionViewportRestore(viewportSnapshot);
+    return;
+  }
+
+  const isAdmin = getCurrentRole() === "admin";
+  const predictionsLocked = matches.some((match) => isMatchLocked(match));
+
+  if (!isAdmin && !predictionsLocked) {
+    renderFocusedUserPredictions(container, matches);
+    updatePredictionShareModeButton();
     schedulePredictionViewportRestore(viewportSnapshot);
     return;
   }
@@ -140,9 +331,10 @@ function renderPredictions() {
           <div class="desktop-prediction-control">
             <div class="score-inputs compact-inputs center-mode pred-score-row">
               <input
-                type="number"
-                min="0"
-                value="${pred.homePred}"
+                type="text"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                value="${getPredictionRenderValue(match.id, player.id, "home", pred.homePred)}"
                 id="pred_home_${match.id}_${player.id}"
                 data-pred-role="input"
                 data-match-id="${match.id}"
@@ -151,9 +343,10 @@ function renderPredictions() {
               />
               <span>-</span>
               <input
-                type="number"
-                min="0"
-                value="${pred.awayPred}"
+                type="text"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                value="${getPredictionRenderValue(match.id, player.id, "away", pred.awayPred)}"
                 id="pred_away_${match.id}_${player.id}"
                 data-pred-role="input"
                 data-match-id="${match.id}"
@@ -216,10 +409,85 @@ function renderPredictions() {
 
 const predictionTimers = {};
 const predictionUiState = {};
+const predictionToastState = {};
 const predictionUiResetTimers = {};
+const predictionInputDrafts = {};
+const predictionEditButtonTapLock = {};
 
 function getPredictionUiKey(matchId, playerId) {
   return `${matchId}_${playerId}`;
+}
+
+function getPredictionToastInfo(matchId, playerId) {
+  return predictionToastState[getPredictionUiKey(matchId, playerId)] || null;
+}
+
+function setPredictionCardToast(matchId, playerId, type, message) {
+  const key = getPredictionUiKey(matchId, playerId);
+  const safeType = type || "idle";
+  const safeMessage = String(message || "").trim();
+
+  if (!safeMessage) {
+    clearPredictionCardToast(matchId, playerId);
+    return;
+  }
+
+  predictionToastState[key] = {
+    type: safeType,
+    message: safeMessage,
+  };
+
+  const toast = document.getElementById(`pred_toast_${matchId}_${playerId}`);
+  if (!toast) return;
+
+  toast.textContent = safeMessage;
+  toast.dataset.toastType = safeType;
+  toast.classList.add("is-visible");
+}
+
+function clearPredictionCardToast(matchId, playerId) {
+  const key = getPredictionUiKey(matchId, playerId);
+  delete predictionToastState[key];
+
+  const toast = document.getElementById(`pred_toast_${matchId}_${playerId}`);
+  if (!toast) return;
+
+  toast.textContent = "";
+  toast.dataset.toastType = "idle";
+  toast.classList.remove("is-visible");
+}
+
+function getPredictionDraft(matchId, playerId) {
+  return predictionInputDrafts[getPredictionUiKey(matchId, playerId)] || null;
+}
+
+function setPredictionDraft(matchId, playerId, values = {}) {
+  const key = getPredictionUiKey(matchId, playerId);
+  const current = predictionInputDrafts[key] || {};
+  predictionInputDrafts[key] = {
+    homePred: Object.prototype.hasOwnProperty.call(values, "homePred")
+      ? values.homePred
+      : current.homePred ?? "",
+    awayPred: Object.prototype.hasOwnProperty.call(values, "awayPred")
+      ? values.awayPred
+      : current.awayPred ?? "",
+    updatedAt: Date.now(),
+  };
+}
+
+function clearPredictionDraft(matchId, playerId) {
+  delete predictionInputDrafts[getPredictionUiKey(matchId, playerId)];
+}
+
+function getPredictionRenderValue(matchId, playerId, side, fallback = "") {
+  const draft = getPredictionDraft(matchId, playerId);
+  if (draft) {
+    const key = side === "away" ? "awayPred" : "homePred";
+    if (Object.prototype.hasOwnProperty.call(draft, key)) {
+      return draft[key];
+    }
+  }
+  return fallback ?? "";
 }
 
 function getPredictionBaseStatus(matchId, playerId) {
@@ -331,21 +599,21 @@ function getPredictionSaveLabel(matchId, playerId) {
   const key = getPredictionUiKey(matchId, playerId);
   const uiState = predictionUiState[key] || "idle";
   const pred = getPrediction(matchId, playerId);
-  const hasSavedValue = !!(pred && pred.remoteId);
+  const hasSavedValue = !!(pred && (pred.remoteId || (pred.homePred !== "" && pred.awayPred !== "")));
 
-  if (uiState === "saving") return "Kaydediliyor...";
+  if (uiState === "saving") return "Güncelleniyor...";
   if (uiState === "deleting") return "Siliniyor...";
-  if (uiState === "saved") return hasSavedValue ? "Güncellendi" : "Kaydedildi";
-  if (uiState === "deleted") return "Kaydet";
+  if (uiState === "saved") return "Güncellendi ✓";
+  if (uiState === "deleted") return "Tahmin gir";
   if (uiState === "queued") return "Sıraya alındı";
   if (uiState === "deleteQueued") return "Silinecek";
   if (uiState === "dirty") return hasSavedValue ? "Güncelle" : "Kaydet";
   if (uiState === "deleteError") return "Tekrar sil";
-  if (uiState === "error")
-    return hasSavedValue ? "Tekrar güncelle" : "Tekrar kaydet";
+  if (uiState === "error") return hasSavedValue ? "Tekrar güncelle" : "Tekrar kaydet";
   if (hasSavedValue) return "Güncelle";
   return "Kaydet";
 }
+
 
 function getPredictionInputElements(matchId, playerId) {
   return {
@@ -356,14 +624,20 @@ function getPredictionInputElements(matchId, playerId) {
 
 function getPredictionInputSnapshot(matchId, playerId) {
   const pred = ensurePrediction(matchId, playerId);
+  const draft = getPredictionDraft(matchId, playerId);
   const { homeInput, awayInput } = getPredictionInputElements(
     matchId,
     playerId,
   );
-  const homePred = parseNumberOrEmpty(homeInput?.value ?? pred.homePred ?? "");
-  const awayPred = parseNumberOrEmpty(awayInput?.value ?? pred.awayPred ?? "");
+  const homeSource =
+    homeInput?.value ?? draft?.homePred ?? pred.homePred ?? "";
+  const awaySource =
+    awayInput?.value ?? draft?.awayPred ?? pred.awayPred ?? "";
+  const homePred = parseNumberOrEmpty(homeSource);
+  const awayPred = parseNumberOrEmpty(awaySource);
   return {
     pred,
+    draft,
     homeInput,
     awayInput,
     homePred,
@@ -391,21 +665,14 @@ function hasPredictionInputChanged(matchId, playerId) {
 }
 
 function shouldShowPredictionSaveAction(matchId, playerId) {
-  const key = getPredictionUiKey(matchId, playerId);
-  const uiState = predictionUiState[key] || "idle";
-  if (["saving", "queued", "error", "deleteError"].includes(uiState))
-    return true;
-
-  const { homePred, awayPred } = getPredictionInputSnapshot(matchId, playerId);
-  if (homePred === "" || awayPred === "") return false;
-
-  // Yeni tahmin girilirken daha önce kayıt yoksa bile + / kaydet ikonu kaybolmasın.
-  if (!hasStoredPredictionRecord(matchId, playerId)) {
-    return uiState === "dirty" || hasPredictionInputChanged(matchId, playerId);
+  const match = state.matches.find((item) => item.id === matchId);
+  if (!match) return false;
+  if ((isMatchLocked(match) && getCurrentRole() !== "admin") || !canEditPrediction(playerId)) {
+    return false;
   }
-
-  return uiState === "dirty" || hasPredictionInputChanged(matchId, playerId);
+  return true;
 }
+
 
 function shouldAutoSavePrediction(matchId, playerId) {
   const match = state.matches.find((item) => item.id === matchId);
@@ -424,8 +691,45 @@ function shouldAutoSavePrediction(matchId, playerId) {
   const { homePred, awayPred } = getPredictionInputSnapshot(matchId, playerId);
   if (homePred === "" || awayPred === "") return false;
 
-  return !hasStoredPredictionRecord(matchId, playerId);
+  return !hasStoredPredictionRecord(matchId, playerId) || hasPredictionInputChanged(matchId, playerId) || !!getPredictionDraft(matchId, playerId);
 }
+
+function focusPredictionHomeInput(matchId, playerId) {
+  const input = document.getElementById(`pred_home_${matchId}_${playerId}`);
+  if (!input || input.disabled) return;
+  requestAnimationFrame(() => {
+    try {
+      input.focus({ preventScroll: true });
+    } catch (_) {
+      input.focus();
+    }
+    if (typeof input.select === "function") input.select();
+  });
+}
+
+window.handlePredictionSaveButtonClick = function (matchId, playerId) {
+  const key = getPredictionUiKey(matchId, playerId);
+  const now = Date.now();
+  if (predictionEditButtonTapLock[key] && now - predictionEditButtonTapLock[key] < 450) {
+    return;
+  }
+  predictionEditButtonTapLock[key] = now;
+
+  const uiState = predictionUiState[key] || "idle";
+  const snapshot = capturePredictionViewport({ matchId, playerId });
+
+  if (uiState === "saving" || uiState === "deleting") return;
+
+  if (shouldAutoSavePrediction(matchId, playerId) || uiState === "dirty" || uiState === "error") {
+    window.queuePredictionSave(matchId, playerId, true, snapshot);
+    return;
+  }
+
+  setPredictionUiState(matchId, playerId, "dirty");
+  focusPredictionHomeInput(matchId, playerId);
+  schedulePredictionViewportRestore(snapshot);
+};
+
 
 function focusPredictionSiblingInput(target) {
   if (!target) return;
@@ -485,7 +789,7 @@ function blurPredictionInputAndCloseKeyboard(input) {
     });
   });
 }
-function setPredictionUiState(matchId, playerId, uiState) {
+function setPredictionUiState(matchId, playerId, uiState, options = {}) {
   const key = getPredictionUiKey(matchId, playerId);
   predictionUiState[key] = uiState;
 
@@ -571,10 +875,67 @@ function setPredictionUiState(matchId, playerId, uiState) {
     }
   }
 
+  if (uiState === "saving") {
+    setPredictionCardToast(
+      matchId,
+      playerId,
+      "saving",
+      options.message || "Kaydediliyor...",
+    );
+  } else if (uiState === "deleting") {
+    setPredictionCardToast(
+      matchId,
+      playerId,
+      "saving",
+      options.message || "Siliniyor...",
+    );
+  } else if (uiState === "saved") {
+    setPredictionCardToast(
+      matchId,
+      playerId,
+      "success",
+      options.message || "Kaydedildi",
+    );
+  } else if (uiState === "deleted") {
+    setPredictionCardToast(
+      matchId,
+      playerId,
+      "success",
+      options.message || "Silindi",
+    );
+  } else if (uiState === "error") {
+    setPredictionCardToast(
+      matchId,
+      playerId,
+      "error",
+      options.message || "Hata oluştu",
+    );
+  } else if (uiState === "deleteError") {
+    setPredictionCardToast(
+      matchId,
+      playerId,
+      "error",
+      options.message || "Silme hatası",
+    );
+  } else if (uiState === "queued" || uiState === "deleteQueued") {
+    setPredictionCardToast(
+      matchId,
+      playerId,
+      "warning",
+      options.message || "Bağlantı bekleniyor",
+    );
+  } else if (uiState === "dirty" || uiState === "idle") {
+    if (!options.keepToast) {
+      clearPredictionCardToast(matchId, playerId);
+    }
+  }
+
   if (uiState === "saved" || uiState === "deleted") {
+    clearPredictionDraft(matchId, playerId);
     predictionUiResetTimers[key] = setTimeout(() => {
+      clearPredictionCardToast(matchId, playerId);
       setPredictionUiState(matchId, playerId, "idle");
-    }, 2200);
+    }, 2600);
   } else if (uiState === "error") {
     predictionUiResetTimers[key] = setTimeout(() => {
       setPredictionUiState(matchId, playerId, "dirty");
@@ -607,6 +968,8 @@ window.queuePredictionSave = function (
     return;
   }
 
+  const { homePred, awayPred } = getPredictionInputSnapshot(matchId, playerId);
+  setPredictionDraft(matchId, playerId, { homePred, awayPred });
   setPredictionUiState(matchId, playerId, "dirty");
   updatePredictionDeleteButton(matchId, playerId, true);
   schedulePredictionViewportRestore(snapshot);
@@ -614,6 +977,7 @@ window.queuePredictionSave = function (
 
 window.deletePredictionEntry = async function (matchId, playerId) {
   const viewportSnapshot = capturePredictionViewport({ matchId, playerId });
+  const key = getPredictionUiKey(matchId, playerId);
   const btn = document.getElementById(`pred_delete_${matchId}_${playerId}`);
   if (!btn) return;
 
@@ -637,6 +1001,10 @@ window.deletePredictionEntry = async function (matchId, playerId) {
 
   btn.innerText = "Siliniyor...";
   btn.disabled = true;
+  clearTimeout(predictionTimers[key]);
+  setPredictionUiState(matchId, playerId, "deleting", {
+    message: "Siliniyor...",
+  });
 
   try {
     const payload = {
@@ -655,16 +1023,29 @@ window.deletePredictionEntry = async function (matchId, playerId) {
     btn.disabled = false;
 
     if (result?.success) {
+      clearPredictionDraft(matchId, playerId);
       clearLocalPredictionRecord(matchId, playerId);
+      if (typeof dequeuePredictionRetry === "function") {
+        dequeuePredictionRetry(payload);
+      }
+      setPredictionUiState(matchId, playerId, "deleted", {
+        message: "Silindi",
+      });
       renderAll();
     } else {
       console.warn("Sheet silme başarısız:", result?.message);
+      setPredictionUiState(matchId, playerId, "deleteError", {
+        message: "Silme hatası",
+      });
       renderAll();
     }
   } catch (err) {
     console.error("Silme hatası:", err);
     btn.innerText = "Sil";
     btn.disabled = false;
+    setPredictionUiState(matchId, playerId, "deleteError", {
+      message: "Silme hatası",
+    });
   } finally {
     schedulePredictionViewportRestore(viewportSnapshot);
   }
@@ -687,6 +1068,7 @@ window.savePrediction = async function (matchId, playerId, options = {}) {
   }
 
   const key = getPredictionUiKey(matchId, playerId);
+  const wasUpdate = hasStoredPredictionRecord(matchId, playerId);
 
   if (predictionUiState[key] === "saving") {
     return;
@@ -696,18 +1078,8 @@ window.savePrediction = async function (matchId, playerId, options = {}) {
 
   const pred = ensurePrediction(matchId, playerId);
 
-  const homeInput = document.getElementById(
-    `pred_home_${match.id}_${playerId}`,
-  );
-  const awayInput = document.getElementById(
-    `pred_away_${match.id}_${playerId}`,
-  );
-
-  const homeValue = homeInput?.value ?? "";
-  const awayValue = awayInput?.value ?? "";
-
-  const homePred = parseNumberOrEmpty(homeValue);
-  const awayPred = parseNumberOrEmpty(awayValue);
+  const { homePred, awayPred } = getPredictionInputSnapshot(matchId, playerId);
+  setPredictionDraft(matchId, playerId, { homePred, awayPred });
 
   pred.homePred = homePred;
   pred.awayPred = awayPred;
@@ -735,17 +1107,23 @@ window.savePrediction = async function (matchId, playerId, options = {}) {
   }
 
   if (!useOnlineMode || !isAuthenticated()) {
-    setPredictionUiState(matchId, playerId, "saved");
+    setPredictionUiState(matchId, playerId, "saved", {
+      message: wasUpdate ? "Güncellendi" : "Kaydedildi",
+    });
     updatePredictionDeleteButton(matchId, playerId, true);
     schedulePredictionViewportRestore(viewportSnapshot);
     return;
   }
 
-  setPredictionUiState(matchId, playerId, "saving");
+  setPredictionUiState(matchId, playerId, "saving", {
+    message: "Firebase'e kaydediliyor...",
+  });
 
   predictionTimers[key] = setTimeout(() => {
     if (predictionUiState[key] === "saving") {
-      setPredictionUiState(matchId, playerId, "error");
+      setPredictionUiState(matchId, playerId, "saving", {
+        message: "Bağlantı bekleniyor...",
+      });
     }
   }, 20000);
 
@@ -792,6 +1170,8 @@ window.savePrediction = async function (matchId, playerId, options = {}) {
     changedBy: actorName,
   };
 
+  let onlineSaveCompleted = false;
+
   try {
     // Aynı maç/kullanıcı için eskiden sırada kalmış tahmin varsa önce temizle.
     // Aksi halde eski kuyruk kaydı Firebase'e tekrar yazıp yeni tahmini geri alabiliyor.
@@ -805,7 +1185,9 @@ window.savePrediction = async function (matchId, playerId, options = {}) {
 
     if (!result?.success) {
       console.error("Online tahmin kaydedilemedi:", result);
-      setPredictionUiState(matchId, playerId, "error");
+      setPredictionUiState(matchId, playerId, "error", {
+        message: result?.message || "Hata oluştu",
+      });
       showAlert(result?.message || "Tahmin veritabanına kaydedilemedi.", {
         title: "Kayıt Hatası",
         type: "warning",
@@ -813,6 +1195,8 @@ window.savePrediction = async function (matchId, playerId, options = {}) {
       schedulePredictionViewportRestore(viewportSnapshot);
       return;
     }
+
+    onlineSaveCompleted = true;
 
     if (result.sheetMatchId) {
       match.sheetMatchId = String(result.sheetMatchId);
@@ -836,11 +1220,29 @@ window.savePrediction = async function (matchId, playerId, options = {}) {
       compactLocalPredictionRecords();
     }
     saveState(true);
-    setPredictionUiState(matchId, playerId, "saved");
+    setPredictionUiState(matchId, playerId, "saved", {
+      message: wasUpdate ? "Güncellendi" : "Kaydedildi",
+    });
     renderPredictions();
     schedulePredictionViewportRestore(viewportSnapshot);
   } catch (error) {
     clearTimeout(predictionTimers[key]);
+
+    if (onlineSaveCompleted) {
+      console.warn("Firebase kaydı tamamlandı; ekran/yerel güncelleme sırasında hata yakalandı:", error);
+      saveState(true);
+      setPredictionUiState(matchId, playerId, "saved", {
+        message: wasUpdate ? "Güncellendi" : "Kaydedildi",
+      });
+      try {
+        renderPredictions();
+      } catch (renderError) {
+        console.warn("Tahmin ekranı yenilenemedi:", renderError);
+      }
+      schedulePredictionViewportRestore(viewportSnapshot);
+      return;
+    }
+
     console.error("Online tahmin kaydı hatası:", error);
 
     const timeoutError = String(error?.message || "").includes(
@@ -848,16 +1250,14 @@ window.savePrediction = async function (matchId, playerId, options = {}) {
     );
 
     if (timeoutError) {
-      setPredictionUiState(matchId, playerId, "saving");
-
-      setTimeout(() => {
-        if (predictionUiState[key] === "saving") {
-          setPredictionUiState(matchId, playerId, "saved");
-        }
-      }, 1500);
+      setPredictionUiState(matchId, playerId, "saving", {
+        message: "Bağlantı bekleniyor...",
+      });
 
       enqueuePredictionRetry(payload);
-      setPredictionUiState(matchId, playerId, "queued");
+      setPredictionUiState(matchId, playerId, "queued", {
+        message: "Bağlantı bekleniyor",
+      });
       recordAdminSyncActivity({
         lastAction: `${getPlayerById(playerId)?.name || "Kullanıcı"} tahmini sıraya alındı.`,
       });
@@ -873,7 +1273,9 @@ window.savePrediction = async function (matchId, playerId, options = {}) {
     }
 
     enqueuePredictionRetry(payload);
-    setPredictionUiState(matchId, playerId, "queued");
+    setPredictionUiState(matchId, playerId, "queued", {
+      message: "Bağlantı bekleniyor",
+    });
     recordAdminSyncActivity({
       lastAction: `${getPlayerById(playerId)?.name || "Kullanıcı"} tahmini çevrimdışı sıraya alındı.`,
       lastError: error?.message || "Bağlantı gecikmesi",
