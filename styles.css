@@ -1480,6 +1480,182 @@ option {
   opacity: 1;
 }
 
+
+.app-toast-stack {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  width: min(420px, calc(100vw - 28px));
+  display: grid;
+  gap: 12px;
+  z-index: 50000;
+  pointer-events: none;
+}
+
+.app-toast {
+  position: relative;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 34px;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 14px 16px;
+  overflow: hidden;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.94));
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  box-shadow: 0 22px 70px rgba(2, 6, 23, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(18px);
+  transform: translateX(22px) scale(0.98);
+  opacity: 0;
+  transition: transform 0.22s ease, opacity 0.22s ease;
+  pointer-events: auto;
+}
+
+.app-toast.show {
+  transform: translateX(0) scale(1);
+  opacity: 1;
+}
+
+.app-toast.hide {
+  transform: translateX(22px) scale(0.98);
+  opacity: 0;
+}
+
+.app-toast__icon {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  font-size: 24px;
+  background: rgba(59, 130, 246, 0.18);
+  border: 1px solid rgba(96, 165, 250, 0.28);
+}
+
+.app-toast__body {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.app-toast__body strong {
+  color: #f8fafc;
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.app-toast__body span {
+  color: rgba(203, 213, 225, 0.92);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.app-toast__close {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.12);
+  color: rgba(226, 232, 240, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.app-toast__bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 100%;
+  transform-origin: left center;
+  background: rgba(96, 165, 250, 0.9);
+  animation: appToastBar linear forwards;
+}
+
+.app-toast--success {
+  border-color: rgba(34, 197, 94, 0.45);
+  box-shadow: 0 22px 70px rgba(2, 6, 23, 0.48), 0 0 0 1px rgba(34, 197, 94, 0.08);
+}
+
+.app-toast--success .app-toast__icon {
+  background: rgba(34, 197, 94, 0.18);
+  border-color: rgba(34, 197, 94, 0.34);
+}
+
+.app-toast--success .app-toast__bar {
+  background: rgba(34, 197, 94, 0.95);
+}
+
+.app-toast--warning {
+  border-color: rgba(245, 158, 11, 0.52);
+  box-shadow: 0 22px 70px rgba(2, 6, 23, 0.48), 0 0 0 1px rgba(245, 158, 11, 0.1);
+}
+
+.app-toast--warning .app-toast__icon {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: rgba(245, 158, 11, 0.36);
+}
+
+.app-toast--warning .app-toast__bar {
+  background: rgba(245, 158, 11, 0.95);
+}
+
+.app-toast--danger,
+.app-toast--error {
+  border-color: rgba(239, 68, 68, 0.56);
+  box-shadow: 0 22px 70px rgba(2, 6, 23, 0.5), 0 0 0 1px rgba(239, 68, 68, 0.12);
+}
+
+.app-toast--danger .app-toast__icon,
+.app-toast--error .app-toast__icon {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.36);
+}
+
+.app-toast--danger .app-toast__bar,
+.app-toast--error .app-toast__bar {
+  background: rgba(239, 68, 68, 0.95);
+}
+
+@keyframes appToastBar {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+@media (max-width: 640px) {
+  .app-toast-stack {
+    top: max(12px, env(safe-area-inset-top));
+    left: 12px;
+    right: 12px;
+    width: auto;
+    gap: 10px;
+  }
+
+  .app-toast {
+    grid-template-columns: 42px minmax(0, 1fr) 30px;
+    padding: 12px 12px 15px;
+    border-radius: 18px;
+  }
+
+  .app-toast__icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    font-size: 22px;
+  }
+
+  .app-toast__body strong {
+    font-size: 14px;
+  }
+
+  .app-toast__body span {
+    font-size: 12.5px;
+  }
+}
+
 .champion-modal {
   position: fixed;
   inset: 0;
@@ -1522,33 +1698,6 @@ option {
   margin-bottom: 10px;
 }
 
-#confettiLayer {
-  pointer-events: none;
-  position: fixed;
-  inset: 0;
-  overflow: hidden;
-  z-index: 95;
-}
-
-.confetti-piece {
-  position: absolute;
-  top: -20px;
-  width: 10px;
-  height: 18px;
-  border-radius: 3px;
-  background: linear-gradient(180deg, #22c55e, #38bdf8);
-  animation: confettiFall linear forwards;
-  will-change: transform, opacity;
-  filter: drop-shadow(0 6px 12px rgba(15, 23, 42, 0.22));
-}
-
-.confetti-piece:nth-child(3n) {
-  background: linear-gradient(180deg, #f59e0b, #ef4444);
-}
-
-.confetti-piece:nth-child(3n + 1) {
-  background: linear-gradient(180deg, #a78bfa, #38bdf8);
-}
 
 @keyframes confettiFall {
   to {
@@ -18558,5 +18707,758 @@ body[data-role="user"] #tab-players .page-header p {
 @media (max-width: 720px) {
   #tab-matches > .page-header {
     display: none !important;
+  }
+}
+/* =========================================================
+   PREMIUM WELCOME CARD - FINAL CLEAN OVERRIDE
+   Not: Eski welcome stilleri kalsın; bu blok en altta olduğu için
+   sadece karşılama kartını premium görünüme taşır.
+========================================================= */
+.welcome-overlay {
+  z-index: 2200 !important;
+  padding: clamp(14px, 3vw, 28px) !important;
+}
+
+.welcome-overlay__backdrop {
+  background:
+    radial-gradient(circle at 50% 16%, rgba(250, 204, 21, 0.16), transparent 25%),
+    radial-gradient(circle at 18% 70%, rgba(56, 189, 248, 0.13), transparent 30%),
+    radial-gradient(circle at 82% 72%, rgba(239, 68, 68, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.82), rgba(2, 6, 23, 0.95)) !important;
+  backdrop-filter: blur(18px) saturate(1.1) !important;
+}
+
+.welcome-card {
+  width: min(100%, 430px) !important;
+  min-height: auto !important;
+  max-height: calc(100vh - 28px) !important;
+  overflow: hidden auto !important;
+  padding: 16px 16px 20px !important;
+  gap: 12px !important;
+  border-radius: 32px !important;
+  isolation: isolate !important;
+  justify-content: flex-start !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.015)),
+    radial-gradient(circle at 50% 0%, rgba(250, 204, 21, 0.18), transparent 34%),
+    radial-gradient(circle at 15% 24%, rgba(239, 68, 68, 0.12), transparent 32%),
+    radial-gradient(circle at 88% 30%, rgba(56, 189, 248, 0.13), transparent 30%),
+    linear-gradient(180deg, rgba(8, 22, 48, 0.98), rgba(2, 10, 24, 0.99)) !important;
+  border: 1px solid rgba(148, 213, 255, 0.22) !important;
+  box-shadow:
+    0 34px 90px rgba(0, 0, 0, 0.58),
+    0 0 0 1px rgba(255, 255, 255, 0.055),
+    inset 0 1px 0 rgba(255, 255, 255, 0.13) !important;
+}
+
+.welcome-card::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.welcome-card::before {
+  inset: -55% !important;
+  z-index: -2 !important;
+  opacity: 0.9 !important;
+  background:
+    conic-gradient(from 180deg, transparent, rgba(250, 204, 21, 0.16), transparent, rgba(56, 189, 248, 0.12), transparent) !important;
+  filter: blur(18px) !important;
+}
+
+.welcome-card::after {
+  content: "" !important;
+  position: absolute !important;
+  inset: 1px !important;
+  z-index: -1 !important;
+  pointer-events: none !important;
+  border-radius: 31px !important;
+  background:
+    linear-gradient(90deg, rgba(250, 204, 21, 0.58), rgba(239, 68, 68, 0.42), rgba(56, 189, 248, 0.48)) top / 100% 3px no-repeat,
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.08), transparent 36%) !important;
+  transform: none !important;
+  width: auto !important;
+  height: auto !important;
+  opacity: 1 !important;
+  filter: none !important;
+
+}
+
+.welcome-card__shine {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.09) 42%, transparent 58%);
+  transform: translateX(-120%);
+}
+
+.welcome-card__glow {
+  inset: auto 50% 49% !important;
+  z-index: 0 !important;
+  width: 240px !important;
+  height: 240px !important;
+  opacity: 0.7 !important;
+  background: radial-gradient(circle, rgba(250, 204, 21, 0.25), rgba(239, 68, 68, 0.12) 45%, transparent 72%) !important;
+}
+
+.welcome-card__topline,
+.welcome-card__content,
+.welcome-card__stats,
+.welcome-card__close,
+.welcome-card__avatar,
+.welcome-card__media {
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+.welcome-card__topline {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 2px 4px;
+}
+
+.welcome-card__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  color: #fff7cc;
+  font-size: 0.74rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(250, 204, 21, 0.13);
+  border: 1px solid rgba(250, 204, 21, 0.32);
+  box-shadow: 0 10px 24px rgba(250, 204, 21, 0.08);
+}
+
+.welcome-card__badge::before {
+  content: "✦";
+  color: #facc15;
+}
+
+.welcome-card__mini {
+  color: rgba(226, 232, 240, 0.72);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.welcome-card__media img,
+.welcome-card__avatar {
+  width: min(100%, 292px) !important;
+  height: 292px !important;
+  margin: 2px auto 0 !important;
+  border-radius: 30px !important;
+}
+
+.welcome-card__avatar {
+  background:
+    radial-gradient(circle at 50% 15%, rgba(250, 204, 21, 0.18), transparent 48%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)) !important;
+  box-shadow:
+    0 24px 55px rgba(0, 0, 0, 0.38),
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+  overflow: hidden !important;
+}
+
+.welcome-card__avatar .app-avatar {
+  border: 0 !important;
+  border-radius: 30px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.welcome-card__avatar img,
+.welcome-card__avatar .app-avatar-image,
+.welcome-card__avatar .welcome-profile-image,
+.welcome-card__media img {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  border-radius: 30px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: rgba(2, 6, 23, 0.28) !important;
+  box-shadow: none !important;
+}
+
+.welcome-card__media img.is-contain {
+  object-fit: contain !important;
+}
+
+.welcome-card__content {
+  width: 100%;
+  padding: 2px 8px 0;
+}
+
+.welcome-card__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 5px;
+  color: rgba(147, 197, 253, 0.92);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.welcome-card__title {
+  margin: 0 !important;
+  font-size: clamp(2.45rem, 8vw, 3.8rem) !important;
+  line-height: 0.92 !important;
+  letter-spacing: -0.075em !important;
+  font-weight: 1000 !important;
+  text-shadow: 0 16px 36px rgba(0, 0, 0, 0.42) !important;
+  background: linear-gradient(90deg, #ffffff 0%, #fff4b8 34%, #facc15 58%, #ffffff 100%) !important;
+  background-size: 220% auto !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
+}
+
+.welcome-card__message {
+  max-width: 330px !important;
+  margin: 10px auto 0 !important;
+  color: rgba(232, 241, 255, 0.9) !important;
+  font-size: 0.98rem !important;
+  line-height: 1.48 !important;
+  font-weight: 700 !important;
+}
+
+.welcome-card__stats {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.welcome-card__stats span {
+  min-width: 0;
+  padding: 8px 7px;
+  border-radius: 15px;
+  color: rgba(241, 245, 249, 0.86);
+  font-size: 0.72rem;
+  font-weight: 850;
+  white-space: nowrap;
+  background: rgba(15, 23, 42, 0.56);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.welcome-card__close {
+  margin-top: 4px !important;
+  min-width: 156px;
+  min-height: 46px;
+  border: 0 !important;
+  border-radius: 999px !important;
+  color: #06111f !important;
+  font-weight: 950 !important;
+  font-size: 1rem !important;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #fef08a, #facc15 48%, #fb923c) !important;
+  box-shadow:
+    0 16px 34px rgba(250, 204, 21, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45) !important;
+}
+
+.welcome-card__close:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+}
+
+
+
+@keyframes welcomePremiumEnter {
+  from { opacity: 0; transform: translateY(24px) scale(0.965); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes welcomePremiumFloat {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-4px) scale(1); }
+}
+
+@keyframes welcomePremiumAura {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes welcomePremiumSweep {
+  0%, 54% { transform: translateX(-120%); opacity: 0; }
+  62% { opacity: 1; }
+  100% { transform: translateX(120%); opacity: 0; }
+}
+
+@media (max-width: 640px) {
+  .welcome-overlay {
+    align-items: center !important;
+    padding: 10px !important;
+  }
+
+  .welcome-card {
+    width: min(100%, 360px) !important;
+    max-height: calc(100dvh - 20px) !important;
+    padding: 13px 13px 16px !important;
+    gap: 10px !important;
+    border-radius: 28px !important;
+  }
+
+  .welcome-card::after {
+    border-radius: 27px !important;
+  }
+
+  .welcome-card__topline {
+    gap: 6px;
+  }
+
+  .welcome-card__badge {
+    padding: 7px 10px;
+    font-size: 0.68rem;
+  }
+
+  .welcome-card__mini {
+    font-size: 0.64rem;
+    max-width: 145px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .welcome-card__media img,
+  .welcome-card__avatar {
+    width: min(100%, 292px) !important;
+    height: min(292px, 42vh) !important;
+    border-radius: 25px !important;
+  }
+
+  .welcome-card__avatar .app-avatar,
+  .welcome-card__avatar img,
+  .welcome-card__avatar .app-avatar-image,
+  .welcome-card__avatar .welcome-profile-image,
+  .welcome-card__media img {
+    border-radius: 25px !important;
+  }
+
+  .welcome-card__content {
+    padding-inline: 6px;
+  }
+
+  .welcome-card__eyebrow {
+    font-size: 0.67rem;
+    margin-bottom: 4px;
+  }
+
+  .welcome-card__title {
+    font-size: clamp(2.05rem, 11vw, 2.85rem) !important;
+  }
+
+  .welcome-card__message {
+    margin-top: 7px !important;
+    max-width: 286px !important;
+    font-size: 0.88rem !important;
+    line-height: 1.4 !important;
+  }
+
+  .welcome-card__stats {
+    gap: 6px;
+  }
+
+  .welcome-card__stats span {
+    padding: 7px 5px;
+    border-radius: 13px;
+    font-size: 0.65rem;
+  }
+
+  .welcome-card__close {
+    min-width: 142px;
+    min-height: 42px;
+    font-size: 0.92rem !important;
+  }
+}
+
+@media (max-width: 370px) {
+  .welcome-card__stats {
+    grid-template-columns: 1fr;
+  }
+
+  .welcome-card__stats span {
+    padding: 6px 8px;
+  }
+
+  .welcome-card__media img,
+  .welcome-card__avatar {
+    height: min(250px, 38vh) !important;
+  }
+}
+
+/* =========================================================
+   PREMIUM WELCOME CARD - V2 PERFORMANCE SAFE OVERRIDE
+   Amaç: EA FC / Champions League hissi, tam görünen figür,
+   eski telefonlarda kasma yapmayan statik kart.
+========================================================= */
+.welcome-overlay {
+  z-index: 2200 !important;
+  padding: clamp(12px, 3vw, 26px) !important;
+}
+
+.welcome-overlay__backdrop {
+  background:
+    radial-gradient(circle at 50% 6%, rgba(245, 158, 11, 0.16), transparent 30%),
+    radial-gradient(circle at 18% 78%, rgba(14, 165, 233, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.86), rgba(1, 5, 15, 0.97)) !important;
+  backdrop-filter: blur(14px) saturate(1.05) !important;
+}
+
+.welcome-card {
+  width: min(100%, 410px) !important;
+  max-height: calc(100dvh - 24px) !important;
+  overflow: hidden auto !important;
+  padding: 16px 16px 18px !important;
+  gap: 10px !important;
+  border-radius: 28px !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255,255,255,0.015)),
+    radial-gradient(circle at 50% 0%, rgba(250, 204, 21, 0.16), transparent 34%),
+    linear-gradient(180deg, rgba(8, 18, 39, 0.98), rgba(2, 8, 20, 0.995)) !important;
+  border: 1px solid rgba(148, 213, 255, 0.24) !important;
+  box-shadow:
+    0 34px 90px rgba(0, 0, 0, 0.62),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+ 
+}
+
+
+
+.welcome-card__shine,
+.welcome-card__stats {
+  display: none !important;
+}
+
+.welcome-card::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 1px !important;
+  z-index: -1 !important;
+  border-radius: 27px !important;
+  background:
+    linear-gradient(90deg, rgba(250, 204, 21, 0.65), rgba(59, 130, 246, 0.42)) top / 100% 2px no-repeat,
+    radial-gradient(circle at 50% 0%, rgba(255,255,255,0.08), transparent 38%) !important;
+  filter: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+.welcome-card::after {
+  display: none !important;
+}
+
+.welcome-card__topline {
+  width: 100% !important;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  justify-items: center !important;
+  gap: 4px !important;
+  padding: 0 4px 2px !important;
+  text-align: center !important;
+}
+
+.welcome-card__badge {
+  padding: 0 !important;
+  color: rgba(226, 232, 240, 0.76) !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  font-size: 0.72rem !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.2em !important;
+}
+
+.welcome-card__badge::before {
+  content: none !important;
+}
+
+.welcome-card__mini {
+  color: #f8e7a2 !important;
+  font-size: 0.86rem !important;
+  font-weight: 950 !important;
+  letter-spacing: 0.08em !important;
+  white-space: normal !important;
+  text-transform: uppercase !important;
+}
+
+.welcome-card__glow {
+  display: none !important;
+}
+
+.welcome-card__media img,
+.welcome-card__avatar {
+  width: min(100%, 306px) !important;
+  height: min(306px, 44vh) !important;
+  margin: 4px auto 2px !important;
+  border-radius: 26px !important;
+}
+
+.welcome-card__avatar {
+  display: grid !important;
+  place-items: center !important;
+  padding: 10px !important;
+  overflow: hidden !important;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(250, 204, 21, 0.10), transparent 52%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.44), rgba(2, 6, 23, 0.38)) !important;
+  border: 1px solid rgba(148, 163, 184, 0.18) !important;
+  box-shadow: 0 22px 52px rgba(0, 0, 0, 0.42) !important;
+}
+
+.welcome-card__avatar .app-avatar,
+.welcome-card__avatar .welcome-hero-avatar {
+  width: 100% !important;
+  height: 100% !important;
+  display: grid !important;
+  place-items: center !important;
+  border-radius: 20px !important;
+  overflow: hidden !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.welcome-card__avatar img,
+.welcome-card__avatar .app-avatar-image,
+.welcome-card__avatar .welcome-profile-image,
+.welcome-card__media img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  object-position: center center !important;
+  border-radius: 20px !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.welcome-card__content {
+  width: 100% !important;
+  padding: 2px 8px 0 !important;
+  text-align: center !important;
+}
+
+.welcome-card__eyebrow {
+  display: block !important;
+  margin: 0 0 4px !important;
+  color: rgba(147, 197, 253, 0.78) !important;
+  font-size: 0.68rem !important;
+  font-weight: 950 !important;
+  letter-spacing: 0.22em !important;
+  text-transform: uppercase !important;
+}
+
+.welcome-card__title {
+  margin: 0 !important;
+  color: #f8fafc !important;
+  background: none !important;
+  -webkit-background-clip: initial !important;
+  background-clip: initial !important;
+  font-size: clamp(2.35rem, 8vw, 3.35rem) !important;
+  line-height: 0.94 !important;
+  letter-spacing: -0.055em !important;
+  font-weight: 1000 !important;
+  text-transform: uppercase !important;
+  text-shadow: 0 16px 34px rgba(0, 0, 0, 0.52) !important;
+}
+
+.welcome-card__message {
+  max-width: 300px !important;
+  margin: 9px auto 0 !important;
+  color: rgba(226, 232, 240, 0.84) !important;
+  font-size: 0.92rem !important;
+  line-height: 1.42 !important;
+  font-weight: 700 !important;
+}
+
+.welcome-card__close {
+  min-width: 166px !important;
+  min-height: 42px !important;
+  margin-top: 8px !important;
+  border-radius: 999px !important;
+  color: #06111f !important;
+  font-size: 0.92rem !important;
+  font-weight: 950 !important;
+  letter-spacing: 0.01em !important;
+  background: linear-gradient(135deg, #fde68a, #facc15 52%, #f59e0b) !important;
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
+  box-shadow: 0 14px 28px rgba(250, 204, 21, 0.20) !important;
+  transition: filter 0.16s ease, transform 0.16s ease !important;
+}
+
+.welcome-card__close:hover {
+  transform: translateY(-1px) !important;
+  filter: brightness(1.04) !important;
+}
+
+@media (max-width: 640px) {
+  .welcome-overlay {
+    padding: 10px !important;
+  }
+
+  .welcome-card {
+    width: min(100%, 360px) !important;
+    padding: 14px 13px 16px !important;
+    gap: 9px !important;
+    border-radius: 26px !important;
+  }
+
+  .welcome-card::before {
+    border-radius: 25px !important;
+  }
+
+  .welcome-card__badge {
+    font-size: 0.64rem !important;
+  }
+
+  .welcome-card__mini {
+    font-size: 0.76rem !important;
+  }
+
+  .welcome-card__media img,
+  .welcome-card__avatar {
+    width: min(100%, 286px) !important;
+    height: min(286px, 42vh) !important;
+    padding: 8px !important;
+    border-radius: 23px !important;
+  }
+
+  .welcome-card__avatar .app-avatar,
+  .welcome-card__avatar .welcome-hero-avatar,
+  .welcome-card__avatar img,
+  .welcome-card__avatar .app-avatar-image,
+  .welcome-card__avatar .welcome-profile-image,
+  .welcome-card__media img {
+    border-radius: 18px !important;
+  }
+
+  .welcome-card__title {
+    font-size: clamp(2.05rem, 11vw, 2.65rem) !important;
+  }
+
+  .welcome-card__message {
+    max-width: 276px !important;
+    font-size: 0.86rem !important;
+  }
+
+  .welcome-card__close {
+    min-width: 152px !important;
+    min-height: 40px !important;
+    font-size: 0.88rem !important;
+  }
+}
+
+@media (max-width: 370px) {
+  .welcome-card {
+    width: min(100%, 338px) !important;
+  }
+
+  .welcome-card__media img,
+  .welcome-card__avatar {
+    height: min(252px, 38vh) !important;
+  }
+
+  .welcome-card__title {
+    font-size: clamp(1.86rem, 10vw, 2.25rem) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .welcome-card,
+  .welcome-card *,
+  .welcome-card::before,
+  .welcome-card::after,
+  .welcome-card__shine,
+  .welcome-card__glow,
+  .welcome-card__glow::before,
+  .welcome-card__glow::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* =========================================================
+   WELCOME FIGURE PORTRAIT FIX - V3
+   Amaç: 543x724 / 1086x1448 gibi dikey figür görselleri
+   kırpılmadan tam görünsün. Kare kutu yerine dikey sahne.
+========================================================= */
+.welcome-card__media,
+.welcome-card__avatar {
+  width: min(100%, 306px) !important;
+  height: auto !important;
+  aspect-ratio: 3 / 4 !important;
+  margin: 4px auto 2px !important;
+  display: grid !important;
+  place-items: center !important;
+  overflow: hidden !important;
+}
+
+.welcome-card__media img,
+.welcome-card__media img.is-cover,
+.welcome-card__media img.is-contain,
+.welcome-card__avatar .app-avatar,
+.welcome-card__avatar .welcome-hero-avatar,
+.welcome-card__avatar img,
+.welcome-card__avatar .app-avatar-image,
+.welcome-card__avatar .welcome-profile-image {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain !important;
+  object-position: center center !important;
+}
+
+.welcome-card__media img,
+.welcome-card__media img.is-cover,
+.welcome-card__media img.is-contain {
+  padding: 8px !important;
+  background: rgba(2, 6, 23, 0.20) !important;
+}
+
+.welcome-card__avatar {
+  padding: 8px !important;
+}
+
+.welcome-card__avatar .app-avatar,
+.welcome-card__avatar .welcome-hero-avatar {
+  padding: 0 !important;
+}
+
+@media (max-width: 640px) {
+  .welcome-card {
+    max-height: calc(100dvh - 18px) !important;
+  }
+
+  .welcome-card__media,
+  .welcome-card__avatar {
+    width: min(100%, 286px) !important;
+    aspect-ratio: 3 / 4 !important;
+  }
+
+  .welcome-card__media img,
+  .welcome-card__media img.is-cover,
+  .welcome-card__media img.is-contain {
+    padding: 6px !important;
+  }
+}
+
+@media (max-width: 370px) {
+  .welcome-card__media,
+  .welcome-card__avatar {
+    width: min(100%, 258px) !important;
+    aspect-ratio: 3 / 4 !important;
   }
 }

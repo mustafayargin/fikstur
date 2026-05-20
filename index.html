@@ -1790,25 +1790,44 @@
       <div class="welcome-overlay__backdrop"></div>
       <div class="welcome-card" id="welcomeCard">
         <div class="welcome-card__glow"></div>
+        <div class="welcome-card__shine" aria-hidden="true"></div>
+
+        <div class="welcome-card__topline">
+          <span class="welcome-card__badge">PREMIUM TAHMİN ARENASI</span>
+          <span class="welcome-card__mini">2025 • 2026 SEZONU</span>
+        </div>
+
         <div class="welcome-card__media hidden" id="welcomeMediaWrap">
           <img id="welcomeImage" alt="Karşılama görseli" />
         </div>
         <div class="welcome-card__avatar" id="welcomeAvatar"></div>
-        <h2 class="welcome-card__title" id="welcomeTitle">Hoş geldin!</h2>
-        <p class="welcome-card__message" id="welcomeMessage">
-          İyi haftalar, bol şans! ✨
-        </p>
+
+        <div class="welcome-card__content">
+          <span class="welcome-card__eyebrow">Hoş geldin</span>
+          <h2 class="welcome-card__title" id="welcomeTitle">Hoş geldin!</h2>
+          <p class="welcome-card__message" id="welcomeMessage">
+            İyi haftalar, bol şans! ✨
+          </p>
+        </div>
+
+        <div class="welcome-card__stats" aria-hidden="true">
+          <span>⚽ Tahmin</span>
+          <span>🏆 Şampiyonluk</span>
+          <span>🔥 Rekabet</span>
+        </div>
+
         <button
           type="button"
           class="secondary welcome-card__close"
           id="welcomeCloseBtn"
         >
-          Kapat
+          Arenaya Gir
         </button>
       </div>
     </div>
 
     <div class="leader-toast" id="leaderToast"></div>
+    <div class="app-toast-stack" id="appToastStack" aria-live="polite" aria-atomic="false"></div>
 
     <div class="app-modal hidden" id="appModal">
       <div class="app-modal-card">

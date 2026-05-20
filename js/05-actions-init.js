@@ -48,7 +48,8 @@ function renderCurrentTabOnly(
       break;
 
     case "notifications":
-      if (typeof renderNotificationCenter === "function") renderNotificationCenter();
+      if (typeof renderNotificationCenter === "function")
+        renderNotificationCenter();
       break;
 
     case "logs":
@@ -586,12 +587,17 @@ function addMatch() {
       detail: `${homeTeam} - ${awayTeam} maçı eklendi (${season?.name || "Sezon"}, ${week?.number || "?"}. hafta)`,
       entityType: "match",
       entityId: newMatch.id,
-      newValue: { homeTeam, awayTeam, date, season: season?.name || "", weekNo: week?.number || "" },
+      newValue: {
+        homeTeam,
+        awayTeam,
+        date,
+        season: season?.name || "",
+        weekNo: week?.number || "",
+      },
     });
   }
   renderAll();
 }
-
 
 function setWelcomeSettingsStatus(message, type = "") {
   const el = document.getElementById("welcomeSettingsStatus");
@@ -605,9 +611,12 @@ function readWelcomeSettingsForm() {
   return normalizeWelcomeCardSettings({
     enabled: document.getElementById("welcomeEnabled")?.checked ?? true,
     title: document.getElementById("welcomeTitleInput")?.value || "Hoş geldin!",
-    message: document.getElementById("welcomeMessageInput")?.value || "İyi haftalar, bol şans! ✨",
+    message:
+      document.getElementById("welcomeMessageInput")?.value ||
+      "İyi haftalar, bol şans! ✨",
     imageFile: document.getElementById("welcomeImageInput")?.value || "",
-    imageFit: document.getElementById("welcomeImageFitSelect")?.value || "cover",
+    imageFit:
+      document.getElementById("welcomeImageFitSelect")?.value || "cover",
     showOnce: document.getElementById("welcomeShowOnce")?.checked ?? false,
     updatedAt: state.settings?.welcomeCard?.updatedAt || "",
   });
@@ -622,7 +631,8 @@ function updateWelcomeSettingsPreview(config = readWelcomeSettingsForm()) {
     image.classList.toggle("is-cover", config.imageFit !== "contain");
   }
   if (title) title.textContent = config.title || "Hoş geldin!";
-  if (message) message.textContent = config.message || "İyi haftalar, bol şans! ✨";
+  if (message)
+    message.textContent = config.message || "İyi haftalar, bol şans! ✨";
   if (image) {
     const src = getWelcomeImageSrc(config.imageFile);
     image.src = src || "";
@@ -638,7 +648,8 @@ function renderWelcomeSettingsPanel() {
   const image = document.getElementById("welcomeImageInput");
   const imageFit = document.getElementById("welcomeImageFitSelect");
   const showOnce = document.getElementById("welcomeShowOnce");
-  if (!enabled || !title || !message || !image || !imageFit || !showOnce) return;
+  if (!enabled || !title || !message || !image || !imageFit || !showOnce)
+    return;
   enabled.checked = config.enabled;
   title.value = config.title;
   message.value = config.message;
@@ -657,14 +668,24 @@ async function saveWelcomeSettingsFromPanel() {
   state.settings.welcomeCard = config;
   saveState(true);
   try {
-    if (typeof firebaseUpdate === "function" && typeof isFirebaseReady === "function" && isFirebaseReady()) {
-      await firebaseUpdate("settings", { welcomeCard: config, updatedAt: new Date().toISOString() });
+    if (
+      typeof firebaseUpdate === "function" &&
+      typeof isFirebaseReady === "function" &&
+      isFirebaseReady()
+    ) {
+      await firebaseUpdate("settings", {
+        welcomeCard: config,
+        updatedAt: new Date().toISOString(),
+      });
     }
     renderWelcomeSettingsPanel();
     setWelcomeSettingsStatus("Karşılama kartı ayarları kaydedildi.", "success");
   } catch (error) {
     console.error("Karşılama kartı kaydetme hatası:", error);
-    setWelcomeSettingsStatus("Yerel kayıt alındı ama Firebase'e yazılamadı.", "error");
+    setWelcomeSettingsStatus(
+      "Yerel kayıt alındı ama Firebase'e yazılamadı.",
+      "error",
+    );
   }
 }
 
@@ -677,7 +698,14 @@ function previewWelcomeSettingsFromPanel() {
 function switchTab(tabName, options = {}) {
   if (
     getCurrentRole() !== "admin" &&
-    ["backup", "notifications", "seasons", "weeks", "matches", "settings"].includes(tabName)
+    [
+      "backup",
+      "notifications",
+      "seasons",
+      "weeks",
+      "matches",
+      "settings",
+    ].includes(tabName)
   ) {
     tabName = "dashboard";
   }
@@ -727,7 +755,6 @@ function switchTab(tabName, options = {}) {
   closeLandscapeSidebar();
   saveState(true);
 }
-
 
 function formatBackupDateStamp() {
   return new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
@@ -807,13 +834,22 @@ function isSeasonRelatedBackupRecord(item = {}, ctx = {}) {
   const seasonName = normalizeText(ctx.seasonName || "");
   const matchIds = ctx.matchIds || new Set();
   const weekIds = ctx.weekIds || new Set();
-  const itemSeasonId = normalizeText(item.seasonId || item.localSeasonId || item.sezonId || "");
-  const itemSeasonName = normalizeText(item.season || item.sezon || item.seasonName || "");
-  const itemMatchId = String(item.matchId || item.localMatchId || item.macId || "").trim();
-  const itemWeekId = String(item.weekId || item.localWeekId || item.haftaId || "").trim();
+  const itemSeasonId = normalizeText(
+    item.seasonId || item.localSeasonId || item.sezonId || "",
+  );
+  const itemSeasonName = normalizeText(
+    item.season || item.sezon || item.seasonName || "",
+  );
+  const itemMatchId = String(
+    item.matchId || item.localMatchId || item.macId || "",
+  ).trim();
+  const itemWeekId = String(
+    item.weekId || item.localWeekId || item.haftaId || "",
+  ).trim();
 
   if (seasonId && itemSeasonId && itemSeasonId === seasonId) return true;
-  if (seasonName && itemSeasonName && itemSeasonName === seasonName) return true;
+  if (seasonName && itemSeasonName && itemSeasonName === seasonName)
+    return true;
   if (itemMatchId && matchIds.has(itemMatchId)) return true;
   if (itemWeekId && weekIds.has(itemWeekId)) return true;
   return false;
@@ -822,18 +858,27 @@ function isSeasonRelatedBackupRecord(item = {}, ctx = {}) {
 async function buildFirebaseSeasonBackupData(season, appStateData = null) {
   if (!season || !isFirebaseReady()) return null;
 
-  const [settings, users, matches, predictions, predictionLogs, auditLogs, notificationLogs, queue, sent] =
-    await Promise.all([
-      firebaseRead("settings").catch(() => null),
-      firebaseRead("users").catch(() => null),
-      firebaseRead("matches").catch(() => null),
-      firebaseRead("predictions").catch(() => null),
-      firebaseRead("predictionLogs").catch(() => null),
-      firebaseRead("settings/auditLogs").catch(() => null),
-      firebaseRead("notificationLogs").catch(() => null),
-      firebaseRead("adminNotificationQueue").catch(() => null),
-      firebaseRead("sentNotifications").catch(() => null),
-    ]);
+  const [
+    settings,
+    users,
+    matches,
+    predictions,
+    predictionLogs,
+    auditLogs,
+    notificationLogs,
+    queue,
+    sent,
+  ] = await Promise.all([
+    firebaseRead("settings").catch(() => null),
+    firebaseRead("users").catch(() => null),
+    firebaseRead("matches").catch(() => null),
+    firebaseRead("predictions").catch(() => null),
+    firebaseRead("predictionLogs").catch(() => null),
+    firebaseRead("settings/auditLogs").catch(() => null),
+    firebaseRead("notificationLogs").catch(() => null),
+    firebaseRead("adminNotificationQueue").catch(() => null),
+    firebaseRead("sentNotifications").catch(() => null),
+  ]);
 
   const localMatches = getMatchesBySeasonId(season.id);
   const localWeeks = getWeeksBySeasonId(season.id);
@@ -847,7 +892,9 @@ async function buildFirebaseSeasonBackupData(season, appStateData = null) {
   const remoteMatches = backupMapToArray(matches).filter((item) =>
     isSeasonRelatedBackupRecord(item, ctx),
   );
-  remoteMatches.forEach((match) => ctx.matchIds.add(String(match.id || match._firebaseKey || "")));
+  remoteMatches.forEach((match) =>
+    ctx.matchIds.add(String(match.id || match._firebaseKey || "")),
+  );
 
   const remotePredictions = backupMapToArray(predictions).filter((item) =>
     isSeasonRelatedBackupRecord(item, ctx),
@@ -855,7 +902,9 @@ async function buildFirebaseSeasonBackupData(season, appStateData = null) {
 
   const usedPlayerIds = new Set(
     remotePredictions
-      .map((pred) => String(pred.playerId || pred.kullaniciId || pred.userId || ""))
+      .map((pred) =>
+        String(pred.playerId || pred.kullaniciId || pred.userId || ""),
+      )
       .filter(Boolean),
   );
 
@@ -868,16 +917,21 @@ async function buildFirebaseSeasonBackupData(season, appStateData = null) {
     return Object.prototype.hasOwnProperty.call(seasonStates, season.id);
   });
 
-  const filterMap = (map) => backupMapToArray(map).filter((item) => isSeasonRelatedBackupRecord(item, ctx));
+  const filterMap = (map) =>
+    backupMapToArray(map).filter((item) =>
+      isSeasonRelatedBackupRecord(item, ctx),
+    );
 
   return {
     exportedFromFirebaseAt: new Date().toISOString(),
     appState: appStateData ? serializeStateForBackup(appStateData) : null,
     settings: {
       seasonsMeta: Array.isArray(settings?.seasonsMeta)
-        ? settings.seasonsMeta.filter((item) =>
-            normalizeText(item.id || "") === normalizeText(season.id || "") ||
-            normalizeText(item.name || "") === normalizeText(season.name || ""),
+        ? settings.seasonsMeta.filter(
+            (item) =>
+              normalizeText(item.id || "") === normalizeText(season.id || "") ||
+              normalizeText(item.name || "") ===
+                normalizeText(season.name || ""),
           )
         : [],
     },
@@ -897,10 +951,14 @@ async function buildSeasonBackupPayload(seasonId) {
   if (!season) return null;
 
   const weeks = getWeeksBySeasonId(season.id);
-  const teams = state.teams.filter((team) => String(team.seasonId) === String(season.id));
+  const teams = state.teams.filter(
+    (team) => String(team.seasonId) === String(season.id),
+  );
   const matches = getMatchesBySeasonId(season.id);
   const matchIds = new Set(matches.map((match) => String(match.id)));
-  const predictions = state.predictions.filter((pred) => matchIds.has(String(pred.matchId)));
+  const predictions = state.predictions.filter((pred) =>
+    matchIds.has(String(pred.matchId)),
+  );
   const players = state.players.map((player) => ({ ...player }));
 
   const localData = {
@@ -924,7 +982,11 @@ async function buildSeasonBackupPayload(seasonId) {
     app: "super-lig-tahmin-paneli",
     version: 2,
     exportedAt: new Date().toISOString(),
-    season: { id: season.id, name: season.name, leagueName: season.leagueName || "" },
+    season: {
+      id: season.id,
+      name: season.name,
+      leagueName: season.leagueName || "",
+    },
     firebaseData: await buildFirebaseSeasonBackupData(season, localData),
   };
 }
@@ -946,17 +1008,29 @@ async function restoreFirebaseSeasonBackupData(firebaseData) {
     writeRows("predictionLogs", firebaseData.predictionLogs || []),
     writeRows("settings/auditLogs", firebaseData.auditLogs || []),
     writeRows("notificationLogs", firebaseData.notificationLogs || []),
-    writeRows("adminNotificationQueue", firebaseData.adminNotificationQueue || []),
+    writeRows(
+      "adminNotificationQueue",
+      firebaseData.adminNotificationQueue || [],
+    ),
     writeRows("sentNotifications", firebaseData.sentNotifications || []),
   ]);
 
   const seasonsMeta = firebaseData.settings?.seasonsMeta || [];
   if (seasonsMeta.length) {
-    const currentSettings = (await firebaseRead("settings").catch(() => null)) || {};
-    const currentMeta = Array.isArray(currentSettings.seasonsMeta) ? currentSettings.seasonsMeta : [];
-    const metaMap = new Map(currentMeta.map((item) => [String(item.id || item.name), item]));
-    seasonsMeta.forEach((item) => metaMap.set(String(item.id || item.name), item));
-    await firebaseUpdate("settings", { seasonsMeta: Array.from(metaMap.values()) });
+    const currentSettings =
+      (await firebaseRead("settings").catch(() => null)) || {};
+    const currentMeta = Array.isArray(currentSettings.seasonsMeta)
+      ? currentSettings.seasonsMeta
+      : [];
+    const metaMap = new Map(
+      currentMeta.map((item) => [String(item.id || item.name), item]),
+    );
+    seasonsMeta.forEach((item) =>
+      metaMap.set(String(item.id || item.name), item),
+    );
+    await firebaseUpdate("settings", {
+      seasonsMeta: Array.from(metaMap.values()),
+    });
   }
 
   return true;
@@ -974,7 +1048,9 @@ function mergeSeasonBackupIntoState(payload) {
   const next = serializeStateForBackup(state);
   const seasonId = String(season.id);
   const incomingMatches = incoming.matches || [];
-  const incomingMatchIds = new Set(incomingMatches.map((match) => String(match.id)));
+  const incomingMatchIds = new Set(
+    incomingMatches.map((match) => String(match.id)),
+  );
 
   next.seasons = [
     ...(next.seasons || []).filter((item) => String(item.id) !== seasonId),
@@ -997,24 +1073,37 @@ function mergeSeasonBackupIntoState(payload) {
   incomingMatchIds.forEach((id) => removedMatchIds.add(id));
 
   next.matches = [
-    ...(next.matches || []).filter((match) => String(match.seasonId) !== seasonId),
+    ...(next.matches || []).filter(
+      (match) => String(match.seasonId) !== seasonId,
+    ),
     ...incomingMatches,
   ];
   next.predictions = [
-    ...(next.predictions || []).filter((pred) => !removedMatchIds.has(String(pred.matchId))),
+    ...(next.predictions || []).filter(
+      (pred) => !removedMatchIds.has(String(pred.matchId)),
+    ),
     ...(incoming.predictions || []),
   ];
 
-  const playerMap = new Map((next.players || []).map((player) => [String(player.id), player]));
+  const playerMap = new Map(
+    (next.players || []).map((player) => [String(player.id), player]),
+  );
   (incoming.players || []).forEach((player) => {
     if (!player?.id) return;
-    playerMap.set(String(player.id), { ...(playerMap.get(String(player.id)) || {}), ...player });
+    playerMap.set(String(player.id), {
+      ...(playerMap.get(String(player.id)) || {}),
+      ...player,
+    });
   });
   next.players = Array.from(playerMap.values());
 
   next.settings = { ...(next.settings || {}) };
   next.settings.activeSeasonId = seasonId;
-  next.settings.activeWeekId = incoming.settings?.activeWeekId || (incoming.weeks || [])[0]?.id || next.settings.activeWeekId || null;
+  next.settings.activeWeekId =
+    incoming.settings?.activeWeekId ||
+    (incoming.weeks || [])[0]?.id ||
+    next.settings.activeWeekId ||
+    null;
   next.settings.celebratedChampions = {
     ...(next.settings.celebratedChampions || {}),
     ...(incoming.settings?.celebratedChampions || {}),
@@ -1022,7 +1111,6 @@ function mergeSeasonBackupIntoState(payload) {
 
   return next;
 }
-
 
 async function syncBackupStateToFirebase(stateObj) {
   if (!isFirebaseReady()) return true;
@@ -1200,7 +1288,10 @@ async function importData(file) {
 
       if (parsed?.type === "full-backup" && parsed?.data) {
         nextState = parsed.data;
-      } else if (parsed?.type === "season-full-backup" && (parsed?.firebaseData?.appState || parsed?.data)) {
+      } else if (
+        parsed?.type === "season-full-backup" &&
+        (parsed?.firebaseData?.appState || parsed?.data)
+      ) {
         nextState = mergeSeasonBackupIntoState(parsed);
       } else if (
         parsed?.seasons ||
@@ -1213,8 +1304,11 @@ async function importData(file) {
         throw new Error("Geçersiz yedek formatı.");
       }
 
-      const isSeasonFullBackup = parsed?.type === "season-full-backup" && parsed?.firebaseData;
-      await applyImportedState(nextState, { syncFirebase: !isSeasonFullBackup });
+      const isSeasonFullBackup =
+        parsed?.type === "season-full-backup" && parsed?.firebaseData;
+      await applyImportedState(nextState, {
+        syncFirebase: !isSeasonFullBackup,
+      });
       if (isSeasonFullBackup) {
         await restoreFirebaseSeasonBackupData(parsed.firebaseData);
       }
@@ -1250,7 +1344,10 @@ function renderBackupPanel() {
 
   if (seasonSelect) {
     const selectedSeasonId =
-      seasonSelect.value || state.settings.activeSeasonId || state.seasons?.[0]?.id || "";
+      seasonSelect.value ||
+      state.settings.activeSeasonId ||
+      state.seasons?.[0]?.id ||
+      "";
     seasonSelect.innerHTML = state.seasons?.length
       ? state.seasons
           .map(
@@ -1260,15 +1357,23 @@ function renderBackupPanel() {
           .join("")
       : '<option value="">Sezon bulunamadı</option>';
 
-    const backupSeason = selectedSeasonId ? getSeasonById(selectedSeasonId) : null;
-    const seasonMatches = backupSeason ? getMatchesBySeasonId(backupSeason.id) : [];
+    const backupSeason = selectedSeasonId
+      ? getSeasonById(selectedSeasonId)
+      : null;
+    const seasonMatches = backupSeason
+      ? getMatchesBySeasonId(backupSeason.id)
+      : [];
     const seasonWeeks = backupSeason ? getWeeksBySeasonId(backupSeason.id) : [];
-    const seasonMatchIds = new Set(seasonMatches.map((match) => String(match.id)));
+    const seasonMatchIds = new Set(
+      seasonMatches.map((match) => String(match.id)),
+    );
     const seasonPredictionCount = state.predictions.filter((pred) =>
       seasonMatchIds.has(String(pred.matchId)),
     ).length;
     const seasonTeamCount = backupSeason
-      ? state.teams.filter((team) => String(team.seasonId) === String(backupSeason.id)).length
+      ? state.teams.filter(
+          (team) => String(team.seasonId) === String(backupSeason.id),
+        ).length
       : 0;
 
     if (seasonSummary) {
@@ -2308,7 +2413,8 @@ function bindEvents() {
   on("pullLeagueStandingsBtn", "click", pullLeagueStandingsFromCurrentResults);
   on("leagueStandingsModalClose", "click", closeLeagueStandingsModal);
   on("leagueStandingsModal", "click", (event) => {
-    if (event.target?.id === "leagueStandingsModal") closeLeagueStandingsModal();
+    if (event.target?.id === "leagueStandingsModal")
+      closeLeagueStandingsModal();
   });
   on("toggleShareModeBtn", "click", togglePredictionShareMode);
   document.addEventListener("click", (event) => {
@@ -2331,7 +2437,14 @@ function bindEvents() {
   on("resetBtn", "click", handleDangerousReset);
   on("saveWelcomeSettingsBtn", "click", saveWelcomeSettingsFromPanel);
   on("previewWelcomeSettingsBtn", "click", previewWelcomeSettingsFromPanel);
-  ["welcomeEnabled", "welcomeTitleInput", "welcomeMessageInput", "welcomeImageInput", "welcomeImageFitSelect", "welcomeShowOnce"].forEach((id) => {
+  [
+    "welcomeEnabled",
+    "welcomeTitleInput",
+    "welcomeMessageInput",
+    "welcomeImageInput",
+    "welcomeImageFitSelect",
+    "welcomeShowOnce",
+  ].forEach((id) => {
     on(id, "input", () => updateWelcomeSettingsPreview());
     on(id, "change", () => updateWelcomeSettingsPreview());
   });
@@ -2450,7 +2563,7 @@ function bindEvents() {
   ].forEach((id) => {
     on(id, "change", (e) => setActiveWeek(e.target.value));
   });
- on("backupSeasonSelect", "change", () => {
+  on("backupSeasonSelect", "change", () => {
     renderBackupPanel();
   });
 }
@@ -2564,9 +2677,7 @@ let appResumeRefreshPromise = null;
 let appWasHiddenAt = 0;
 let appLastResumeRefreshAt = 0;
 
-function logAppResumeRefresh(step, details = {}) {
-
-}
+function logAppResumeRefresh(step, details = {}) {}
 
 async function runAppResumeRefresh(reason = "visible") {
   if (!isAuthenticated()) {
@@ -2789,6 +2900,41 @@ let dashboardClockRefreshTimer = null;
 let dashboardClockRefreshBusy = false;
 let dashboardClockLastPhaseMap = new Map();
 
+function getPremiumMatchState(match) {
+  const now = Date.now();
+  const visual = typeof getMatchVisualState === "function"
+    ? getMatchVisualState(match)
+    : "waiting";
+  const runtime = typeof getMatchRuntimeInfo === "function"
+    ? getMatchRuntimeInfo(match, now)
+    : { diffMs: null, elapsedMs: null, minute: null, phase: visual };
+  const diff = runtime.diffMs;
+  const countdown = diff !== null && diff > 0
+    ? formatPredictionLockCountdown(diff)
+    : "00sa 00dk 00sn";
+
+  if (match?.played || visual === "played" || visual === "played-postponed") {
+    return { phase: visual, label: "BİTTİ", kicker: "FULL TIME" };
+  }
+
+  if (visual === "finished-time") {
+    return { phase: visual, label: "BİTTİ", kicker: "SONUÇ BEKLİYOR" };
+  }
+
+  if (visual === "live") {
+    const liveMinute = runtime.minute
+      ? `${runtime.minute}'`
+      : (String(match?.statusText || "Canlı").replace(/live|in play/gi, "").trim() || "Canlı");
+    return { phase: visual, label: "CANLI", kicker: liveMinute };
+  }
+
+  if (visual === "locked") {
+    return { phase: visual, label: "KİLİTLİ", kicker: countdown };
+  }
+
+  return { phase: visual, label: "BEKLİYOR", kicker: countdown };
+}
+
 function startDashboardClockRefresh() {
   if (dashboardClockRefreshTimer) return;
 
@@ -2804,27 +2950,31 @@ function startDashboardClockRefresh() {
     try {
       let needsFullRender = false;
 
-      container.querySelectorAll(".premium-match-card[data-match-id]").forEach((card) => {
-        const matchId = card.dataset.matchId;
-        const match = state.matches.find((item) => String(item.id) === String(matchId));
-        if (!match) return;
+      container
+        .querySelectorAll(".premium-match-card[data-match-id]")
+        .forEach((card) => {
+          const matchId = card.dataset.matchId;
+          const match = state.matches.find(
+            (item) => String(item.id) === String(matchId),
+          );
+          if (!match) return;
 
-        const premium = getPremiumMatchState(match);
-        const countdownEl = card.querySelector(".premium-countdown strong");
+          const premium = getPremiumMatchState(match);
+          const countdownEl = card.querySelector("[data-countdown-text], .premium-countdown strong");
 
-        if (countdownEl) {
-          countdownEl.textContent = premium.kicker || "";
-        }
+          if (countdownEl) {
+            countdownEl.textContent = premium.kicker || "";
+          }
 
-        const oldPhase = dashboardClockLastPhaseMap.get(matchId);
-        const newPhase = premium.phase || premium.label || "";
+          const oldPhase = dashboardClockLastPhaseMap.get(matchId);
+          const newPhase = premium.phase || premium.label || "";
 
-        if (oldPhase && oldPhase !== newPhase) {
-          needsFullRender = true;
-        }
+          if (oldPhase && oldPhase !== newPhase) {
+            needsFullRender = true;
+          }
 
-        dashboardClockLastPhaseMap.set(matchId, newPhase);
-      });
+          dashboardClockLastPhaseMap.set(matchId, newPhase);
+        });
 
       if (needsFullRender) {
         renderDashboardOverview();
