@@ -2784,3 +2784,27 @@ document.addEventListener("keydown", (e) => {
 
   document.body.classList.toggle("standings-shot-mode");
 });
+
+let dashboardClockRefreshTimer = null;
+let dashboardClockRefreshBusy = false;
+
+function startDashboardClockRefresh() {
+  if (dashboardClockRefreshTimer) return;
+  dashboardClockRefreshTimer = setInterval(() => {
+    if (dashboardClockRefreshBusy) return;
+    if ((state.settings.currentTab || "dashboard") !== "dashboard") return;
+    const container = document.getElementById("dashboardMatches");
+    if (!container) return;
+    dashboardClockRefreshBusy = true;
+    try {
+      renderDashboardOverview();
+      renderMatches("dashboardMatches", state.settings.activeWeekId);
+    } catch (error) {
+      console.warn("Dashboard saat yenileme hatası:", error);
+    } finally {
+      dashboardClockRefreshBusy = false;
+    }
+  }, 15000);
+}
+
+startDashboardClockRefresh();

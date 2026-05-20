@@ -96,7 +96,8 @@ option {
 
 .app-shell {
   display: grid;
-  grid-template-columns: clamp(180px, 19vw, 205px) minmax(0, 1fr);  min-height: 100vh;
+  grid-template-columns: clamp(180px, 19vw, 205px) minmax(0, 1fr);
+  min-height: 100vh;
   align-items: start;
 }
 
@@ -192,7 +193,7 @@ option {
   display: inline-flex;
   justify-content: center;
   font-size: 15px;
-  opacity: .92;
+  opacity: 0.92;
   flex-shrink: 0;
 }
 .nav-tab.active {
@@ -624,7 +625,6 @@ option {
 }
 
 .score-inputs input {
-
   width: 48px;
   height: 32px;
   text-align: center;
@@ -636,7 +636,7 @@ option {
 }
 
 .compact-inputs input {
-  width: 443px ;
+  width: 443px;
   height: 30px;
 }
 
@@ -2106,18 +2106,20 @@ input[type="number"] {
     padding: 8px;
     border-radius: 26px;
 
-    background:
-      linear-gradient(180deg, rgba(15, 23, 42, .86), rgba(2, 6, 23, .94));
-    border: 1px solid rgba(255,255,255,.13);
+    background: linear-gradient(
+      180deg,
+      rgba(15, 23, 42, 0.86),
+      rgba(2, 6, 23, 0.94)
+    );
+    border: 1px solid rgba(255, 255, 255, 0.13);
 
     box-shadow:
-      0 18px 45px rgba(0,0,0,.48),
-      inset 0 1px 0 rgba(255,255,255,.10);
+      0 18px 45px rgba(0, 0, 0, 0.48),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
 
     backdrop-filter: blur(18px) saturate(130%);
     -webkit-backdrop-filter: blur(18px) saturate(130%);
   }
-
 
   .content {
     padding-bottom: 108px;
@@ -2802,7 +2804,6 @@ input[type="number"] {
 }
 
 .pred-status-slot {
-
   min-height: 24px;
   width: 100%;
   display: flex;
@@ -2811,7 +2812,6 @@ input[type="number"] {
 }
 
 .pred-status-slot .prediction-status-chip {
-  
   min-height: 24px;
   width: min(100%, 190px);
   max-width: min(100%, 190px);
@@ -4551,7 +4551,6 @@ textarea {
   touch-action: pan-x pan-y;
   -webkit-overflow-scrolling: touch;
   scrollbar-gutter: stable both-edges;
-
 }
 
 .predictions-scroll-shell.is-dragging {
@@ -6772,8 +6771,7 @@ body.login-locked {
   line-height: 1.45;
 }
 
-.dashboard-match-meta-pills
- {
+.dashboard-match-meta-pills {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -6786,8 +6784,6 @@ body.login-locked {
   color: #e6f0ff;
   font-size: 12px;
 }
-
-
 
 .dashboard-detail-modal.hidden {
   display: none;
@@ -7140,7 +7136,6 @@ body.dashboard-modal-open {
 #tab-dashboard .dashboard-stats-grid--compact,
 #tab-dashboard .stats-grid {
   display: none !important;
-
 }
 
 #tab-dashboard .stat-card {
@@ -7279,8 +7274,6 @@ body.dashboard-modal-open {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-
-
 
 .dashboard-detail-sheet {
   width: min(700px, calc(100vw - 20px));
@@ -7423,7 +7416,6 @@ body.dashboard-modal-open {
     padding: 4px 7px;
     font-size: 10px;
   }
-
 }
 
 /* === Dashboard Full Redesign === */
@@ -8202,7 +8194,6 @@ body.dashboard-modal-open {
   min-height: 30px;
 }
 
-
 .dashboard-pulse-item,
 .dashboard-leader-row {
   min-height: 58px;
@@ -8325,7 +8316,6 @@ body.dashboard-modal-open {
     font-size: 16px;
   }
 
-
   .dashboard-match-insight {
     min-height: 0;
     margin-bottom: 6px;
@@ -8347,8 +8337,6 @@ body.dashboard-modal-open {
   .dashboard-match-card__footer {
     position: relative;
   }
-
-
 
   .dashboard-coverage-badge {
     margin: 0 !important;
@@ -10694,8 +10682,12 @@ body.dashboard-modal-open {
   text-align: center;
   gap: 20px;
   background:
-    radial-gradient(circle at 50% 18%, rgba(56, 228, 212, 0.16), transparent 30%),
-    radial-gradient(circle at 0% 0%, rgba(250, 204, 21, 0.10), transparent 28%),
+    radial-gradient(
+      circle at 50% 18%,
+      rgba(56, 228, 212, 0.16),
+      transparent 30%
+    ),
+    radial-gradient(circle at 0% 0%, rgba(250, 204, 21, 0.1), transparent 28%),
     linear-gradient(180deg, rgba(7, 26, 52, 0.96), rgba(3, 13, 30, 0.98));
   border: 1px solid rgba(122, 213, 255, 0.22);
   box-shadow:
@@ -10777,7 +10769,6 @@ body.dashboard-modal-open {
   font-size: clamp(1.08rem, 2.9vw, 1.45rem);
   line-height: 1.45;
   text-wrap: balance;
-
 }
 
 @media (max-width: 640px) {
@@ -13495,7 +13486,6 @@ body[data-role="user"] #tab-players .page-header p {
     max-width: 100% !important;
     margin: 0 auto !important;
     position: relative !important;
-    
   }
 
   #tab-predictions .pred-score-row {
@@ -15245,7 +15235,11 @@ body[data-role="user"] #tab-players .page-header p {
   width: 260px;
   height: 260px;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(245, 158, 11, 0.24), transparent 68%);
+  background: radial-gradient(
+    circle,
+    rgba(245, 158, 11, 0.24),
+    transparent 68%
+  );
   pointer-events: none;
 }
 
@@ -15540,7 +15534,11 @@ body[data-role="user"] #tab-players .page-header p {
   #tab-logs .prediction-log-filters,
   #tab-logs .prediction-log-mobile-card,
   #tab-logs .prediction-log-empty {
-    background: linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(8, 14, 25, 0.96)) !important;
+    background: linear-gradient(
+      180deg,
+      rgba(15, 23, 42, 0.96),
+      rgba(8, 14, 25, 0.96)
+    ) !important;
     border-color: rgba(148, 163, 184, 0.22) !important;
     color: #f8fafc !important;
     box-shadow: 0 18px 38px rgba(2, 6, 23, 0.22);
@@ -15609,9 +15607,6 @@ body[data-role="user"] #tab-players .page-header p {
     color: #fde68a !important;
     background: rgba(245, 158, 11, 0.18) !important;
   }
-
-
-
 }
 
 /* Fair Play / Gizli Tahmin sistemi */
@@ -15621,7 +15616,11 @@ body[data-role="user"] #tab-players .page-header p {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(145deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.88)) !important;
+  background: linear-gradient(
+    145deg,
+    rgba(15, 23, 42, 0.96),
+    rgba(30, 41, 59, 0.88)
+  ) !important;
   border-color: rgba(148, 163, 184, 0.18) !important;
 }
 
@@ -15630,7 +15629,13 @@ body[data-role="user"] #tab-players .page-header p {
   min-height: 74px;
   border-radius: 18px;
   border: 1px solid rgba(148, 163, 184, 0.22);
-  background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.13), transparent 40%), rgba(2, 6, 23, 0.48);
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(56, 189, 248, 0.13),
+      transparent 40%
+    ),
+    rgba(2, 6, 23, 0.48);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -15669,7 +15674,11 @@ body[data-role="user"] #tab-players .page-header p {
   padding: 10px 12px;
   border-radius: 16px;
   border: 1px solid rgba(96, 165, 250, 0.22);
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(15, 23, 42, 0.72));
+  background: linear-gradient(
+    135deg,
+    rgba(14, 165, 233, 0.12),
+    rgba(15, 23, 42, 0.72)
+  );
   color: #dbeafe;
   font-size: 11px;
   font-weight: 900;
@@ -16027,7 +16036,11 @@ body[data-role="user"] #tab-players .page-header p {
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 28px;
-  background: linear-gradient(145deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.96));
+  background: linear-gradient(
+    145deg,
+    rgba(15, 23, 42, 0.98),
+    rgba(30, 41, 59, 0.96)
+  );
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.38);
 }
 
@@ -16196,8 +16209,14 @@ body[data-role="user"] #tab-players .page-header p {
   min-height: 46px;
   padding: 0 18px;
   border-radius: 999px;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(147, 197, 253, 0.18);
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.96), rgba(14, 165, 233, 0.92));
+  box-shadow:
+    0 16px 36px rgba(0, 0, 0, 0.34),
+    0 0 0 1px rgba(147, 197, 253, 0.18);
+  background: linear-gradient(
+    135deg,
+    rgba(37, 99, 235, 0.96),
+    rgba(14, 165, 233, 0.92)
+  );
   color: #ffffff;
   font-weight: 900;
 }
@@ -16329,9 +16348,10 @@ body[data-role="user"] #tab-players .page-header p {
   }
 }
 
-
 /* Karşılama kartı ayarları */
-.welcome-settings-card { overflow: hidden; }
+.welcome-settings-card {
+  overflow: hidden;
+}
 .welcome-settings-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
@@ -16347,7 +16367,9 @@ body[data-role="user"] #tab-players .page-header p {
   border-radius: 16px;
   background: rgba(15, 23, 42, 0.35);
 }
-.toggle-row input { width: auto; }
+.toggle-row input {
+  width: auto;
+}
 .welcome-admin-preview-box {
   margin-top: 8px;
   padding: 18px;
@@ -16367,19 +16389,33 @@ body[data-role="user"] #tab-players .page-header p {
   background: rgba(2, 6, 23, 0.35);
   border-radius: 20px;
   margin-bottom: 14px;
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 .welcome-admin-preview-box img.is-contain,
-.welcome-card__media img.is-contain { object-fit: contain; }
+.welcome-card__media img.is-contain {
+  object-fit: contain;
+}
 .welcome-admin-preview-box img.is-cover,
-.welcome-card__media img.is-cover { object-fit: cover; }
-.welcome-card__media { width: 100%; }
-.welcome-card__close { margin-top: 14px; }
-.welcome-card:has(.welcome-card__media:not(.hidden)) .welcome-card__avatar { display: none; }
+.welcome-card__media img.is-cover {
+  object-fit: cover;
+}
+.welcome-card__media {
+  width: 100%;
+}
+.welcome-card__close {
+  margin-top: 14px;
+}
+.welcome-card:has(.welcome-card__media:not(.hidden)) .welcome-card__avatar {
+  display: none;
+}
 @media (max-width: 780px) {
-  .welcome-settings-grid { grid-template-columns: 1fr; }
+  .welcome-settings-grid {
+    grid-template-columns: 1fr;
+  }
   .welcome-admin-preview-box img,
-  .welcome-card__media img { max-height: 380px; }
+  .welcome-card__media img {
+    max-height: 380px;
+  }
 }
 #welcomeMessageInput {
   background: rgba(15, 23, 42, 0.92);
@@ -16413,7 +16449,8 @@ body[data-role="user"] #tab-players .page-header p {
 
 /* Poster/resim yavaş zoom */
 .welcome-overlay.is-visible .welcome-card__media img {
-  animation: welcomePosterZoom 2s ease-in-out infinite alternate;  transform-origin: center;
+  animation: welcomePosterZoom 2s ease-in-out infinite alternate;
+  transform-origin: center;
 }
 
 /* GS altın parıltı efekti */
@@ -16422,9 +16459,21 @@ body[data-role="user"] #tab-players .page-header p {
   position: absolute;
   inset: -40%;
   background:
-    radial-gradient(circle at 25% 20%, rgba(255, 214, 80, 0.24), transparent 18%),
-    radial-gradient(circle at 75% 30%, rgba(255, 40, 40, 0.18), transparent 16%),
-    radial-gradient(circle at 50% 85%, rgba(255, 190, 40, 0.18), transparent 20%);
+    radial-gradient(
+      circle at 25% 20%,
+      rgba(255, 214, 80, 0.24),
+      transparent 18%
+    ),
+    radial-gradient(
+      circle at 75% 30%,
+      rgba(255, 40, 40, 0.18),
+      transparent 16%
+    ),
+    radial-gradient(
+      circle at 50% 85%,
+      rgba(255, 190, 40, 0.18),
+      transparent 20%
+    );
   filter: blur(8px);
   opacity: 0.85;
   animation: welcomeGlowMove 6s ease-in-out infinite alternate;
@@ -16468,8 +16517,6 @@ body[data-role="user"] #tab-players .page-header p {
   animation: championMessageRise 900ms ease both;
 }
 
-
-
 .welcome-card__glow::after {
   animation-delay: 1.9s;
   opacity: 0.65;
@@ -16478,15 +16525,15 @@ body[data-role="user"] #tab-players .page-header p {
 
 /* Animasyonlar */
 @keyframes welcomeCardFloat {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0) scale(1);
   }
 
-50% {
-  transform: translateY(-3px);
-}
+  50% {
+    transform: translateY(-3px);
   }
-
+}
 
 @keyframes welcomePosterZoom {
   from {
@@ -16554,152 +16601,150 @@ body[data-role="user"] #tab-players .page-header p {
     height: 320px;
     width: 190px;
   }
-
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .welcome-card,
-    .welcome-card::before,
-    .welcome-card::after,
-    .welcome-card__media img,
-    .welcome-card__glow::before,
-    .welcome-card__glow::after,
-    .welcome-card__title,
-    .welcome-card__message {
-      animation: none !important;
-      transition: none !important;
-    }
-  }
-
-
-  /* Hoş geldin kartı - büyük kare profil görseli */
-  .welcome-card__avatar {
-    width: auto !important;
-    height: auto !important;
-  
-    padding: 0 !important;
-    margin: 0 auto !important;
-  
-    background: transparent !important;
-    border: 0 !important;
-    box-shadow: none !important;
-  
-    overflow: visible !important;
-  }
-  
-  .welcome-card__avatar .app-avatar {
-    width: 100% !important;
-    height: 100% !important;
-    border-radius: 24px !important;
-    overflow: hidden !important;
-    border: 3px solid rgba(255, 255, 255, 0.14) !important;
-  }
-  
-  .welcome-card__avatar .welcome-profile-image,
-  .welcome-card__avatar .app-avatar-image,
-  .welcome-card__avatar img {
-    width: 100% !important;
-    height: 100% !important;
-    object-fit: cover !important;
-    border-radius: 22px !important;
-  }
-  
-  .welcome-card__title {
-    font-size: clamp(2rem, 4.6vw, 2.8rem) !important;
-    line-height: 0.98 !important;
-    margin-top: 4px !important;
-  }
-  
+}
+@media (prefers-reduced-motion: reduce) {
+  .welcome-card,
+  .welcome-card::before,
+  .welcome-card::after,
+  .welcome-card__media img,
+  .welcome-card__glow::before,
+  .welcome-card__glow::after,
+  .welcome-card__title,
   .welcome-card__message {
-    font-size: clamp(0.95rem, 2.2vw, 1.08rem) !important;
-    line-height: 1.5 !important;
-    max-width: 360px !important;
+    animation: none !important;
+    transition: none !important;
   }
-  
-  @media (max-width: 640px) {
-    .welcome-card {
-      width: min(100%, 350px) !important;
-      min-height: auto !important;
-      padding: 20px 18px 24px !important;
-      gap: 16px !important;
-    }
-  
-    .welcome-card__avatar {
-      width: 285px !important;
-      height: 285px !important;
-      border-radius: 26px !important;
-    }
-  
-    .welcome-card__avatar .app-avatar,
-    .welcome-card__avatar .welcome-profile-image,
-    .welcome-card__avatar .app-avatar-image,
-    .welcome-card__avatar img {
-      border-radius: 20px !important;
-    }
-  
-    .welcome-card__title {
-      font-size: 2.15rem !important;
-    }
-  
-    .welcome-card__message {
-      font-size: 0.95rem !important;
-      max-width: 280px !important;
-    }
-  }/* ===== Hoş geldin kartı görselini tamamen temizle ===== */
+}
+
+/* Hoş geldin kartı - büyük kare profil görseli */
+.welcome-card__avatar {
+  width: auto !important;
+  height: auto !important;
+
+  padding: 0 !important;
+  margin: 0 auto !important;
+
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+
+  overflow: visible !important;
+}
+
+.welcome-card__avatar .app-avatar {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 24px !important;
+  overflow: hidden !important;
+  border: 3px solid rgba(255, 255, 255, 0.14) !important;
+}
+
+.welcome-card__avatar .welcome-profile-image,
+.welcome-card__avatar .app-avatar-image,
+.welcome-card__avatar img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  border-radius: 22px !important;
+}
+
+.welcome-card__title {
+  font-size: clamp(2rem, 4.6vw, 2.8rem) !important;
+  line-height: 0.98 !important;
+  margin-top: 4px !important;
+}
+
+.welcome-card__message {
+  font-size: clamp(0.95rem, 2.2vw, 1.08rem) !important;
+  line-height: 1.5 !important;
+  max-width: 360px !important;
+}
+
+@media (max-width: 640px) {
+  .welcome-card {
+    width: min(100%, 350px) !important;
+    min-height: auto !important;
+    padding: 20px 18px 24px !important;
+    gap: 16px !important;
+  }
 
   .welcome-card__avatar {
     width: 285px !important;
     height: 285px !important;
-    padding: 0 !important;
-    margin: 0 auto !important;
     border-radius: 26px !important;
-    background: transparent !important;
-    border: 0 !important;
-    box-shadow: none !important;
-    overflow: hidden !important;
   }
-  
-  .welcome-card__avatar::before,
-  .welcome-card__avatar .app-avatar::before,
-  .welcome-card__avatar .app-avatar::after {
-    display: none !important;
-    content: none !important;
-  }
-  
-  .welcome-card__avatar .app-avatar {
-    width: 100% !important;
-    height: 100% !important;
-    padding: 0 !important;
-    border: 0 !important;
-    border-radius: 26px !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    overflow: hidden !important;
-  }
-  
-  .welcome-card__avatar img,
+
+  .welcome-card__avatar .app-avatar,
+  .welcome-card__avatar .welcome-profile-image,
   .welcome-card__avatar .app-avatar-image,
-  .welcome-card__avatar .welcome-profile-image {
-    width: auto !important;
-    height: 330px !important;
-    max-width: 100% !important;
-  
-    display: block !important;
-    margin: 0 auto !important;
-  
-    object-fit: contain !important;
-    object-position: center center !important;
-  
-    border-radius: 50px !important;
-    border: 1px solid rgba(255,255,255,0.06) !important;
-  
-    box-shadow:
-      0 20px 45px rgba(0,0,0,0.34),
-      0 0 28px rgba(56,189,248,0.08) !important;
-  
-    background: transparent !important;
+  .welcome-card__avatar img {
+    border-radius: 20px !important;
   }
-  /* ===== tahminler kartı görselini tamamen temizle ===== */
-  /* TAHMİNLER - FINAL TEMİZ MAÇ KARTI */
+
+  .welcome-card__title {
+    font-size: 2.15rem !important;
+  }
+
+  .welcome-card__message {
+    font-size: 0.95rem !important;
+    max-width: 280px !important;
+  }
+} /* ===== Hoş geldin kartı görselini tamamen temizle ===== */
+
+.welcome-card__avatar {
+  width: 285px !important;
+  height: 285px !important;
+  padding: 0 !important;
+  margin: 0 auto !important;
+  border-radius: 26px !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+}
+
+.welcome-card__avatar::before,
+.welcome-card__avatar .app-avatar::before,
+.welcome-card__avatar .app-avatar::after {
+  display: none !important;
+  content: none !important;
+}
+
+.welcome-card__avatar .app-avatar {
+  width: 100% !important;
+  height: 100% !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 26px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+}
+
+.welcome-card__avatar img,
+.welcome-card__avatar .app-avatar-image,
+.welcome-card__avatar .welcome-profile-image {
+  width: auto !important;
+  height: 330px !important;
+  max-width: 100% !important;
+
+  display: block !important;
+  margin: 0 auto !important;
+
+  object-fit: contain !important;
+  object-position: center center !important;
+
+  border-radius: 50px !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+
+  box-shadow:
+    0 20px 45px rgba(0, 0, 0, 0.34),
+    0 0 28px rgba(56, 189, 248, 0.08) !important;
+
+  background: transparent !important;
+}
+/* ===== tahminler kartı görselini tamamen temizle ===== */
+/* TAHMİNLER - FINAL TEMİZ MAÇ KARTI */
 
 .focused-prediction-list {
   display: grid;
@@ -16715,7 +16760,7 @@ body[data-role="user"] #tab-players .page-header p {
   background-image: var(--match-scene-bg);
   background-size: cover;
   background-position: center;
-  box-shadow: 0 18px 38px rgba(0, 0, 0, .35);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.35);
   isolation: isolate;
 }
 
@@ -16723,7 +16768,7 @@ body[data-role="user"] #tab-players .page-header p {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: rgba(0,0,0,.12);
+  background: rgba(0, 0, 0, 0.12);
 }
 
 .prediction-scene-inner {
@@ -16754,7 +16799,7 @@ body[data-role="user"] #tab-players .page-header p {
 .prediction-scene-logo img,
 .prediction-scene-logo svg {
   width: 80px !important;
-  height: 80px  !important;
+  height: 80px !important;
   max-width: 80px !important;
   max-height: 80px !important;
   object-fit: contain;
@@ -16763,14 +16808,14 @@ body[data-role="user"] #tab-players .page-header p {
 .prediction-scene-logo {
   display: grid;
   place-items: center;
-  filter: drop-shadow(0 12px 18px rgba(0,0,0,.72));
+  filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.72));
 }
 
 .prediction-scene-team strong {
   max-width: 160px;
   padding: 7px 15px;
   border-radius: 999px;
-  background: rgba(0,0,0,.55);
+  background: rgba(0, 0, 0, 0.55);
   color: #fff;
   font-size: 15px;
   font-weight: 900;
@@ -16778,7 +16823,7 @@ body[data-role="user"] #tab-players .page-header p {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-shadow: 0 2px 8px rgba(0,0,0,.85);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
 }
 .prediction-glass-panel {
   background: transparent;
@@ -16792,22 +16837,21 @@ body[data-role="user"] #tab-players .page-header p {
 .prediction-score-control {
   padding: 8px 10px;
   border-radius: 22px;
-  background: rgba(5, 10, 18, .18);
+  background: rgba(5, 10, 18, 0.18);
   box-shadow:
-    0 12px 26px rgba(0,0,0,.26),
-    inset 0 1px 0 rgba(255,255,255,.08);
+    0 12px 26px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
 }
 
 .prediction-score-control span {
-  color: rgba(255,255,255,.95);
+  color: rgba(255, 255, 255, 0.95);
 
   font-size: 28px;
   font-weight: 900;
 
-  text-shadow:
-    0 0 12px rgba(255,255,255,.35);
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.35);
 }
 
 .prediction-scene-date {
@@ -16822,7 +16866,7 @@ body[data-role="user"] #tab-players .page-header p {
   color: #fff;
   font-size: 11px;
   font-weight: 950;
-  letter-spacing: .08em;
+  letter-spacing: 0.08em;
   line-height: 1;
   text-transform: uppercase;
 }
@@ -16850,7 +16894,7 @@ body[data-role="user"] #tab-players .page-header p {
   line-height: 46px;
   text-align: center;
   outline: none;
-  box-shadow: 0 6px 14px rgba(0,0,0,.38);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.38);
 }
 
 .prediction-score-control span {
@@ -16891,14 +16935,14 @@ body[data-role="user"] #tab-players .page-header p {
 }
 
 .prediction-scene-actions .focused-save-btn {
-  background: rgba(34, 197, 94, .9);
+  background: rgba(34, 197, 94, 0.9);
   color: #fff;
   font-size: 0 !important;
   text-indent: -9999px;
 }
 
 .prediction-scene-actions .focused-delete-btn {
-  background: rgba(239, 68, 68, .92);
+  background: rgba(239, 68, 68, 0.92);
   color: #fff;
 }
 
@@ -17009,7 +17053,7 @@ body[data-role="user"] #tab-players .page-header p {
 
   .prediction-scene-title {
     font-size: 9px;
-    letter-spacing: .05em;
+    letter-spacing: 0.05em;
   }
 
   .prediction-score-control {
@@ -17035,7 +17079,7 @@ body[data-role="user"] #tab-players .page-header p {
   .prediction-scene-badge {
     top: 9px;
     right: 9px;
-    transform: scale(.82);
+    transform: scale(0.82);
     transform-origin: top right;
   }
 }
@@ -17049,18 +17093,20 @@ body[data-role="user"] #tab-players .page-header p {
   max-width: calc(100% - 28px);
   padding: 7px 12px;
   border-radius: 999px;
-  background: rgba(15, 23, 42, .9);
+  background: rgba(15, 23, 42, 0.9);
   color: #fff;
   font-size: 11px;
   font-weight: 900;
   line-height: 1.15;
   text-align: center;
   white-space: nowrap;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, .28);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
   opacity: 0;
   pointer-events: none;
-  transform: translateX(-50%) translateY(8px) scale(.96);
-  transition: opacity .2s ease, transform .2s ease;
+  transform: translateX(-50%) translateY(8px) scale(0.96);
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 
 .prediction-card-toast.is-visible {
@@ -17069,19 +17115,19 @@ body[data-role="user"] #tab-players .page-header p {
 }
 
 .prediction-card-toast[data-toast-type="success"] {
-  background: rgba(22, 163, 74, .94);
+  background: rgba(22, 163, 74, 0.94);
 }
 
 .prediction-card-toast[data-toast-type="error"] {
-  background: rgba(220, 38, 38, .94);
+  background: rgba(220, 38, 38, 0.94);
 }
 
 .prediction-card-toast[data-toast-type="saving"] {
-  background: rgba(37, 99, 235, .94);
+  background: rgba(37, 99, 235, 0.94);
 }
 
 .prediction-card-toast[data-toast-type="warning"] {
-  background: rgba(217, 119, 6, .94);
+  background: rgba(217, 119, 6, 0.94);
 }
 
 @media (max-width: 768px) {
@@ -17096,25 +17142,22 @@ body[data-role="user"] #tab-players .page-header p {
   position: relative;
   overflow: hidden;
   border-radius: 24px;
-  border: 1px solid rgba(255,255,255,.16);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   box-shadow:
-    0 18px 45px rgba(0,0,0,.45),
-    inset 0 1px 0 rgba(255,255,255,.14);
+    0 18px 45px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
-
-
 
 .prediction-scene-inner {
   position: relative;
   z-index: 2;
 }
 
-
 .prediction-scene-team strong,
 .prediction-scene-team-name {
   position: relative;
   display: inline-block;
-  text-shadow: 0 3px 10px rgba(0,0,0,.75);
+  text-shadow: 0 3px 10px rgba(0, 0, 0, 0.75);
 }
 .prediction-match-time-bar {
   position: absolute;
@@ -17126,8 +17169,8 @@ body[data-role="user"] #tab-players .page-header p {
   padding: 7px 18px;
   border-radius: 999px;
 
-  background: rgba(5, 10, 20, .58);
-  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(5, 10, 20, 0.58);
+  border: 1px solid rgba(255, 255, 255, 0.16);
 
   color: #fff;
   font-size: 11px;
@@ -17137,9 +17180,9 @@ body[data-role="user"] #tab-players .page-header p {
   white-space: nowrap;
 
   box-shadow:
-    0 8px 22px rgba(0,0,0,.38),
-    inset 0 1px 0 rgba(255,255,255,.14),
-    0 0 18px rgba(250,204,21,.20);
+    0 8px 22px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 0 18px rgba(250, 204, 21, 0.2);
 
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -17192,13 +17235,16 @@ body[data-role="user"] #tab-players .page-header p {
     padding: 6px;
     border-radius: 22px;
 
-    background:
-      linear-gradient(180deg, rgba(15,23,42,.90), rgba(2,6,23,.96));
-    border: 1px solid rgba(255,255,255,.12);
+    background: linear-gradient(
+      180deg,
+      rgba(15, 23, 42, 0.9),
+      rgba(2, 6, 23, 0.96)
+    );
+    border: 1px solid rgba(255, 255, 255, 0.12);
 
     box-shadow:
-      0 14px 32px rgba(0,0,0,.42),
-      inset 0 1px 0 rgba(255,255,255,.10);
+      0 14px 32px rgba(0, 0, 0, 0.42),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
 
     backdrop-filter: blur(16px) saturate(125%);
     -webkit-backdrop-filter: blur(16px) saturate(125%);
@@ -17213,7 +17259,7 @@ body[data-role="user"] #tab-players .page-header p {
     background: transparent;
     border: 1px solid transparent;
 
-    color: rgba(226,232,240,.72);
+    color: rgba(226, 232, 240, 0.72);
     font-size: 9.5px;
     font-weight: 900;
     line-height: 1;
@@ -17230,7 +17276,7 @@ body[data-role="user"] #tab-players .page-header p {
     place-items: center;
 
     border-radius: 999px;
-    background: rgba(255,255,255,.06);
+    background: rgba(255, 255, 255, 0.06);
 
     font-size: 12px;
     line-height: 1;
@@ -17239,18 +17285,26 @@ body[data-role="user"] #tab-players .page-header p {
   .mobile-nav-btn.active {
     color: #fff;
     background:
-      radial-gradient(circle at top, rgba(34,197,94,.30), transparent 60%),
-      linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.025));
-    border-color: rgba(34,197,94,.24);
+      radial-gradient(circle at top, rgba(34, 197, 94, 0.3), transparent 60%),
+      linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.07),
+        rgba(255, 255, 255, 0.025)
+      );
+    border-color: rgba(34, 197, 94, 0.24);
 
     box-shadow:
-      inset 0 1px 0 rgba(255,255,255,.12),
-      0 7px 14px rgba(34,197,94,.12);
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      0 7px 14px rgba(34, 197, 94, 0.12);
   }
 
   .mobile-nav-btn.active .mobile-nav-icon {
-    background: linear-gradient(135deg, rgba(34,197,94,.95), rgba(56,189,248,.70));
-    box-shadow: 0 0 14px rgba(34,197,94,.24);
+    background: linear-gradient(
+      135deg,
+      rgba(34, 197, 94, 0.95),
+      rgba(56, 189, 248, 0.7)
+    );
+    box-shadow: 0 0 14px rgba(34, 197, 94, 0.24);
   }
 
   .content {
@@ -17276,12 +17330,1233 @@ body[data-role="user"] #tab-players .page-header p {
     grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   }
 
-  .mobile-bottom-nav:has(#mobileAdminMenuBtn:not(.hidden-by-role)) .mobile-nav-btn[data-tab="logs"],
-  .mobile-bottom-nav:has(#mobileAdminMenuBtn:not(.hidden-by-role)) .mobile-nav-btn[data-tab="stats"] {
+  .mobile-bottom-nav:has(#mobileAdminMenuBtn:not(.hidden-by-role))
+    .mobile-nav-btn[data-tab="logs"],
+  .mobile-bottom-nav:has(#mobileAdminMenuBtn:not(.hidden-by-role))
+    .mobile-nav-btn[data-tab="stats"] {
     display: none !important;
   }
 
   #mobileAdminMenuBtn:not(.hidden-by-role) {
     display: grid !important;
+  }
+}
+/* =========================================================
+
+/* =========================================================
+   PREMIUM MAÇ KARTLARI - TEMİZ + MOBİL KOMPAKT SÜRÜM
+   Amaç:
+   - Mükerrer V7/V8/V9/V10 kodlarını tek blokta toplar.
+   - Masaüstünde 2 kolon, mobilde daha kompakt kart.
+   - Ağır animasyon yok, eski telefon dostu.
+   ========================================================= */
+
+/* 1) Liste alanı */
+.dashboard-match-hub.premium-match-hub,
+.premium-match-hub {
+  gap: 16px !important;
+  padding: 0 0 92px !important;
+}
+
+/* 2) Ana kart */
+.dashboard-match-card.premium-match-card,
+.dashboard-match-card.premium-match-card.master-match-card {
+  --state-main: #4dbbff;
+  --state-soft: rgba(77, 187, 255, 0.14);
+  --state-line: rgba(77, 187, 255, 0.5);
+  --state-shadow: rgba(77, 187, 255, 0.18);
+
+  position: relative !important;
+  overflow: hidden !important;
+  isolation: isolate !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 250px !important;
+  padding: 14px !important;
+  border-radius: 24px !important;
+  border: 1px solid var(--state-line) !important;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(3, 10, 20, 0.28),
+      rgba(2, 6, 14, 0.68) 56%,
+      rgba(1, 4, 10, 0.9)
+    ),
+    var(--match-stadium-bg, url("images/match-scenes/default.png")) center/cover no-repeat !important;
+  box-shadow:
+    0 16px 36px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 3px 0 var(--state-line) !important;
+  backdrop-filter: none !important;
+  animation: none !important;
+}
+
+.dashboard-match-card.premium-match-card::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: -1 !important;
+  pointer-events: none !important;
+  opacity: 0.18 !important;
+  background:
+    radial-gradient(circle at 22% 24%, rgba(255,255,255,.18), transparent 18%),
+    radial-gradient(circle at 78% 24%, rgba(255,255,255,.14), transparent 18%),
+    linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255,255,255,.025) 1px, transparent 1px) !important;
+  background-size: auto, auto, 74px 74px, 74px 74px !important;
+}
+
+.dashboard-match-card.premium-match-card::after {
+  content: "" !important;
+  position: absolute !important;
+  left: 12px !important;
+  right: 12px !important;
+  top: 12px !important;
+  height: 34% !important;
+  z-index: -1 !important;
+  border-radius: 22px !important;
+  pointer-events: none !important;
+  opacity: 0.36 !important;
+  background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,0)) !important;
+}
+
+.premium-stadium-bg,
+.premium-stadium-lights,
+.dashboard-match-card__glow {
+  display: none !important;
+}
+
+/* 3) Durum renkleri */
+.dashboard-match-card.premium-match-card.is-upcoming,
+.dashboard-match-card.premium-match-card.is-waiting,
+.dashboard-match-card.premium-match-card.is-locked {
+  --state-main: #4dbbff;
+  --state-soft: rgba(77, 187, 255, 0.15);
+  --state-line: rgba(77, 187, 255, 0.54);
+  --state-shadow: rgba(77, 187, 255, 0.18);
+}
+
+.dashboard-match-card.premium-match-card.is-live {
+  --state-main: #ff6571;
+  --state-soft: rgba(255, 101, 113, 0.14);
+  --state-line: rgba(255, 101, 113, 0.58);
+  --state-shadow: rgba(255, 101, 113, 0.2);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(25, 7, 10, 0.34),
+      rgba(5, 5, 10, 0.72) 58%,
+      rgba(2, 3, 7, 0.9)
+    ),
+    var(--match-stadium-bg, url("images/match-scenes/default.png")) center/cover no-repeat !important;
+}
+
+.dashboard-match-card.premium-match-card.is-played,
+.dashboard-match-card.premium-match-card.is-finished-time,
+.dashboard-match-card.premium-match-card.is-played-postponed {
+  --state-main: #45e08a;
+  --state-soft: rgba(69, 224, 138, 0.14);
+  --state-line: rgba(69, 224, 138, 0.52);
+  --state-shadow: rgba(69, 224, 138, 0.16);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(5, 28, 20, 0.32),
+      rgba(3, 9, 8, 0.72) 58%,
+      rgba(1, 5, 4, 0.9)
+    ),
+    var(--match-stadium-bg, url("images/match-scenes/default.png")) center/cover no-repeat !important;
+}
+
+/* 4) Üst satır */
+.premium-card-head {
+  position: relative !important;
+  z-index: 2 !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  margin-bottom: 10px !important;
+}
+
+.premium-status-chip {
+  min-height: 36px !important;
+  padding: 5px 11px 5px 6px !important;
+  border-radius: 999px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  white-space: nowrap !important;
+  font-size: 13px !important;
+  line-height: 1 !important;
+  font-weight: 850 !important;
+  color: #ecf7ff !important;
+  border: 1px solid rgba(124,190,255,.38) !important;
+  background: linear-gradient(135deg, rgba(35,115,235,.82), rgba(15,58,130,.72)) !important;
+  box-shadow:
+    0 8px 20px rgba(0,0,0,.22),
+    inset 0 1px 0 rgba(255,255,255,.16) !important;
+}
+
+.premium-status-icon {
+  width: 26px !important;
+  height: 26px !important;
+  min-width: 26px !important;
+  display: inline-grid !important;
+  place-items: center !important;
+  border-radius: 999px !important;
+  margin-right: 0 !important;
+  background: rgba(255,255,255,.15) !important;
+  font-size: 13px !important;
+}
+
+.is-live .premium-status-chip {
+  background: linear-gradient(135deg, rgba(190,42,57,.88), rgba(95,21,30,.78)) !important;
+  border-color: rgba(255,143,152,.52) !important;
+}
+
+.is-played .premium-status-chip,
+.is-finished-time .premium-status-chip,
+.is-played-postponed .premium-status-chip {
+  background: linear-gradient(135deg, rgba(24,144,86,.88), rgba(8,76,50,.78)) !important;
+  border-color: rgba(112,242,166,.5) !important;
+}
+
+/* 5) Sağ üst sayaç */
+.premium-countdown {
+  width: auto !important;
+  min-width: auto !important;
+  max-width: 160px !important;
+  height: 34px !important;
+  padding: 0 12px !important;
+  border-radius: 999px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  background: rgba(5, 12, 24, 0.72) !important;
+  border: 1px solid rgba(255,255,255,.13) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08) !important;
+}
+
+.premium-countdown small {
+  display: none !important;
+}
+
+.premium-countdown strong {
+  display: block !important;
+  margin: 0 !important;
+  color: #9ee8ff !important;
+  font-size: 12px !important;
+  line-height: 1 !important;
+  font-weight: 900 !important;
+  letter-spacing: 0 !important;
+  white-space: nowrap !important;
+}
+
+.is-live .premium-countdown {
+  border-color: rgba(255,95,109,.36) !important;
+  background: linear-gradient(135deg, rgba(34,10,16,.82), rgba(68,18,25,.62)) !important;
+}
+
+.is-live .premium-countdown strong {
+  color: #ffb0b8 !important;
+}
+
+.is-played .premium-countdown,
+.is-finished-time .premium-countdown,
+.is-played-postponed .premium-countdown {
+  border-color: rgba(75,230,145,.34) !important;
+  background: linear-gradient(135deg, rgba(8,28,20,.82), rgba(10,58,38,.62)) !important;
+}
+
+.is-played .premium-countdown strong,
+.is-finished-time .premium-countdown strong,
+.is-played-postponed .premium-countdown strong {
+  color: #a7ffc9 !important;
+}
+
+/* 6) Takımlar + orta alan */
+.premium-match-body {
+  position: relative !important;
+  z-index: 2 !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 92px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 8px !important;
+  min-height: 96px !important;
+  padding: 0 !important;
+}
+
+.premium-team {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+  min-width: 0 !important;
+}
+
+.premium-team strong {
+  max-width: 120px !important;
+  font-size: 13px !important;
+  line-height: 1.08 !important;
+  font-weight: 900 !important;
+  text-align: center !important;
+  color: #f7fbff !important;
+  text-shadow: 0 2px 10px rgba(0,0,0,.5) !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+}
+
+/* Logo arkasındaki yuvarlak efekt kapalı */
+.premium-logo-aura {
+  position: relative !important;
+  width: 68px !important;
+  height: 68px !important;
+  display: grid !important;
+  place-items: center !important;
+  border-radius: 999px !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+.premium-logo-aura::before,
+.premium-logo-aura::after {
+  display: none !important;
+  content: none !important;
+}
+
+.premium-logo-aura img,
+.premium-logo-aura .team-logo,
+.premium-logo-aura .team-logo-img,
+.premium-logo-aura svg {
+  position: relative !important;
+  z-index: 1 !important;
+  width: auto !important;
+  height: auto !important;
+  max-width: 60px !important;
+  max-height: 60px !important;
+  object-fit: contain !important;
+  filter: drop-shadow(0 8px 12px rgba(0,0,0,.46)) !important;
+}
+
+/* Orta skor/VS paneli */
+.premium-score-core {
+  min-height: 96px !important;
+  padding: 10px 6px !important;
+  border-radius: 22px !important;
+  background: rgba(6, 13, 27, 0.46) !important;
+  border: 1px solid rgba(255,255,255,.13) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.1),
+    0 10px 22px rgba(0,0,0,.22) !important;
+}
+
+.premium-score-core .dashboard-score-core__label {
+  font-size: 10px !important;
+  letter-spacing: .13em !important;
+  color: rgba(214,232,255,.74) !important;
+  font-weight: 850 !important;
+}
+
+.premium-score-value,
+.premium-score-core .dashboard-score-core__value {
+  min-height: 42px !important;
+  margin: 6px 0 5px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-direction: row !important;
+  gap: 7px !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+  font-size: 30px !important;
+  font-weight: 950 !important;
+  color: #f8fbff !important;
+  text-shadow: 0 8px 22px rgba(0,0,0,.42) !important;
+}
+
+.premium-score-value span,
+.premium-score-core .dashboard-score-core__value span {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: none !important;
+}
+
+.premium-vs-capsule {
+  min-width: 68px !important;
+  height: 40px !important;
+  border-radius: 15px !important;
+  display: grid !important;
+  place-items: center !important;
+  color: #eaf5ff !important;
+  font-size: 22px !important;
+  font-weight: 950 !important;
+  background:
+    linear-gradient(135deg, rgba(80,146,255,.38), rgba(19,49,101,.66)),
+    radial-gradient(circle at 50% 0%, rgba(255,255,255,.18), transparent 55%) !important;
+  border: 1px solid rgba(128,194,255,.3) !important;
+}
+
+.dashboard-score-core__sub {
+  font-size: 11px !important;
+  color: rgba(224,237,255,.72) !important;
+}
+
+/* 7) İlerleme */
+.premium-progress-line {
+  position: relative !important;
+  z-index: 2 !important;
+  height: 6px !important;
+  margin: 11px 4px 10px !important;
+  border-radius: 999px !important;
+  overflow: hidden !important;
+  background: rgba(0,0,0,.38) !important;
+  border: 1px solid rgba(255,255,255,.09) !important;
+}
+
+.premium-progress-line span {
+  display: block !important;
+  height: 100% !important;
+  border-radius: 999px !important;
+  background: linear-gradient(90deg, #49e0ff, #3f7cff) !important;
+}
+
+.is-live .premium-progress-line span {
+  background: linear-gradient(90deg, #ff7a7a, #ff4c60, #ffb066) !important;
+}
+
+.is-played .premium-progress-line span,
+.is-finished-time .premium-progress-line span,
+.is-played-postponed .premium-progress-line span {
+  background: linear-gradient(90deg, #6af0a2, #24c878) !important;
+}
+
+/* 8) Avatarlar */
+.premium-avatar-row {
+  position: relative !important;
+  z-index: 2 !important;
+  display: flex !important;
+  justify-content: center !important;
+  min-height: 27px !important;
+  margin: 0 0 10px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  overflow: visible !important;
+}
+
+.premium-avatar-row .dashboard-avatar-row__chips {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  overflow: visible !important;
+}
+
+.premium-avatar-row .dashboard-avatar-chip {
+  width: 27px !important;
+  height: 27px !important;
+  min-width: 27px !important;
+  margin-left: -6px !important;
+  position: relative !important;
+  border-radius: 999px !important;
+  opacity: .92 !important;
+  border: 2px solid rgba(8,16,30,.85) !important;
+  background: #111b2d !important;
+  box-shadow: 0 5px 12px rgba(0,0,0,.28) !important;
+  transition: transform .16s ease, filter .16s ease, opacity .16s ease, box-shadow .16s ease !important;
+  transform-origin: center !important;
+}
+
+.premium-avatar-row .dashboard-avatar-chip:first-child {
+  margin-left: 0 !important;
+}
+
+.premium-avatar-row .dashboard-avatar-chip.is-missing {
+  filter: grayscale(1) saturate(.05) brightness(.52) contrast(1.08) !important;
+  opacity: .5 !important;
+  border-color: rgba(160,170,185,.22) !important;
+}
+
+.premium-avatar-row .dashboard-avatar-chip.is-filled,
+.premium-avatar-row .dashboard-avatar-chip.is-exact,
+.premium-avatar-row .dashboard-avatar-chip.is-close,
+.premium-avatar-row .dashboard-avatar-chip.is-miss {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+.premium-avatar-row .dashboard-avatar-chip:hover,
+.premium-avatar-row .dashboard-avatar-chip:focus-visible,
+.premium-avatar-row .dashboard-avatar-chip:active {
+  transform: scale(1.42) translateY(-5px) !important;
+  z-index: 25 !important;
+  opacity: 1 !important;
+  filter: none !important;
+  border-color: rgba(255,255,255,.88) !important;
+  box-shadow:
+    0 0 0 3px rgba(255,255,255,.1),
+    0 12px 26px rgba(0,0,0,.5),
+    0 0 22px var(--state-shadow) !important;
+}
+
+.premium-avatar-row .dashboard-avatar-row__more {
+  height: 27px !important;
+  min-width: 38px !important;
+  display: grid !important;
+  place-items: center !important;
+  margin-left: 5px !important;
+  border-radius: 999px !important;
+  background: rgba(6,17,33,.72) !important;
+  border: 1px solid rgba(118,186,255,.25) !important;
+  color: #eaf6ff !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+}
+
+/* 9) Alt istatistik */
+.premium-card-footer {
+  position: relative !important;
+  z-index: 2 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+.premium-meta-pills {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 7px !important;
+}
+
+.premium-meta-pills .dashboard-meta-pill {
+  min-width: 0 !important;
+  min-height: 48px !important;
+  height: 48px !important;
+  padding: 6px 3px !important;
+  border-radius: 15px !important;
+  display: grid !important;
+  place-items: center !important;
+  gap: 1px !important;
+  background: rgba(7,15,30,.58) !important;
+  border: 1px solid rgba(255,255,255,.13) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08) !important;
+}
+
+.premium-meta-pills .dashboard-meta-pill i {
+  font-style: normal !important;
+  font-size: 16px !important;
+  line-height: 1 !important;
+}
+
+.premium-meta-pills .dashboard-meta-pill b {
+  color: #f7fbff !important;
+  font-size: 16px !important;
+  line-height: 1 !important;
+  font-weight: 950 !important;
+}
+
+.premium-meta-pills .dashboard-meta-pill em {
+  font-style: normal !important;
+  color: rgba(221,235,255,.74) !important;
+  font-size: 8px !important;
+  line-height: 1 !important;
+  text-transform: uppercase !important;
+  letter-spacing: .06em !important;
+}
+
+/* 10) Masaüstü kolon */
+@media (min-width: 901px) {
+  .dashboard-match-hub.premium-match-hub,
+  .premium-match-hub {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(360px, 1fr)) !important;
+    gap: 18px !important;
+    align-items: stretch !important;
+  }
+}
+
+@media (min-width: 1500px) {
+  .dashboard-match-hub.premium-match-hub,
+  .premium-match-hub {
+    grid-template-columns: repeat(auto-fit, minmax(390px, 1fr)) !important;
+  }
+}
+
+@media (min-width: 721px) and (max-width: 1050px) {
+  .dashboard-match-hub.premium-match-hub,
+  .premium-match-hub {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* 11) MOBİL KOMPAKT - asıl düzeltme burada */
+@media (max-width: 720px) {
+  .dashboard-match-hub.premium-match-hub,
+  .premium-match-hub {
+    gap: 12px !important;
+    padding-bottom: 104px !important;
+  }
+
+  .dashboard-match-card.premium-match-card,
+  .dashboard-match-card.premium-match-card.master-match-card {
+    min-height: 218px !important;
+    padding: 10px 10px 9px !important;
+    border-radius: 22px !important;
+  }
+
+  .dashboard-match-card.premium-match-card::after {
+    left: 10px !important;
+    right: 10px !important;
+    top: 10px !important;
+    height: 31% !important;
+    border-radius: 18px !important;
+  }
+
+  .premium-card-head {
+    gap: 6px !important;
+    margin-bottom: 7px !important;
+    align-items: flex-start !important;
+  }
+
+  .premium-status-chip {
+    min-height: 31px !important;
+    max-width: 132px !important;
+    padding: 4px 9px 4px 5px !important;
+    gap: 5px !important;
+    font-size: 11px !important;
+    line-height: 1.05 !important;
+    overflow: hidden !important;
+  }
+
+  .premium-status-chip span:not(.premium-status-icon),
+  .premium-status-chip b {
+    font-size: 11px !important;
+    line-height: 1.05 !important;
+  }
+
+  .premium-status-icon {
+    width: 22px !important;
+    height: 22px !important;
+    min-width: 22px !important;
+    font-size: 11px !important;
+  }
+
+  .premium-countdown {
+    height: 27px !important;
+    max-width: 132px !important;
+    padding: 0 8px !important;
+  }
+
+  .premium-countdown strong {
+    font-size: 10px !important;
+    letter-spacing: -0.01em !important;
+  }
+
+  .premium-match-body {
+    grid-template-columns: minmax(0, 1fr) 72px minmax(0, 1fr) !important;
+    gap: 5px !important;
+    min-height: 78px !important;
+  }
+
+  .premium-team {
+    gap: 4px !important;
+  }
+
+  .premium-logo-aura {
+    width: 54px !important;
+    height: 54px !important;
+  }
+
+  .premium-logo-aura img,
+  .premium-logo-aura .team-logo,
+  .premium-logo-aura .team-logo-img,
+  .premium-logo-aura svg {
+    max-width: 49px !important;
+    max-height: 49px !important;
+  }
+
+  .premium-team strong {
+    max-width: 82px !important;
+    font-size: 11px !important;
+    line-height: 1.05 !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+  }
+
+  .premium-score-core {
+    min-height: 76px !important;
+    padding: 7px 4px !important;
+    border-radius: 18px !important;
+  }
+
+  .premium-score-core .dashboard-score-core__label {
+    font-size: 8px !important;
+    letter-spacing: .11em !important;
+  }
+
+  .premium-vs-capsule {
+    min-width: 54px !important;
+    height: 33px !important;
+    border-radius: 13px !important;
+    font-size: 18px !important;
+  }
+
+  .premium-score-value,
+  .premium-score-core .dashboard-score-core__value {
+    min-height: 32px !important;
+    margin: 4px 0 3px !important;
+    font-size: 24px !important;
+    gap: 5px !important;
+  }
+
+  .dashboard-score-core__sub {
+    font-size: 9px !important;
+    line-height: 1.05 !important;
+  }
+
+  .premium-progress-line {
+    height: 5px !important;
+    margin: 7px 3px 7px !important;
+  }
+
+  .premium-avatar-row {
+    min-height: 22px !important;
+    margin-bottom: 7px !important;
+  }
+
+  .premium-avatar-row .dashboard-avatar-chip {
+    width: 22px !important;
+    height: 22px !important;
+    min-width: 22px !important;
+    margin-left: -5px !important;
+    border-width: 1.5px !important;
+  }
+
+  .premium-avatar-row .dashboard-avatar-row__more {
+    height: 22px !important;
+    min-width: 32px !important;
+    font-size: 9px !important;
+  }
+
+  .premium-avatar-row .dashboard-avatar-chip:hover,
+  .premium-avatar-row .dashboard-avatar-chip:focus-visible,
+  .premium-avatar-row .dashboard-avatar-chip:active {
+    transform: scale(1.42) translateY(-4px) !important;
+  }
+
+  .premium-meta-pills {
+    gap: 5px !important;
+  }
+
+  .premium-meta-pills .dashboard-meta-pill {
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 4px 2px !important;
+    border-radius: 13px !important;
+  }
+
+  .premium-meta-pills .dashboard-meta-pill i {
+    font-size: 13px !important;
+  }
+
+  .premium-meta-pills .dashboard-meta-pill b {
+    font-size: 14px !important;
+  }
+
+  .premium-meta-pills .dashboard-meta-pill em {
+    font-size: 7px !important;
+    letter-spacing: .04em !important;
+  }
+}
+
+/* 12) Çok küçük telefon */
+@media (max-width: 380px) {
+  .dashboard-match-card.premium-match-card,
+  .dashboard-match-card.premium-match-card.master-match-card {
+    min-height: 205px !important;
+    padding: 9px 8px 8px !important;
+    border-radius: 20px !important;
+  }
+
+  .premium-status-chip {
+    max-width: 118px !important;
+    min-height: 29px !important;
+    padding-right: 7px !important;
+    font-size: 10px !important;
+  }
+
+  .premium-status-chip span:not(.premium-status-icon),
+  .premium-status-chip b {
+    font-size: 10px !important;
+  }
+
+  .premium-status-icon {
+    width: 20px !important;
+    height: 20px !important;
+    min-width: 20px !important;
+  }
+
+  .premium-countdown {
+    height: 25px !important;
+    max-width: 116px !important;
+    padding: 0 7px !important;
+  }
+
+  .premium-countdown strong {
+    font-size: 9px !important;
+  }
+
+  .premium-match-body {
+    grid-template-columns: minmax(0, 1fr) 64px minmax(0, 1fr) !important;
+    min-height: 72px !important;
+  }
+
+  .premium-logo-aura {
+    width: 48px !important;
+    height: 48px !important;
+  }
+
+  .premium-logo-aura img,
+  .premium-logo-aura .team-logo,
+  .premium-logo-aura .team-logo-img,
+  .premium-logo-aura svg {
+    max-width: 44px !important;
+    max-height: 44px !important;
+  }
+
+  .premium-team strong {
+    max-width: 72px !important;
+    font-size: 10px !important;
+  }
+
+  .premium-score-core {
+    min-height: 70px !important;
+    border-radius: 16px !important;
+  }
+
+  .premium-vs-capsule {
+    min-width: 48px !important;
+    height: 30px !important;
+    font-size: 16px !important;
+  }
+
+  .premium-meta-pills .dashboard-meta-pill {
+    height: 38px !important;
+    min-height: 38px !important;
+  }
+}
+
+/* 13) Performans */
+.dashboard-match-card.premium-match-card,
+.dashboard-match-card.premium-match-card *,
+.dashboard-match-card.premium-match-card::before,
+.dashboard-match-card.premium-match-card::after {
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-match-card.premium-match-card *,
+  .dashboard-match-card.premium-match-card::before,
+  .dashboard-match-card.premium-match-card::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+
+
+/* =========================================================
+   ADMIN MAÇLAR EKRANI - MOBİL PRO TASARIM
+   Amaç: Maçlar sekmesini telefonda kart düzenine çevirir.
+   Masaüstü tablo korunur.
+   ========================================================= */
+
+.admin-matches-table {
+  overflow: hidden;
+}
+
+.admin-match-row {
+  align-items: center;
+}
+
+.admin-match-teams {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.admin-match-team {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.admin-match-team-away {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.admin-match-team strong {
+  min-width: 0;
+  color: #f8fbff;
+  font-size: 14px;
+  font-weight: 850;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-match-score-mobile {
+  display: none;
+}
+
+.admin-match-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.admin-score-inputs input {
+  width: 58px;
+}
+
+@media (max-width: 720px) {
+  #tab-matches .page-header {
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  #tab-matches .page-header h2 {
+    font-size: 22px;
+  }
+
+  #tab-matches .page-header p {
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  #tab-matches .header-actions.double-selects {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    width: 100%;
+  }
+
+  #tab-matches .form-card {
+    padding: 12px;
+    border-radius: 18px;
+  }
+
+  #tab-matches .form-card .form-grid.four {
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+
+  #tab-matches .form-card .field label {
+    font-size: 12px;
+    margin-bottom: 5px;
+  }
+
+  #tab-matches .form-card input,
+  #tab-matches .form-card select {
+    min-height: 42px;
+    padding: 9px 11px;
+    border-radius: 12px;
+    font-size: 13px;
+  }
+
+  #tab-matches .form-actions button {
+    width: 100%;
+    min-height: 42px;
+  }
+
+  #tab-matches > .card:last-child {
+    padding: 12px;
+    border-radius: 20px;
+  }
+
+  #tab-matches > .card:last-child .card-header {
+    margin-bottom: 10px;
+  }
+
+  #tab-matches > .card:last-child .card-header h3 {
+    font-size: 17px;
+  }
+
+  #tab-matches .admin-matches-table {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    overflow: visible;
+  }
+
+  #tab-matches .admin-matches-table .excel-thead {
+    display: none !important;
+  }
+
+  #tab-matches .admin-matches-body {
+    display: grid;
+    gap: 12px;
+    padding: 0;
+  }
+
+  #tab-matches .admin-match-row.match-tr {
+    position: relative;
+    display: grid !important;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    min-height: 0;
+    padding: 12px;
+    border-radius: 22px;
+    overflow: hidden;
+    border: 1px solid rgba(110, 180, 255, 0.2);
+    background:
+      radial-gradient(circle at 18% 0%, rgba(80, 180, 255, 0.12), transparent 34%),
+      linear-gradient(180deg, rgba(17, 30, 52, 0.92), rgba(8, 14, 26, 0.96));
+    box-shadow:
+      0 14px 32px rgba(0, 0, 0, 0.24),
+      inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  }
+
+  #tab-matches .admin-match-row.match-tr > div {
+    padding: 0;
+    border-right: 0;
+    min-width: 0;
+  }
+
+  #tab-matches .admin-match-row.is-live {
+    border-color: rgba(255, 95, 109, 0.46);
+    background:
+      radial-gradient(circle at 18% 0%, rgba(255, 95, 109, 0.12), transparent 34%),
+      linear-gradient(180deg, rgba(34, 14, 22, 0.94), rgba(8, 12, 22, 0.97));
+  }
+
+  #tab-matches .admin-match-row.is-played {
+    border-color: rgba(69, 224, 138, 0.36);
+    background:
+      radial-gradient(circle at 18% 0%, rgba(69, 224, 138, 0.11), transparent 34%),
+      linear-gradient(180deg, rgba(12, 34, 27, 0.94), rgba(8, 13, 22, 0.97));
+  }
+
+  #tab-matches .admin-match-fixture {
+    order: 1;
+  }
+
+  #tab-matches .admin-match-teams {
+    grid-template-columns: minmax(0, 1fr) 58px minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+  }
+
+  #tab-matches .admin-match-team {
+    display: grid;
+    justify-items: center;
+    text-align: center;
+    gap: 6px;
+  }
+
+  #tab-matches .admin-match-team-away {
+    justify-content: center;
+    text-align: center;
+  }
+
+  #tab-matches .admin-match-team .team-logo,
+  #tab-matches .admin-match-team .team-logo-img,
+  #tab-matches .admin-match-team img {
+    width: 46px !important;
+    height: 46px !important;
+    min-width: 46px !important;
+    min-height: 46px !important;
+    object-fit: contain;
+  }
+
+  #tab-matches .admin-match-team strong {
+    max-width: 92px;
+    font-size: 12px;
+    line-height: 1.12;
+    white-space: normal;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    text-overflow: ellipsis;
+  }
+
+  #tab-matches .admin-match-score-mobile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 54px;
+    min-height: 40px;
+    padding: 7px 8px;
+    border-radius: 16px;
+    color: #f8fbff;
+    font-size: 18px;
+    font-weight: 950;
+    letter-spacing: 0.02em;
+    background: rgba(2, 8, 18, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    white-space: nowrap;
+  }
+
+  #tab-matches .admin-match-score-cell {
+    display: none;
+  }
+
+  #tab-matches .admin-match-status-cell {
+    order: 0;
+    display: flex;
+    justify-content: flex-start;
+  }
+
+  #tab-matches .admin-match-status-cell .badge {
+    min-height: 30px;
+    padding: 7px 11px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 850;
+  }
+
+  #tab-matches .admin-match-date {
+    order: 0;
+    position: absolute;
+    right: 12px;
+    top: 14px;
+    max-width: 145px;
+    padding: 7px 10px;
+    border-radius: 999px;
+    color: #cfe7ff;
+    font-size: 11px;
+    line-height: 1;
+    white-space: nowrap;
+    background: rgba(2, 8, 18, 0.62);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+  }
+
+  #tab-matches .admin-match-result-cell {
+    order: 2;
+    padding-top: 9px !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+  }
+
+  #tab-matches .admin-score-inputs {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+  }
+
+  #tab-matches .admin-score-inputs input {
+    width: 100% !important;
+    height: 42px;
+    min-height: 42px;
+    border-radius: 14px;
+    text-align: center;
+    font-size: 18px;
+    font-weight: 900;
+    background: rgba(2, 8, 18, 0.74);
+    border-color: rgba(255, 255, 255, 0.13);
+  }
+
+  #tab-matches .admin-score-inputs > span:not(.auto-save-note) {
+    color: rgba(225, 238, 255, 0.7);
+    font-size: 18px;
+    font-weight: 900;
+  }
+
+  #tab-matches .admin-score-inputs .auto-save-note {
+    grid-column: 1 / -1;
+    justify-self: center;
+    font-size: 10px;
+    color: rgba(207, 225, 245, 0.62);
+  }
+
+  #tab-matches .admin-match-actions {
+    order: 3;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  #tab-matches .admin-match-actions button {
+    min-width: 0;
+    width: 100%;
+    min-height: 38px;
+    padding: 9px 8px;
+    border-radius: 13px;
+    font-size: 12px;
+  }
+
+  #tab-matches .admin-match-actions button:nth-child(2):last-child {
+    grid-column: auto;
+  }
+
+  #tab-matches .admin-match-actions button:nth-child(3) {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 380px) {
+  #tab-matches .admin-match-row.match-tr {
+    padding: 10px;
+    border-radius: 20px;
+  }
+
+  #tab-matches .admin-match-teams {
+    grid-template-columns: minmax(0, 1fr) 50px minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  #tab-matches .admin-match-team .team-logo,
+  #tab-matches .admin-match-team .team-logo-img,
+  #tab-matches .admin-match-team img {
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+  }
+
+  #tab-matches .admin-match-team strong {
+    max-width: 78px;
+    font-size: 11px;
+  }
+
+  #tab-matches .admin-match-score-mobile {
+    min-width: 48px;
+    min-height: 36px;
+    font-size: 16px;
+  }
+
+  #tab-matches .admin-match-date {
+    right: 10px;
+    top: 12px;
+    max-width: 130px;
+    font-size: 10px;
+    padding: 6px 8px;
+  }
+}
+/* Mobilde Maçlar ekranındaki üst sezon/hafta alanını gizle */
+@media (max-width: 720px) {
+  #tab-matches > .page-header {
+    display: none !important;
   }
 }

@@ -4878,8 +4878,80 @@ function renderDashboardMatchCards(container, matches) {
     container.innerHTML = createEmptyState("Bu haftada henüz maç yok.");
     return;
   }
+
   const players = getVisiblePlayersOrdered();
-  container.innerHTML = `<div class="dashboard-match-hub">${matches
+  const now = Date.now();
+
+  const getPremiumStateMeta = (match, visual, badge, timeText) => {
+    const runtime = typeof getMatchRuntimeInfo === "function"
+      ? getMatchRuntimeInfo(match, now)
+      : { diffMs: null, elapsedMs: null, minute: null, phase: "unknown" };
+    const diff = runtime.diffMs;
+    const countdown = diff !== null && diff > 0 ? formatPredictionLockCountdown(diff) : "00sa 00dk 00sn";
+    const progress = diff === null
+      ? 12
+      : diff > 0
+        ? Math.max(8, Math.min(94, 100 - Math.floor(diff / (1000 * 60 * 60 * 24)) * 8))
+        : visual === "live"
+          ? Math.max(12, Math.min(96, Math.floor((runtime.elapsedMs || 0) / (120 * 60 * 1000) * 100)))
+          : 100;
+
+    if (match.played || visual === "played" || visual === "played-postponed") {
+      return {
+        icon: "✓",
+        label: "BİTTİ",
+        sub: "Sonuç işlendi",
+        kicker: "FULL TIME",
+        progress: 100,
+        timeText,
+      };
+    }
+
+    if (visual === "finished-time") {
+      return {
+        icon: "⏱",
+        label: "BİTTİ",
+        sub: "Skor girilmesi bekleniyor",
+        kicker: "SONUÇ BEKLİYOR",
+        progress: 100,
+        timeText,
+      };
+    }
+
+    if (visual === "live") {
+      const liveMinute = runtime.minute ? `${runtime.minute}'` : (String(match.statusText || "Canlı").replace(/live|in play/gi, "").trim() || "Canlı");
+      return {
+        icon: "●",
+        label: "CANLI",
+        sub: "Maç şu anda devam ediyor",
+        kicker: liveMinute,
+        progress,
+        timeText,
+      };
+    }
+
+    if (visual === "locked") {
+      return {
+        icon: "🔒",
+        label: "KİLİTLİ",
+        sub: "Maç başlamak üzere",
+        kicker: countdown,
+        progress: Math.max(progress, 88),
+        timeText,
+      };
+    }
+
+    return {
+      icon: "⚡",
+      label: badge.text || "BEKLİYOR",
+      sub: "Maça kalan süre",
+      kicker: countdown,
+      progress,
+      timeText,
+    };
+  };
+
+  container.innerHTML = `<div class="dashboard-match-hub premium-match-hub">${matches
     .map((match) => {
       const badge = getMatchBadge(match);
       const visual = getMatchVisualState(match);
@@ -4896,7 +4968,6 @@ function renderDashboardMatchCards(container, matches) {
       const resultOnly = predictions.filter(
         ({ pred }) => pred && Number(pred.points || 0) === 1,
       ).length;
-      const insight = getDashboardMatchInsight(match);
       const missing = Math.max(players.length - filled.length, 0);
       const fillRatio = players.length ? filled.length / players.length : 1;
       const coverageClass =
@@ -4912,68 +4983,79 @@ function renderDashboardMatchCards(container, matches) {
             hour: "2-digit",
             minute: "2-digit",
           });
+      const premium = getPremiumStateMeta(match, visual, badge, timeText);
 
-          const avatars = predictions
-            .map(({ player, pred }) => {
-              const tone = getDashboardPredictionTone(pred, match);
-              return `
-              <button
-                type="button"
-                class="dashboard-avatar-chip ${tone}"
-                title="${escapeHtml(player.name)}"
-                onclick="event.stopPropagation(); handleDashboardAvatarTap(event, '${match.id}', '${player.id}');"            >
-                ${createGenericAvatarMarkup(player, "dashboard-inline-avatar")}
-              </button>
-              `;            })
-            .join("");
+      const avatars = predictions
+        .slice(0, 6)
+        .map(({ player, pred }) => {
+          const tone = getDashboardPredictionTone(pred, match);
+          return `
+            <button
+              type="button"
+              class="dashboard-avatar-chip ${tone}"
+              title="${escapeHtml(player.name)}"
+              onclick="event.stopPropagation(); handleDashboardAvatarTap(event, '${match.id}', '${player.id}');">
+              ${createGenericAvatarMarkup(player, "dashboard-inline-avatar")}
+            </button>
+          `;
+        })
+        .join("");
+      const hiddenAvatarCount = Math.max(predictions.length - 6, 0);
 
       return `
-      <article class="dashboard-match-card is-${visual} ${coverageClass} ${match.played ? "is-played" : ""} ${visual === "postponed" ? "postponed-row" : ""} ${visual === "played-postponed" ? "rescheduled-played-row" : ""}">
+        <article class="dashboard-match-card premium-match-card master-match-card is-${visual} ${coverageClass} ${match.played ? "is-played" : ""} ${visual === "postponed" ? "postponed-row" : ""} ${visual === "played-postponed" ? "rescheduled-played-row" : ""}" style="--match-stadium-bg:url('images/match-scenes/default.png')">
+          <div class="premium-stadium-bg" aria-hidden="true"></div>
+          <div class="premium-stadium-lights" aria-hidden="true"></div>
           <div class="dashboard-match-card__glow"></div>
 
-          <div
-  class="dashboard-match-card__top dashboard-match-open-zone"
-  onclick="openDashboardMatchModal('${match.id}')"
->
-            <div class="dashboard-card-topline">
-              <span class="badge ${badge.cls}">${badge.text}<span class="badge-time">• ${timeText}</span></span>
-            </div>
+          <div class="premium-card-head dashboard-match-open-zone" onclick="openDashboardMatchModal('${match.id}')">
+            <span class="premium-status-chip">
+              <span class="premium-status-icon">${premium.icon}</span>
+              <strong>${escapeHtml(premium.label)}</strong>
+              <span>•</span>
+              <b>${premium.timeText}</b>
+            </span>
+            <span class="premium-countdown">
+
+              <strong>${escapeHtml(premium.kicker)}</strong>
+            </span>
           </div>
 
-          <div
-  class="dashboard-match-card__body dashboard-match-open-zone"
-  onclick="openDashboardMatchModal('${match.id}')"
->
-            <div class="dashboard-team dashboard-team--home">
-              ${teamLogoHtml(match.homeTeam, match.seasonId)}
+          <div class="dashboard-match-card__body premium-match-body dashboard-match-open-zone" onclick="openDashboardMatchModal('${match.id}')">
+            <div class="dashboard-team premium-team dashboard-team--home">
+              <div class="premium-logo-aura premium-logo-aura--home">${teamLogoHtml(match.homeTeam, match.seasonId)}</div>
               <strong>${escapeHtml(match.homeTeam)}</strong>
             </div>
 
-            <div class="dashboard-score-core">
-              <div class="dashboard-score-core__label">${match.played ? "Skor" : "Maç"}</div>
-              <div class="dashboard-score-core__value">${match.played ? `${match.homeScore} <span>-</span> ${match.awayScore}` : '<span class="dashboard-score-core__pending">VS</span>'}</div>
-              <div class="dashboard-score-core__sub">${match.played ? "Sonuç işlendi" : "Detay için dokun"}</div>
+            <div class="dashboard-score-core premium-score-core">
+              <div class="dashboard-score-core__label">${match.played ? "SKOR" : visual === "finished-time" ? "BİTTİ" : visual === "live" ? "CANLI" : "MAÇ"}</div>
+              <div class="dashboard-score-core__value premium-score-value">${match.played ? `${match.homeScore} <span>-</span> ${match.awayScore}` : '<span class="dashboard-score-core__pending premium-vs-capsule">VS</span>'}</div>
+              <div class="dashboard-score-core__sub">${match.played ? "Sonuç işlendi" : visual === "finished-time" ? "Skor bekleniyor" : "Detay için dokun"}</div>
             </div>
 
-            <div class="dashboard-team dashboard-team--away">
-              ${teamLogoHtml(match.awayTeam, match.seasonId)}
+            <div class="dashboard-team premium-team dashboard-team--away">
+              <div class="premium-logo-aura premium-logo-aura--away">${teamLogoHtml(match.awayTeam, match.seasonId)}</div>
               <strong>${escapeHtml(match.awayTeam)}</strong>
             </div>
           </div>
 
-          <div class="dashboard-avatar-row">
-  <div class="dashboard-avatar-row__chips">${avatars}</div>
-  <span class="dashboard-avatar-row__more"></span>
-</div>
+          <div class="premium-progress-line" aria-hidden="true">
+            <span style="width:${premium.progress}%"></span>
+          </div>
 
-<div class="dashboard-match-card__footer">
-  <div class="dashboard-match-meta-pills">
-    <span class="dashboard-meta-pill">${filled.length}/${players.length} tahmin</span>
-    <span class="dashboard-meta-pill">${missing} eksik</span>
-    <span class="dashboard-meta-pill">${exact} tam</span>
-    <span class="dashboard-meta-pill">${resultOnly} yakın</span>
-  </div>
-</div>
+          <div class="dashboard-avatar-row premium-avatar-row">
+            <div class="dashboard-avatar-row__chips">${avatars}</div>
+            ${hiddenAvatarCount ? `<span class="dashboard-avatar-row__more">+${hiddenAvatarCount}</span>` : ""}
+          </div>
+
+          <div class="dashboard-match-card__footer premium-card-footer">
+            <div class="dashboard-match-meta-pills premium-meta-pills">
+              <span class="dashboard-meta-pill"><i>🎯</i><b>${filled.length}/${players.length}</b><em>tahmin</em></span>
+              <span class="dashboard-meta-pill"><i>👥</i><b>${missing}</b><em>eksik</em></span>
+              <span class="dashboard-meta-pill"><i>✅</i><b>${exact}</b><em>tam</em></span>
+              <span class="dashboard-meta-pill"><i>📍</i><b>${resultOnly}</b><em>yakın</em></span>
+            </div>
+          </div>
         </article>
       `;
     })

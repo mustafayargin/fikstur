@@ -458,25 +458,44 @@ function renderMatches(
     return;
   }
   container.innerHTML = `
-    <div class="excel-table compact-table ${isDashboard ? "dashboard-fixtures" : ""}">
+    <div class="excel-table compact-table admin-matches-table ${isDashboard ? "dashboard-fixtures" : ""}">
       <div class="excel-thead ${isDashboard ? "dashboard-head" : ""}">
         <div>Maç</div><div>Skor</div><div>Durum</div><div>Tarih</div><div>Sonuç</div>${isDashboard ? "" : "<div>İşlem</div>"}
       </div>
-      <div class="excel-tbody">${matches
+      <div class="excel-tbody admin-matches-body">${matches
         .map((match) => {
           const badge = getMatchBadge(match);
           const visual = getMatchVisualState(match);
+          const scoreText = match.played ? `${match.homeScore} - ${match.awayScore}` : "- -";
+          const statusClass =
+            match.played || visual === "played" || visual === "finished-time" || visual === "played-postponed"
+              ? "is-played"
+              : visual === "live"
+                ? "is-live"
+                : "is-waiting";
           return `
-        <div class="excel-tr match-tr ${match.played ? "played-row" : ""} ${visual === "postponed" ? "postponed-row" : ""} ${visual === "played-postponed" ? "rescheduled-played-row" : ""}">
-          <div>${matchCell(match)}</div>
-          <div><span class="score-box slim">${match.played ? `${match.homeScore} - ${match.awayScore}` : "- -"}</span></div>
-          <div><span class="badge ${badge.cls}">${badge.text}</span></div>
-          <div class="small-meta">${formatDate(match.date)}</div>
-          <div>
-            <div class="score-inputs compact-inputs">
-              <input type="number" min="0" id="homeScore_${match.id}" value="${match.played ? match.homeScore : ""}" oninput="queueResultSave('${match.id}')" />
+        <div class="excel-tr match-tr admin-match-row ${statusClass} ${match.played ? "played-row" : ""} ${visual === "postponed" ? "postponed-row" : ""} ${visual === "played-postponed" ? "rescheduled-played-row" : ""}">
+          <div class="admin-match-fixture">
+            <div class="admin-match-teams">
+              <div class="admin-match-team">
+                ${teamLogoHtml(match.homeTeam, match.seasonId)}
+                <strong>${escapeHtml(match.homeTeam)}</strong>
+              </div>
+              <div class="admin-match-score-mobile">${escapeHtml(scoreText)}</div>
+              <div class="admin-match-team admin-match-team-away">
+                ${teamLogoHtml(match.awayTeam, match.seasonId)}
+                <strong>${escapeHtml(match.awayTeam)}</strong>
+              </div>
+            </div>
+          </div>
+          <div class="admin-match-score-cell"><span class="score-box slim">${escapeHtml(scoreText)}</span></div>
+          <div class="admin-match-status-cell"><span class="badge ${badge.cls}">${badge.text}</span></div>
+          <div class="admin-match-date small-meta">${formatDate(match.date)}</div>
+          <div class="admin-match-result-cell">
+            <div class="score-inputs compact-inputs admin-score-inputs">
+              <input type="number" min="0" id="homeScore_${match.id}" value="${match.played ? match.homeScore : ""}" oninput="queueResultSave('${match.id}')" aria-label="${escapeHtml(match.homeTeam)} skoru" />
               <span>-</span>
-              <input type="number" min="0" id="awayScore_${match.id}" value="${match.played ? match.awayScore : ""}" oninput="queueResultSave('${match.id}')" />
+              <input type="number" min="0" id="awayScore_${match.id}" value="${match.played ? match.awayScore : ""}" oninput="queueResultSave('${match.id}')" aria-label="${escapeHtml(match.awayTeam)} skoru" />
               <span class="auto-save-note">Otomatik</span>
             </div>
           </div>
@@ -484,7 +503,7 @@ function renderMatches(
             isDashboard
               ? ""
               : `
-            <div class="match-action-buttons">
+            <div class="match-action-buttons admin-match-actions">
               <button class="small secondary" onclick="editMatch('${match.id}')">Düzenle</button>
               ${match.played ? `<button class="small secondary" onclick="clearMatchScore('${match.id}')">Skoru Temizle</button>` : ""}
               <button class="small danger" onclick="removeMatch('${match.id}')">Sil</button>

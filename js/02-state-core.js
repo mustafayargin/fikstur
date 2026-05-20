@@ -821,13 +821,45 @@ function isPostponedStatus(statusText = "") {
   );
 }
 
+function getMatchRuntimeInfo(match, nowMs = Date.now()) {
+  const startTs = parseMatchDateTimestamp(match?.date);
+  if (Number.isNaN(startTs)) {
+    return { startTs: NaN, diffMs: null, elapsedMs: null, minute: null, phase: "unknown" };
+  }
+
+  const diffMs = startTs - nowMs;
+  const elapsedMs = nowMs - startTs;
+  const liveMinutes = Number(match?.liveMinutes || match?.durationMinutes || 120);
+  const liveMs = Math.max(90, liveMinutes) * 60 * 1000;
+
+  if (diffMs > 0) {
+    return { startTs, diffMs, elapsedMs, minute: null, phase: "waiting" };
+  }
+
+  if (elapsedMs <= liveMs) {
+    const minute = Math.max(1, Math.min(120, Math.floor(elapsedMs / 60000) + 1));
+    return { startTs, diffMs, elapsedMs, minute, phase: "live" };
+  }
+
+  return { startTs, diffMs, elapsedMs, minute: null, phase: "finished-time" };
+}
+
 function getMatchVisualState(match) {
   if (match.played && match.wasPostponed) return "played-postponed";
   if (match.played) return "played";
   if (match.postponed) return "postponed";
+
   const statusText = String(match.statusText || "").toLowerCase();
-  if (statusText.includes("live") || statusText.includes("in play"))
+  if (statusText.includes("finished") || statusText.includes("full time") || statusText.includes("bitti")) {
+    return "finished-time";
+  }
+  if (statusText.includes("live") || statusText.includes("in play") || statusText.includes("canlı")) {
     return "live";
+  }
+
+  const runtime = getMatchRuntimeInfo(match);
+  if (runtime.phase === "live") return "live";
+  if (runtime.phase === "finished-time") return "finished-time";
   if (isMatchLocked(match)) return "locked";
   return "waiting";
 }
@@ -837,6 +869,7 @@ function getMatchBadge(match) {
   if (visual === "played-postponed")
     return { text: "Ertelendi / Oynandı", cls: "info" };
   if (visual === "played") return { text: "Bitti", cls: "" };
+  if (visual === "finished-time") return { text: "Sonuç Bekliyor", cls: "warn" };
   if (visual === "postponed") return { text: "Ertelendi", cls: "warn" };
   if (visual === "live") return { text: "Canlı", cls: "red" };
   if (visual === "locked") return { text: "🔒 Kilitli", cls: "red" };
