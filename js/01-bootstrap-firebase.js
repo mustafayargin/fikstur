@@ -2054,13 +2054,82 @@ function openAppModal({
   });
 }
 
+function ensureAppToastStack() {
+  let stack = document.getElementById("appToastStack");
+  if (stack) return stack;
+  stack = document.createElement("div");
+  stack.id = "appToastStack";
+  stack.className = "app-toast-stack";
+  stack.setAttribute("aria-live", "polite");
+  stack.setAttribute("aria-atomic", "false");
+  document.body.appendChild(stack);
+  return stack;
+}
+
+function showAppToast(message, options = {}) {
+  const stack = ensureAppToastStack();
+  if (!stack) return Promise.resolve(true);
+
+  const type = options.type || "info";
+  const title = options.title || (type === "success" ? "Başarılı" : type === "danger" ? "Hata" : type === "warning" ? "Uyarı" : "Bilgi");
+  const duration = Number(options.duration || (type === "danger" || type === "warning" ? 6500 : 4200));
+  const icons = {
+    info: "ℹ️",
+    success: "✅",
+    warning: "⚠️",
+    danger: "⛔",
+    error: "⛔",
+  };
+
+  const toast = document.createElement("div");
+  toast.className = `app-toast app-toast--${type}`;
+  toast.setAttribute("role", type === "danger" || type === "error" ? "alert" : "status");
+  toast.innerHTML = `
+    <div class="app-toast__icon">${icons[type] || icons.info}</div>
+    <div class="app-toast__body">
+      <strong>${escapeHtml(title)}</strong>
+      <span>${escapeHtml(message)}</span>
+    </div>
+    <button type="button" class="app-toast__close" aria-label="Bildirimi kapat">×</button>
+    <div class="app-toast__bar"></div>
+  `;
+
+  const removeToast = () => {
+    toast.classList.remove("show");
+    toast.classList.add("hide");
+    setTimeout(() => toast.remove(), 220);
+  };
+
+  toast.querySelector(".app-toast__close")?.addEventListener("click", removeToast);
+  stack.prepend(toast);
+
+  requestAnimationFrame(() => toast.classList.add("show"));
+  const bar = toast.querySelector(".app-toast__bar");
+  if (bar) bar.style.animationDuration = `${duration}ms`;
+  setTimeout(removeToast, duration);
+
+  return Promise.resolve(true);
+}
+
 function showAlert(message, options = {}) {
-  return openAppModal({
+  return showAppToast(message, {
     type: options.type || "info",
     title: options.title || "Bilgi",
-    message,
-    confirmText: options.confirmText || "Tamam",
+    duration: options.duration,
   });
+}
+
+window.showAppToast = showAppToast;
+window.showAlert = showAlert;
+if (!window.__nativeAppAlert) {
+  window.__nativeAppAlert = window.alert.bind(window);
+  window.alert = function appToastAlert(message) {
+    if (document?.body) {
+      showAppToast(String(message || ""), { title: "Bilgi", type: "info" });
+      return;
+    }
+    window.__nativeAppAlert(message);
+  };
 }
 
 function showConfirm(message, options = {}) {
@@ -3572,10 +3641,10 @@ function showWelcomeOverlay(user = getAuthUser(), options = {}) {
   const shortName = displayName.split(/\s+/).filter(Boolean)[0] || displayName;
   // Eski motivasyon sistemi (karşılama kartı kapalıysa çalışır)
 const welcomeLines = [
-    "İyi haftalar, bol şans! ✨",
-    "Yeni haftada güzel tahminler seni bekliyor. ⚽",
-    "Hazırsan başlayalım, şans seninle olsun. 🌟",
-    "Harika bir hafta olsun, bol puanlar! 🙌",
+    "Sezon hazır. Tahminlerini oluşturmaya başlayalım.",
+    "Arena hazır. İlk tahmin için sahaya çıkalım.",
+    "Yeni sezon başladı. Puanları toplamaya başlayalım.",
+    "Premium arena açıldı. Şimdi tahmin zamanı."
   ];
   const selectedMessage =
     options.message ||
@@ -3619,8 +3688,9 @@ const welcomeLines = [
     `;
 
     avatar.innerHTML = avatarSource;
-  title.textContent = config.title || `Hoş geldin, ${shortName}!`;
-  message.textContent = selectedMessage;
+  const premiumWelcomeTitle = String(shortName || displayName || "Oyuncu").toLocaleUpperCase("tr-TR");
+  title.textContent = premiumWelcomeTitle;
+  message.textContent = selectedMessage || "Sezon hazır. Tahminlerini oluşturmaya başlayalım.";
 
   const imageSrc = getWelcomeImageSrc(config.imageFile);
   if (image && mediaWrap && imageSrc) {
@@ -5003,7 +5073,10 @@ function renderDashboardMatchCards(container, matches) {
       const hiddenAvatarCount = Math.max(predictions.length - 6, 0);
 
       return `
-        <article class="dashboard-match-card premium-match-card master-match-card is-${visual} ${coverageClass} ${match.played ? "is-played" : ""} ${visual === "postponed" ? "postponed-row" : ""} ${visual === "played-postponed" ? "rescheduled-played-row" : ""}" style="--match-stadium-bg:url('images/match-scenes/default.png')">
+      <article
+      class="dashboard-match-card premium-match-card master-match-card is-${visual} ${coverageClass} ${match.played ? "is-played" : ""} ${visual === "postponed" ? "postponed-row" : ""} ${visual === "played-postponed" ? "rescheduled-played-row" : ""}"
+      data-match-id="${match.id}"
+      style="--match-stadium-bg:url('images/match-scenes/default.png')">
           <div class="premium-stadium-bg" aria-hidden="true"></div>
           <div class="premium-stadium-lights" aria-hidden="true"></div>
           <div class="dashboard-match-card__glow"></div>
@@ -5015,9 +5088,8 @@ function renderDashboardMatchCards(container, matches) {
               <span>•</span>
               <b>${premium.timeText}</b>
             </span>
-            <span class="premium-countdown">
-
-              <strong>${escapeHtml(premium.kicker)}</strong>
+            <span class="premium-countdown" data-countdown-role="match-clock">
+              <strong data-countdown-text>${escapeHtml(premium.kicker)}</strong>
             </span>
           </div>
 
