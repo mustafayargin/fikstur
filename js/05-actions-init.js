@@ -2787,6 +2787,7 @@ document.addEventListener("keydown", (e) => {
 
 let dashboardClockRefreshTimer = null;
 let dashboardClockRefreshBusy = false;
+let dashboardClockLastPhaseMap = new Map();
 
 function startDashboardClockRefresh() {
   if (dashboardClockRefreshTimer) return;
@@ -2801,8 +2802,34 @@ function startDashboardClockRefresh() {
     dashboardClockRefreshBusy = true;
 
     try {
-      renderDashboardOverview();
-      renderMatches("dashboardMatches", state.settings.activeWeekId);
+      let needsFullRender = false;
+
+      container.querySelectorAll(".premium-match-card[data-match-id]").forEach((card) => {
+        const matchId = card.dataset.matchId;
+        const match = state.matches.find((item) => String(item.id) === String(matchId));
+        if (!match) return;
+
+        const premium = getPremiumMatchState(match);
+        const countdownEl = card.querySelector(".premium-countdown strong");
+
+        if (countdownEl) {
+          countdownEl.textContent = premium.kicker || "";
+        }
+
+        const oldPhase = dashboardClockLastPhaseMap.get(matchId);
+        const newPhase = premium.phase || premium.label || "";
+
+        if (oldPhase && oldPhase !== newPhase) {
+          needsFullRender = true;
+        }
+
+        dashboardClockLastPhaseMap.set(matchId, newPhase);
+      });
+
+      if (needsFullRender) {
+        renderDashboardOverview();
+        renderMatches("dashboardMatches", state.settings.activeWeekId);
+      }
     } catch (error) {
       console.warn("Dashboard saat yenileme hatası:", error);
     } finally {
@@ -2813,7 +2840,5 @@ function startDashboardClockRefresh() {
   tickDashboardClock();
   dashboardClockRefreshTimer = setInterval(tickDashboardClock, 1000);
 }
-
-startDashboardClockRefresh();
 
 startDashboardClockRefresh();
