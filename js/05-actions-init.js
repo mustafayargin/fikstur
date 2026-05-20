@@ -2790,12 +2790,16 @@ let dashboardClockRefreshBusy = false;
 
 function startDashboardClockRefresh() {
   if (dashboardClockRefreshTimer) return;
-  dashboardClockRefreshTimer = setInterval(() => {
+
+  const tickDashboardClock = () => {
     if (dashboardClockRefreshBusy) return;
     if ((state.settings.currentTab || "dashboard") !== "dashboard") return;
+
     const container = document.getElementById("dashboardMatches");
     if (!container) return;
+
     dashboardClockRefreshBusy = true;
+
     try {
       renderDashboardOverview();
       renderMatches("dashboardMatches", state.settings.activeWeekId);
@@ -2804,7 +2808,12 @@ function startDashboardClockRefresh() {
     } finally {
       dashboardClockRefreshBusy = false;
     }
-  }, 15000);
+  };
+
+  tickDashboardClock();
+  dashboardClockRefreshTimer = setInterval(tickDashboardClock, 1000);
 }
+
+startDashboardClockRefresh();
 
 startDashboardClockRefresh();
