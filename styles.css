@@ -16584,11 +16584,7 @@ body[data-role="user"] #tab-players .page-header p {
   background: rgba(245, 158, 11, 0.35);
   color: #ffffff;
 }
-/* Geçici olarak puan çek barını gizle silinecek*/
-#pullLeagueStandingsBtn,
-.league-standings-trigger-btn {
-  display: none !important;
-}
+
 /* ===== Welcome kart premium şampiyon efekti ===== */
 
 /* Kart açılış + hafif parallax hissi */
