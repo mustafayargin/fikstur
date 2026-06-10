@@ -13,6 +13,38 @@ const PREDICTION_NOTIFICATION_REMINDERS = [
 ];
 
 let predictionNotificationTimer = null;
+const FIKSTUR_FOREGROUND_NOTIFICATION_DEDUPE_KEY = "fikstur_foreground_notification_dedupe_v1";
+const FIKSTUR_FOREGROUND_NOTIFICATION_DEDUPE_MS = 15000;
+
+function shouldSkipForegroundFiksturNotification(key) {
+  const safeKey = String(key || "").trim();
+  if (!safeKey) return false;
+
+  let cache = {};
+  try {
+    cache = JSON.parse(sessionStorage.getItem(FIKSTUR_FOREGROUND_NOTIFICATION_DEDUPE_KEY) || "{}");
+  } catch {
+    cache = {};
+  }
+
+  const now = Date.now();
+  Object.keys(cache).forEach((cacheKey) => {
+    if (now - Number(cache[cacheKey] || 0) > FIKSTUR_FOREGROUND_NOTIFICATION_DEDUPE_MS) {
+      delete cache[cacheKey];
+    }
+  });
+
+  if (now - Number(cache[safeKey] || 0) < FIKSTUR_FOREGROUND_NOTIFICATION_DEDUPE_MS) {
+    return true;
+  }
+
+  cache[safeKey] = now;
+  try {
+    sessionStorage.setItem(FIKSTUR_FOREGROUND_NOTIFICATION_DEDUPE_KEY, JSON.stringify(cache));
+  } catch {}
+
+  return false;
+}
 
 function isPredictionNotificationSupported() {
   return "Notification" in window;
@@ -295,13 +327,19 @@ async function setupFiksturFcmToken() {
   messaging.onMessage((payload) => {
     const title = payload?.data?.title || payload?.notification?.title || "Tahmin Paneli";
     const body = payload?.data?.body || payload?.notification?.body || "Yeni bildirimin var.";
+    const dedupeKey = payload?.data?.dedupeKey || payload?.data?.tag || `${title}|${body}`;
+    if (shouldSkipForegroundFiksturNotification(dedupeKey)) {
+      console.log("[FCM] Aynı ön plan bildirimi kısa süre içinde tekrar geldi, gösterilmedi:", dedupeKey);
+      return;
+    }
+
     try {
       new Notification(title, {
         body,
         icon: payload?.data?.icon || payload?.notification?.icon || getFiksturNotificationAssetUrl("/icons/icon-192.png"),
         badge: payload?.data?.badge || getFiksturNotificationAssetUrl("/icons/badge-72.png"),
         image: payload?.data?.image || getFiksturNotificationAssetUrl("/icons/icon-512.png"),
-        tag: payload?.data?.tag || `fikstur-${title}-${body}`,
+        tag: payload?.data?.tag || String(dedupeKey).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 120),
         renotify: false,
         data: payload?.data || {},
       });
