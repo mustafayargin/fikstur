@@ -116,8 +116,8 @@ function showPredictionReminderNotification(target, reminder) {
       body,
       tag: `prediction-reminder-${target.week.id}-${reminder.id}`,
       renotify: true,
-      icon: getFiksturNotificationAssetUrl("/icons/icon-192.png"),
-      badge: getFiksturNotificationAssetUrl("/icons/badge-72.png"),
+      icon: getFiksturNotificationAssetUrl("/app-icons/pwa-icon-192-v3.png"),
+      badge: getFiksturNotificationAssetUrl("/notification-icons/badge-72.png"),
     });
 
   } catch (error) {
@@ -336,9 +336,9 @@ async function setupFiksturFcmToken() {
     try {
       new Notification(title, {
         body,
-        icon: payload?.data?.icon || payload?.notification?.icon || getFiksturNotificationAssetUrl("/icons/icon-192.png"),
-        badge: payload?.data?.badge || getFiksturNotificationAssetUrl("/icons/badge-72.png"),
-        image: payload?.data?.image || getFiksturNotificationAssetUrl("/icons/icon-512.png"),
+        icon: payload?.data?.icon || payload?.notification?.icon || getFiksturNotificationAssetUrl("/app-icons/pwa-icon-192-v3.png"),
+        badge: payload?.data?.badge || getFiksturNotificationAssetUrl("/notification-icons/badge-72.png"),
+        image: payload?.data?.image || getFiksturNotificationAssetUrl("/app-icons/pwa-icon-512-v3.png"),
         tag: payload?.data?.tag || String(dedupeKey).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 120),
         renotify: false,
         data: payload?.data || {},
@@ -487,19 +487,19 @@ let adminNotificationLastTokenRows = [];
 let adminNotificationLastUserRows = [];
 
 const ADMIN_NOTIFICATION_ICONS = [
-  { id: "default", emoji: "🔔", label: "Genel", iconPath: "/icons/notif-default.png", badgePath: "/icons/badge-default.png" },
-  { id: "match", emoji: "⚽", label: "Maç", iconPath: "/icons/notif-match.png", badgePath: "/icons/badge-match.png" },
-  { id: "cup", emoji: "🏆", label: "Sonuç", iconPath: "/icons/notif-cup.png", badgePath: "/icons/badge-cup.png" },
-  { id: "alert", emoji: "🚨", label: "Acil", iconPath: "/icons/notif-alert.png", badgePath: "/icons/badge-alert.png" },
-  { id: "announce", emoji: "📢", label: "Duyuru", iconPath: "/icons/notif-announce.png", badgePath: "/icons/badge-announce.png" },
-  { id: "star", emoji: "⭐", label: "Öne Çıkan", iconPath: "/icons/notif-star.png", badgePath: "/icons/badge-star.png" },
+  { id: "default", emoji: "🔔", label: "Genel", iconPath: "/notification-icons/notif-default.png", badgePath: "/notification-icons/badge-default.png" },
+  { id: "match", emoji: "⚽", label: "Maç", iconPath: "/notification-icons/notif-match.png", badgePath: "/notification-icons/badge-match.png" },
+  { id: "cup", emoji: "🏆", label: "Sonuç", iconPath: "/notification-icons/notif-cup.png", badgePath: "/notification-icons/badge-cup.png" },
+  { id: "alert", emoji: "🚨", label: "Acil", iconPath: "/notification-icons/notif-alert.png", badgePath: "/notification-icons/badge-alert.png" },
+  { id: "announce", emoji: "📢", label: "Duyuru", iconPath: "/notification-icons/notif-announce.png", badgePath: "/notification-icons/badge-announce.png" },
+  { id: "star", emoji: "⭐", label: "Öne Çıkan", iconPath: "/notification-icons/notif-star.png", badgePath: "/notification-icons/badge-star.png" },
 ];
 
 function getAdminNotificationAssetUrls(iconId) {
   const meta = getAdminNotificationIconMeta(iconId);
   return {
-    iconUrl: getFiksturNotificationAssetUrl(meta.iconPath || "/icons/notif-default.png"),
-    badgeUrl: getFiksturNotificationAssetUrl(meta.badgePath || "/icons/badge-default.png"),
+    iconUrl: getFiksturNotificationAssetUrl(meta.iconPath || "/notification-icons/notif-default.png"),
+    badgeUrl: getFiksturNotificationAssetUrl(meta.badgePath || "/notification-icons/badge-default.png"),
   };
 }
 

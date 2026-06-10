@@ -62,9 +62,9 @@ messaging.onBackgroundMessage((payload) => {
 
   const options = {
     body,
-    icon: payload?.data?.icon || notificationAssetUrl("/icons/icon-192.png"),
-    badge: payload?.data?.badge || notificationAssetUrl("/icons/badge-72.png"),
-    image: payload?.data?.image || notificationAssetUrl("/icons/icon-512.png"),
+    icon: payload?.data?.icon || notificationAssetUrl("/app-icons/pwa-icon-192-v3.png"),
+    badge: payload?.data?.badge || notificationAssetUrl("/notification-icons/badge-72.png"),
+    image: payload?.data?.image || notificationAssetUrl("/app-icons/pwa-icon-512-v3.png"),
     tag: payload?.data?.tag || String(dedupeKey).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 120),
     renotify: false,
     data: {
