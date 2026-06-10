@@ -293,12 +293,12 @@ async function setupFiksturFcmToken() {
   const messaging = window.firebase.messaging();
 
   messaging.onMessage((payload) => {
-    const title = payload?.notification?.title || "Tahmin Paneli";
-    const body = payload?.notification?.body || "Yeni bildirimin var.";
+    const title = payload?.data?.title || payload?.notification?.title || "Tahmin Paneli";
+    const body = payload?.data?.body || payload?.notification?.body || "Yeni bildirimin var.";
     try {
       new Notification(title, {
         body,
-        icon: payload?.notification?.icon || payload?.data?.icon || getFiksturNotificationAssetUrl("/icons/icon-192.png"),
+        icon: payload?.data?.icon || payload?.notification?.icon || getFiksturNotificationAssetUrl("/icons/icon-192.png"),
         badge: payload?.data?.badge || getFiksturNotificationAssetUrl("/icons/badge-72.png"),
         image: payload?.data?.image || getFiksturNotificationAssetUrl("/icons/icon-512.png"),
         tag: payload?.data?.tag || `fikstur-${title}-${body}`,
@@ -449,13 +449,21 @@ let adminNotificationLastTokenRows = [];
 let adminNotificationLastUserRows = [];
 
 const ADMIN_NOTIFICATION_ICONS = [
-  { id: "default", emoji: "🔔", label: "Genel" },
-  { id: "match", emoji: "⚽", label: "Maç" },
-  { id: "cup", emoji: "🏆", label: "Sonuç" },
-  { id: "alert", emoji: "🚨", label: "Acil" },
-  { id: "announce", emoji: "📢", label: "Duyuru" },
-  { id: "star", emoji: "⭐", label: "Öne Çıkan" },
+  { id: "default", emoji: "🔔", label: "Genel", iconPath: "/icons/notif-default.png", badgePath: "/icons/badge-default.png" },
+  { id: "match", emoji: "⚽", label: "Maç", iconPath: "/icons/notif-match.png", badgePath: "/icons/badge-match.png" },
+  { id: "cup", emoji: "🏆", label: "Sonuç", iconPath: "/icons/notif-cup.png", badgePath: "/icons/badge-cup.png" },
+  { id: "alert", emoji: "🚨", label: "Acil", iconPath: "/icons/notif-alert.png", badgePath: "/icons/badge-alert.png" },
+  { id: "announce", emoji: "📢", label: "Duyuru", iconPath: "/icons/notif-announce.png", badgePath: "/icons/badge-announce.png" },
+  { id: "star", emoji: "⭐", label: "Öne Çıkan", iconPath: "/icons/notif-star.png", badgePath: "/icons/badge-star.png" },
 ];
+
+function getAdminNotificationAssetUrls(iconId) {
+  const meta = getAdminNotificationIconMeta(iconId);
+  return {
+    iconUrl: getFiksturNotificationAssetUrl(meta.iconPath || "/icons/notif-default.png"),
+    badgeUrl: getFiksturNotificationAssetUrl(meta.badgePath || "/icons/badge-default.png"),
+  };
+}
 
 function getAdminNotificationIconMeta(iconId) {
   return ADMIN_NOTIFICATION_ICONS.find((item) => item.id === iconId) || ADMIN_NOTIFICATION_ICONS[0];
@@ -510,8 +518,8 @@ function normalizeFcmTokenRows(tokens) {
     id,
     token: item?.token || id,
     deviceId: item?.deviceId || id,
-    userId: String(item?.userId || item?.playerId || "").trim(),
-    playerId: String(item?.playerId || item?.userId || "").trim(),
+    userId: String(item?.userId || item?.playerId || item?.kisiId || item?.username || item?.kullaniciAdi || "").trim(),
+    playerId: String(item?.playerId || item?.userId || item?.kisiId || item?.username || item?.kullaniciAdi || "").trim(),
     displayName: item?.displayName || item?.name || item?.userName || "Bilinmeyen kullanıcı",
     role: item?.role || "",
     permission: item?.permission || "unknown",
@@ -520,11 +528,15 @@ function normalizeFcmTokenRows(tokens) {
   })).sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
 
   const uniqueRows = [];
-  const seen = new Set();
+  const seenTokens = new Set();
+  const seenOwners = new Set();
+
   rows.forEach((row) => {
-    const key = row.token || row.deviceId || row.id;
-    if (!key || seen.has(key)) return;
-    seen.add(key);
+    const tokenKey = row.token || row.deviceId || row.id;
+    const ownerKey = row.userId || row.playerId || row.displayName || tokenKey;
+    if (!tokenKey || seenTokens.has(tokenKey) || seenOwners.has(ownerKey)) return;
+    seenTokens.add(tokenKey);
+    seenOwners.add(ownerKey);
     uniqueRows.push(row);
   });
 
@@ -1130,6 +1142,7 @@ async function queueManualNotification() {
 
   const id = sanitizeFirebaseKey(`manual_${Date.now()}`);
   const now = new Date().toISOString();
+  const assetUrls = getAdminNotificationAssetUrls(icon);
   const payload = {
     id,
     type: "manual",
@@ -1139,6 +1152,8 @@ async function queueManualNotification() {
     target,
     icon,
     iconEmoji: getAdminNotificationIconMeta(icon).emoji,
+    iconUrl: assetUrls.iconUrl,
+    badgeUrl: assetUrls.badgeUrl,
     targetUserIds,
     targetMode: target === "custom" ? "selectedUsers" : target,
     createdAt: now,
