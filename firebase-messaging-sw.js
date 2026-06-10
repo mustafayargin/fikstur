@@ -21,22 +21,25 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+function notificationAssetUrl(path) {
+  return new URL(path, self.location.origin + "/").toString();
+}
+
 messaging.onBackgroundMessage((payload) => {
   console.log("[FCM SW] Arka plan bildirimi geldi:", payload);
 
-  const title =
-    payload?.notification?.title || payload?.data?.title || "Tahmin Paneli";
+  const title = payload?.data?.title || payload?.notification?.title || "Tahmin Paneli";
+  const body = payload?.data?.body || payload?.notification?.body || "Yeni bildirimin var.";
 
   const options = {
-    body:
-      payload?.notification?.body ||
-      payload?.data?.body ||
-      "Yeni bildirimin var.",
-    icon: "./icons/icon-192.png",
-    badge: "./icons/icon-192.png",
-    image: "/icons/icon-512.png",
+    body,
+    icon: payload?.data?.icon || notificationAssetUrl("/icons/icon-192.png"),
+    badge: payload?.data?.badge || notificationAssetUrl("/icons/badge-72.png"),
+    image: payload?.data?.image || notificationAssetUrl("/icons/icon-512.png"),
+    tag: payload?.data?.tag || `fikstur-${title}-${body}`,
+    renotify: false,
     data: {
-      url: payload?.data?.url || "./index.html",
+      url: payload?.data?.url || notificationAssetUrl("/index.html"),
       ...(payload?.data || {}),
     },
   };

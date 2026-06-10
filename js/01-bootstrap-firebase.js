@@ -4133,6 +4133,12 @@ async function loginUser() {
       loadingMessage: "Kayıtlı veriler açılıyor, güncel bilgiler yükleniyor...",
     });
 
+    if (typeof window.refreshFiksturFcmTokenOwner === "function") {
+      window.refreshFiksturFcmTokenOwner().catch((error) => {
+        console.warn("[FCM] Giriş sonrası token kullanıcıya bağlanamadı:", error);
+      });
+    }
+
     forceDefaultLandingAfterLogin("login-after-hydration");
     saveState(true);
     switchTab("dashboard", {

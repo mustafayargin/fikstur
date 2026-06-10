@@ -3,6 +3,7 @@
 const PREDICTION_NOTIFICATION_STORAGE_KEY = "fikstur_prediction_notifications_enabled_v1";
 const PREDICTION_NOTIFICATION_SENT_KEY = "fikstur_prediction_notifications_sent_v1";
 const PREDICTION_NOTIFICATION_FCM_TOKEN_KEY = "fikstur_prediction_fcm_token_v1";
+const PREDICTION_NOTIFICATION_DEVICE_ID_KEY = "fikstur_prediction_fcm_device_id_v1";
 const PREDICTION_NOTIFICATION_CHECK_INTERVAL_MS = 60 * 1000;
 
 const PREDICTION_NOTIFICATION_REMINDERS = [
@@ -83,8 +84,8 @@ function showPredictionReminderNotification(target, reminder) {
       body,
       tag: `prediction-reminder-${target.week.id}-${reminder.id}`,
       renotify: true,
-      icon: "./icons/icon-192.png",
-      badge: "./icons/icon-192.png",
+      icon: getFiksturNotificationAssetUrl("/icons/icon-192.png"),
+      badge: getFiksturNotificationAssetUrl("/icons/badge-72.png"),
     });
 
   } catch (error) {
@@ -119,19 +120,90 @@ function checkPredictionNotifications() {
   if (changed) writePredictionNotificationSentMap(sentMap);
 }
 
+function getFiksturNotificationDeviceId() {
+  let deviceId = localStorage.getItem(PREDICTION_NOTIFICATION_DEVICE_ID_KEY);
+  if (!deviceId) {
+    const randomPart =
+      window.crypto?.randomUUID?.() ||
+      `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    deviceId = `web_${String(randomPart).replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+    localStorage.setItem(PREDICTION_NOTIFICATION_DEVICE_ID_KEY, deviceId);
+  }
+  return deviceId;
+}
+
+function getFiksturNotificationAssetUrl(path) {
+  try {
+    return new URL(path, window.location.origin + "/").toString();
+  } catch {
+    return path;
+  }
+}
+
+async function cleanupDuplicateFiksturFcmTokens(currentDeviceKey, token, owner) {
+  if (!token || !currentDeviceKey || !isFirebaseReady?.()) return;
+
+  try {
+    const rows = typeof firebaseRead === "function" ? await firebaseRead("fcmTokens") : null;
+    const updates = {};
+    const ownerIds = [owner?.userId, owner?.playerId].filter(Boolean).map(String);
+
+    Object.entries(rows || {}).forEach(([key, value]) => {
+      if (!value || key === currentDeviceKey) return;
+
+      const rowToken = String(value.token || "");
+      const rowDeviceId = String(value.deviceId || key || "");
+      const rowIds = [value.userId, value.playerId].filter(Boolean).map(String);
+
+      const sameToken = rowToken && rowToken === token;
+      const sameDevice = rowDeviceId && rowDeviceId === currentDeviceKey;
+      const sameOwnerSameToken = sameToken && ownerIds.length && rowIds.some((id) => ownerIds.includes(id));
+
+      if (sameToken || sameDevice || sameOwnerSameToken) {
+        updates[`fcmTokens/${key}`] = null;
+      }
+    });
+
+    if (Object.keys(updates).length) {
+      await firebaseUpdate("", updates);
+      console.log(`[FCM] Eski/çift token kayıtları temizlendi: ${Object.keys(updates).length}`);
+    }
+  } catch (error) {
+    console.warn("[FCM] Çift token temizliği yapılamadı:", error);
+  }
+}
+
 function getFcmTokenOwnerInfo() {
   const authUser = getAuthUser?.() || state?.settings?.auth?.user || null;
   const player = getCurrentPlayer?.() || null;
+  const authPlayerId = state?.settings?.auth?.playerId || null;
+  const isLoggedIn = !!(state?.settings?.auth?.isAuthenticated && authUser);
+
+  if (!isLoggedIn) {
+    return null;
+  }
+
+  const userId = String(player?.id || authPlayerId || authUser?.playerId || authUser?.id || authUser?.kisiId || "").trim();
+  const playerId = String(player?.id || authPlayerId || authUser?.playerId || authUser?.kisiId || "").trim();
+  const displayName = String(
+    player?.adSoyad ||
+    player?.name ||
+    authUser?.adSoyad ||
+    authUser?.name ||
+    authUser?.kullaniciAdi ||
+    authUser?.username ||
+    ""
+  ).trim();
+
+  if (!userId || !displayName) {
+    return null;
+  }
+
   return {
-    userId: authUser?.id || player?.id || state?.settings?.auth?.playerId || "anonymous",
-    playerId: player?.id || state?.settings?.auth?.playerId || null,
-    displayName:
-      player?.adSoyad ||
-      player?.name ||
-      authUser?.adSoyad ||
-      authUser?.name ||
-      authUser?.kullaniciAdi ||
-      "Bilinmeyen kullanıcı",
+    userId,
+    playerId: playerId || userId,
+    displayName,
+    username: authUser?.kullaniciAdi || authUser?.username || "",
     role: authUser?.rol || state?.settings?.auth?.role || null,
   };
 }
@@ -154,29 +226,41 @@ async function registerFiksturMessagingServiceWorker() {
 }
 
 async function saveFiksturFcmTokenToFirebase(token) {
-  if (!token) return;
+  if (!token) return false;
 
   const owner = getFcmTokenOwnerInfo();
-  const safeTokenKey = sanitizeFirebaseKey?.(token) || token.replace(/[.#$\[\]/]/g, "_");
+  if (!owner) {
+    console.warn("[FCM] Kullanıcı oturumu hazır olmadığı için token kaydı bekletildi.");
+    return false;
+  }
+
+  const deviceId = getFiksturNotificationDeviceId();
+  const safeDeviceKey = sanitizeFirebaseKey?.(deviceId) || deviceId.replace(/[.#$\[\]/]/g, "_");
+  const previousToken = localStorage.getItem(PREDICTION_NOTIFICATION_FCM_TOKEN_KEY) || "";
 
   const payload = {
     token,
+    previousToken: previousToken && previousToken !== token ? previousToken : null,
+    deviceId: safeDeviceKey,
     ...owner,
     permission: Notification.permission,
     userAgent: navigator.userAgent,
+    platform: navigator.platform || "",
     updatedAt: new Date().toISOString(),
   };
 
   try {
     if (typeof firebaseUpdate === "function") {
-      await firebaseUpdate(`fcmTokens/${safeTokenKey}`, payload);
+      await firebaseUpdate(`fcmTokens/${safeDeviceKey}`, payload);
     } else if (window.firebase?.database) {
-      await window.firebase.database().ref(`fcmTokens/${safeTokenKey}`).update(payload);
+      await window.firebase.database().ref(`fcmTokens/${safeDeviceKey}`).update(payload);
     } else {
       throw new Error("Firebase Database kayıt fonksiyonu bulunamadı.");
     }
 
+    await cleanupDuplicateFiksturFcmTokens(safeDeviceKey, token, owner);
     localStorage.setItem(PREDICTION_NOTIFICATION_FCM_TOKEN_KEY, token);
+    return true;
 
   } catch (error) {
     console.warn("[FCM] Token Firebase'e kaydedilemedi:", error);
@@ -214,8 +298,11 @@ async function setupFiksturFcmToken() {
     try {
       new Notification(title, {
         body,
-        icon: payload?.notification?.icon || "./icons/icon-192.png",
-        badge: "./icons/icon-192.png",
+        icon: payload?.notification?.icon || payload?.data?.icon || getFiksturNotificationAssetUrl("/icons/icon-192.png"),
+        badge: payload?.data?.badge || getFiksturNotificationAssetUrl("/icons/badge-72.png"),
+        image: payload?.data?.image || getFiksturNotificationAssetUrl("/icons/icon-512.png"),
+        tag: payload?.data?.tag || `fikstur-${title}-${body}`,
+        renotify: false,
         data: payload?.data || {},
       });
     } catch (error) {
@@ -245,8 +332,8 @@ async function setupFiksturFcmToken() {
   }
 
 
-  await saveFiksturFcmTokenToFirebase(token);
-  return token;
+  const saved = await saveFiksturFcmTokenToFirebase(token);
+  return saved ? token : null;
 }
 
 async function enablePredictionNotifications() {
@@ -301,6 +388,17 @@ async function enablePredictionNotifications() {
   checkPredictionNotifications();
   renderPredictionLockBanner?.(state?.settings?.activeWeekId);
 }
+
+window.refreshFiksturFcmTokenOwner = async function refreshFiksturFcmTokenOwner() {
+  if (
+    isPredictionNotificationSupported() &&
+    Notification.permission === "granted" &&
+    hasValidFiksturVapidKey()
+  ) {
+    return setupFiksturFcmToken();
+  }
+  return null;
+};
 
 function bindPredictionNotificationHooks() {
   document.addEventListener("click", (event) => {
@@ -408,9 +506,10 @@ function getPlayerNotificationId(player) {
 }
 
 function normalizeFcmTokenRows(tokens) {
-  return Object.entries(tokens || {}).map(([id, item]) => ({
+  const rows = Object.entries(tokens || {}).map(([id, item]) => ({
     id,
     token: item?.token || id,
+    deviceId: item?.deviceId || id,
     userId: String(item?.userId || item?.playerId || "").trim(),
     playerId: String(item?.playerId || item?.userId || "").trim(),
     displayName: item?.displayName || item?.name || item?.userName || "Bilinmeyen kullanıcı",
@@ -419,21 +518,32 @@ function normalizeFcmTokenRows(tokens) {
     updatedAt: item?.updatedAt || item?.createdAt || "",
     userAgent: item?.userAgent || "",
   })).sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+
+  const uniqueRows = [];
+  const seen = new Set();
+  rows.forEach((row) => {
+    const key = row.token || row.deviceId || row.id;
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    uniqueRows.push(row);
+  });
+
+  return uniqueRows;
 }
 
 function getNotificationUserRows(tokenRows) {
   const tokenByUser = new Map();
   tokenRows.forEach((token) => {
-    const keys = [token.userId, token.playerId].filter(Boolean);
+    const keys = [...new Set([token.userId, token.playerId].filter(Boolean).map(String))];
     keys.forEach((key) => {
-      if (!tokenByUser.has(key)) tokenByUser.set(key, []);
-      tokenByUser.get(key).push(token);
+      if (!tokenByUser.has(key)) tokenByUser.set(key, new Map());
+      tokenByUser.get(key).set(token.token || token.deviceId || token.id, token);
     });
   });
 
   return getNotificationSelectablePlayers().map((player) => {
     const id = getPlayerNotificationId(player);
-    const tokens = tokenByUser.get(id) || [];
+    const tokens = [...(tokenByUser.get(id)?.values() || [])];
     const grantedTokens = tokens.filter((token) => token.permission === "granted" || token.permission === "unknown");
     const lastToken = tokens[0] || null;
     return {
