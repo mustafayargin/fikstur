@@ -47,8 +47,13 @@ function renderSeasons() {
           <span>Logo dosya adı</span>
           <input type="text" value="${escapeHtml(team.slug || "")}" oninput="markSeasonTeamSlugDraft('${team.id}', this.value)" placeholder="örn: galatasaray" />
         </label>
+        <label class="field inline-field">
+          <span>Stadyum dosya adı</span>
+          <input type="text" value="${escapeHtml(getEffectiveMatchSceneSlug(team) || team.slug || slugify(team.name))}" oninput="markSeasonTeamSceneDraft('${team.id}', this.value)" placeholder="örn: galatasaray" />
+        </label>
         <div class="inline-actions compact wrap-actions">
           <button class="small secondary" onclick="saveSeasonTeamSlug('${team.id}', this)">Logo adını kaydet</button>
+          <button class="small secondary" onclick="saveSeasonTeamSceneSlug('${team.id}', this)">Stadyum adını kaydet</button>
           <button class="small secondary" onclick="renameSeasonTeam('${team.id}')">Adı düzenle</button>
           <button class="small danger" onclick="removeSeasonTeam('${team.id}')">Sil</button>
         </div>
@@ -73,6 +78,12 @@ window.markSeasonTeamSlugDraft = function (teamId, value) {
   team._draftSlug = String(value || "").trim();
 };
 
+window.markSeasonTeamSceneDraft = function (teamId, value) {
+  const team = getTeamById(teamId);
+  if (!team) return;
+  team._draftSceneSlug = String(value || "").trim();
+};
+
 window.saveSeasonTeamSlug = async function (teamId, buttonOrEvent) {
   if (isReadOnlyMode()) {
     return showAlert("Kullanıcı görünümünde takım logosu düzenlenemez.", {
@@ -94,6 +105,33 @@ window.saveSeasonTeamSlug = async function (teamId, buttonOrEvent) {
   }
   team.slug = nextSlug;
   delete team._draftSlug;
+  saveState(true);
+  renderAll();
+  setAsyncButtonState(actionButton, "success", { success: "Kaydedildi" });
+};
+
+window.saveSeasonTeamSceneSlug = async function (teamId, buttonOrEvent) {
+  if (isReadOnlyMode()) {
+    return showAlert("Kullanıcı görünümünde takım stadyumu düzenlenemez.", {
+      title: "Yetki yok",
+      type: "warning",
+    });
+  }
+  const actionButton = getActionButtonFromArg(buttonOrEvent);
+  const team = getTeamById(teamId);
+  if (!team) return;
+  const nextSceneSlug = String(
+    team._draftSceneSlug || getEffectiveMatchSceneSlug(team) || team.slug || slugify(team.name) || "",
+  ).trim();
+  if (!nextSceneSlug) {
+    return showAlert("Stadyum dosya adı boş olamaz.", {
+      title: "Eksik bilgi",
+      type: "warning",
+    });
+  }
+  team.sceneSlug = nextSceneSlug.replace(/\.png$/i, "");
+  team.stadiumSlug = team.sceneSlug;
+  delete team._draftSceneSlug;
   saveState(true);
   renderAll();
   setAsyncButtonState(actionButton, "success", { success: "Kaydedildi" });
@@ -260,8 +298,14 @@ window.renameSeasonTeam = async function (teamId) {
     title: "Logo dosya adı",
     placeholder: "örn: fenerbahce",
   });
+  const sceneSlug = await showPrompt("Stadyum dosya adı:", getEffectiveMatchSceneSlug(team) || slugify(name), {
+    title: "Stadyum dosya adı",
+    placeholder: "örn: galatasaray veya beşiktaş",
+  });
   team.name = name.trim();
   team.slug = (slug || slugify(name)).trim();
+  team.sceneSlug = String(sceneSlug || getEffectiveMatchSceneSlug(team) || team.slug || slugify(name)).trim().replace(/\.png$/i, "");
+  team.stadiumSlug = team.sceneSlug;
   saveState();
   renderAll();
 };

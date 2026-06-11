@@ -19459,3 +19459,33 @@ body[data-role="user"] #tab-players .page-header p {
     aspect-ratio: 3 / 4 !important;
   }
 }
+
+/* =========================================================
+   GENEL BAKIŞ STADYUM KART OTURTMA DÜZELTMESİ
+   - Maç Merkezi kartlarında stadyum görseli kartın tamamına yayılır.
+   - 16:9 stadyum görsellerinde kenar/köşe boşluğu ve kırpılma azaltılır.
+   ========================================================= */
+.dashboard-match-card.premium-match-card,
+.dashboard-match-card.premium-match-card.master-match-card {
+  background-size: 100% 100%, 100% 100%, 100% 100% !important;
+  background-position: center center, center center, center center !important;
+  background-repeat: no-repeat, no-repeat, no-repeat !important;
+}
+
+.dashboard-match-card.premium-match-card.is-live,
+.dashboard-match-card.premium-match-card.is-played,
+.dashboard-match-card.premium-match-card.is-finished-time,
+.dashboard-match-card.premium-match-card.is-played-postponed {
+  background-size: 100% 100%, 100% 100%, 100% 100% !important;
+  background-position: center center, center center, center center !important;
+  background-repeat: no-repeat, no-repeat, no-repeat !important;
+}
+
+@media (min-width: 901px) {
+  .dashboard-match-card.premium-match-card,
+  .dashboard-match-card.premium-match-card.master-match-card {
+    aspect-ratio: 16 / 9 !important;
+    min-height: 0 !important;
+    height: auto !important;
+  }
+}

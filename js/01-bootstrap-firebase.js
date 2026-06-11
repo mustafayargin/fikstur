@@ -2204,11 +2204,55 @@ const MATCH_SCENE_BY_TEAM = {
   "caykur rize": "çaykurrize.png",
 };
 
-function getMatchSceneUrl(teamName) {
+function normalizeMatchSceneFileName(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  return raw.toLowerCase().endsWith(".png") ? raw : `${raw}.png`;
+}
+
+function getDefaultMatchSceneSlugForTeam(teamName, teamMeta = null) {
   const normalized = normalizeText(teamName);
   const slug = slugify(teamName);
-  const fileName = MATCH_SCENE_BY_TEAM[normalized] || MATCH_SCENE_BY_TEAM[slug];
-  return fileName ? `${MATCH_SCENE_BASE_PATH}${fileName}` : MATCH_SCENE_DEFAULT;
+  const mappedFileName = MATCH_SCENE_BY_TEAM[normalized] || MATCH_SCENE_BY_TEAM[slug] || "";
+  const mappedSlug = mappedFileName.replace(/\.png$/i, "");
+  return mappedSlug || String(teamMeta?.slug || "").trim() || slug || "default";
+}
+
+function getEffectiveMatchSceneSlug(team) {
+  if (!team) return "";
+  return String(
+    team.sceneSlug ||
+      team.stadiumSlug ||
+      team.matchSceneSlug ||
+      getDefaultMatchSceneSlugForTeam(team.name, team) ||
+      "",
+  )
+    .trim()
+    .replace(/\.png$/i, "");
+}
+
+function findTeamMetaForMatchScene(teamName, seasonId = getActiveSeasonId?.()) {
+  const normalizedName = normalizeText(teamName);
+  if (!normalizedName) return null;
+  const teams = Array.isArray(state?.teams) ? state.teams : [];
+  return (
+    teams.find(
+      (team) =>
+        String(team.seasonId || "") === String(seasonId || "") &&
+        normalizeText(team.name) === normalizedName,
+    ) || teams.find((team) => normalizeText(team.name) === normalizedName) || null
+  );
+}
+
+function getMatchSceneUrl(teamName, seasonId = getActiveSeasonId?.()) {
+  const teamMeta = findTeamMetaForMatchScene(teamName, seasonId);
+  const sceneSlug = teamMeta
+    ? getEffectiveMatchSceneSlug(teamMeta)
+    : getDefaultMatchSceneSlugForTeam(teamName);
+  const fileName = normalizeMatchSceneFileName(sceneSlug);
+  return fileName && fileName !== "default.png"
+    ? `${MATCH_SCENE_BASE_PATH}${fileName}`
+    : MATCH_SCENE_DEFAULT;
 }
 function buildPlayerKeyFromName(name, existingUsers = {}) {
   const baseSlug = slugify(name);
@@ -2600,6 +2644,7 @@ async function syncOnlineMatchesFromSheet(options = {}) {
           seasonId,
           name: homeTeam,
           slug: DEFAULT_TEAM_SLUGS[homeTeam] || slugify(homeTeam),
+          sceneSlug: getDefaultMatchSceneSlugForTeam(homeTeam),
         });
       }
 
@@ -2613,6 +2658,7 @@ async function syncOnlineMatchesFromSheet(options = {}) {
           seasonId,
           name: awayTeam,
           slug: DEFAULT_TEAM_SLUGS[awayTeam] || slugify(awayTeam),
+          sceneSlug: getDefaultMatchSceneSlugForTeam(awayTeam),
         });
       }
     });
@@ -5122,7 +5168,7 @@ function renderDashboardMatchCards(container, matches) {
       <article
       class="dashboard-match-card premium-match-card master-match-card is-${visual} ${coverageClass} ${match.played ? "is-played" : ""} ${visual === "postponed" ? "postponed-row" : ""} ${visual === "played-postponed" ? "rescheduled-played-row" : ""}"
       data-match-id="${match.id}"
-      style="--match-stadium-bg:url('${getMatchSceneUrl(match.homeTeam)}')">
+      style="--match-stadium-bg:url('${getMatchSceneUrl(match.homeTeam, match.seasonId)}'), url('${MATCH_SCENE_DEFAULT}')">
           <div class="premium-stadium-bg" aria-hidden="true"></div>
           <div class="premium-stadium-lights" aria-hidden="true"></div>
           <div class="dashboard-match-card__glow"></div>

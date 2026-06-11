@@ -399,6 +399,10 @@ function getTeamMetaByName(name, seasonId = getActiveSeasonId()) {
     state.teams.find((t) => t.name === name) || {
       name,
       slug: DEFAULT_TEAM_SLUGS[name] || slugify(name),
+      sceneSlug:
+        typeof getDefaultMatchSceneSlugForTeam === "function"
+          ? getDefaultMatchSceneSlugForTeam(name)
+          : slugify(name),
     }
   );
 }

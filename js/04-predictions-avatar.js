@@ -73,22 +73,12 @@ function renderFocusedUserPredictions(container, matches) {
       const showSaveAction =
         canEdit && shouldShowPredictionSaveAction(match.id, currentPlayerId);
 
-      const sceneSlug =
-        typeof slugifyTeamName === "function"
-          ? slugifyTeamName(match.homeTeam)
-          : String(match.homeTeam || "")
-              .toLowerCase()
-              .replaceAll("ı", "i")
-              .replaceAll("ğ", "g")
-              .replaceAll("ü", "u")
-              .replaceAll("ş", "s")
-              .replaceAll("ö", "o")
-              .replaceAll("ç", "c")
-              .replace(/[^a-z0-9]+/g, "-")
-              .replace(/^-+|-+$/g, "");
-
-              const sceneUrl = `images/match-scenes/${sceneSlug || "default"}.png`;
-              const sceneFallbackUrl = `images/match-scenes/default.png`;      return `
+      const sceneUrl =
+        typeof getMatchSceneUrl === "function"
+          ? getMatchSceneUrl(match.homeTeam, match.seasonId)
+          : `images/match-scenes/${slugify(match.homeTeam) || "default"}.png`;
+      const sceneFallbackUrl = `images/match-scenes/default.png`;
+      return `
       <article
         class="prediction-scene-card ${match.played ? "is-played" : ""} ${lockedForUi ? "is-locked" : "is-open"} ${hasFullPrediction ? "has-prediction" : "needs-prediction"} ${visual === "postponed" ? "postponed-row" : ""} ${visual === "played-postponed" ? "rescheduled-played-row" : ""}"
         style="--match-scene-bg: url('${sceneUrl}'), url('${sceneFallbackUrl}');"      >
