@@ -131,10 +131,40 @@ window.saveSeasonTeamSceneSlug = async function (teamId, buttonOrEvent) {
   }
   team.sceneSlug = nextSceneSlug.replace(/\.png$/i, "");
   team.stadiumSlug = team.sceneSlug;
+
+  if (!state.settings || typeof state.settings !== "object") state.settings = {};
+  if (!state.settings.teamSceneSlugs || typeof state.settings.teamSceneSlugs !== "object") {
+    state.settings.teamSceneSlugs = {};
+  }
+  const seasonId = String(team.seasonId || getActiveSeasonId() || "");
+  const sceneKey = getMatchSceneOverrideKey(team.name);
+  if (!state.settings.teamSceneSlugs[seasonId]) state.settings.teamSceneSlugs[seasonId] = {};
+  state.settings.teamSceneSlugs[seasonId][sceneKey] = {
+    teamName: team.name,
+    sceneSlug: team.sceneSlug,
+    updatedAt: new Date().toISOString(),
+  };
+
   delete team._draftSceneSlug;
   saveState(true);
-  renderAll();
-  setAsyncButtonState(actionButton, "success", { success: "Kaydedildi" });
+
+  try {
+    if (isFirebaseReady()) {
+      await firebaseUpdate(`settings/teamSceneSlugs/${seasonId}`, {
+        [sceneKey]: state.settings.teamSceneSlugs[seasonId][sceneKey],
+      });
+    }
+    renderAll();
+    setAsyncButtonState(actionButton, "success", { success: "Firebase'e kaydedildi" });
+  } catch (error) {
+    console.error("Stadyum dosya adı Firebase'e kaydedilemedi:", error);
+    renderAll();
+    showAlert("Stadyum adı bu cihazda güncellendi ama Firebase'e yazılamadı. Rules tarafında settings yazma iznini kontrol et.", {
+      title: "Firebase kayıt uyarısı",
+      type: "warning",
+    });
+    setAsyncButtonState(actionButton, "error", { error: "Firebase hatası" });
+  }
 };
 
 window.removeSeason = async function (id) {

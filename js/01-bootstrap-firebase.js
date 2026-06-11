@@ -2245,14 +2245,54 @@ function findTeamMetaForMatchScene(teamName, seasonId = getActiveSeasonId?.()) {
 }
 
 function getMatchSceneUrl(teamName, seasonId = getActiveSeasonId?.()) {
+  const savedOverride = getStoredMatchSceneOverride(teamName, seasonId);
   const teamMeta = findTeamMetaForMatchScene(teamName, seasonId);
-  const sceneSlug = teamMeta
+  const sceneSlug = savedOverride || (teamMeta
     ? getEffectiveMatchSceneSlug(teamMeta)
-    : getDefaultMatchSceneSlugForTeam(teamName);
+    : getDefaultMatchSceneSlugForTeam(teamName));
   const fileName = normalizeMatchSceneFileName(sceneSlug);
   return fileName && fileName !== "default.png"
     ? `${MATCH_SCENE_BASE_PATH}${fileName}`
     : MATCH_SCENE_DEFAULT;
+}
+
+function getMatchSceneOverrideKey(teamName) {
+  const normalized = normalizeText(teamName);
+  return slugify(normalized || teamName) || sanitizeFirebaseKey(String(teamName || "team"));
+}
+
+function getStoredMatchSceneOverrides() {
+  if (!state.settings || typeof state.settings !== "object") state.settings = {};
+  if (!state.settings.teamSceneSlugs || typeof state.settings.teamSceneSlugs !== "object") {
+    state.settings.teamSceneSlugs = {};
+  }
+  return state.settings.teamSceneSlugs;
+}
+
+function getStoredMatchSceneOverride(teamName, seasonId = getActiveSeasonId?.()) {
+  const overrides = getStoredMatchSceneOverrides();
+  const seasonMap = overrides[String(seasonId || "")] || {};
+  const key = getMatchSceneOverrideKey(teamName);
+  const raw = seasonMap[key];
+  const sceneSlug = typeof raw === "string" ? raw : raw?.sceneSlug || raw?.stadiumSlug || "";
+  return String(sceneSlug || "").trim().replace(/\.png$/i, "");
+}
+
+function applyMatchSceneOverridesToTeams(overrides = null) {
+  const allOverrides = overrides || getStoredMatchSceneOverrides();
+  if (!allOverrides || typeof allOverrides !== "object" || !Array.isArray(state?.teams)) return;
+
+  state.teams.forEach((team) => {
+    const seasonId = String(team.seasonId || "");
+    const seasonMap = allOverrides[seasonId] || {};
+    const key = getMatchSceneOverrideKey(team.name);
+    const raw = seasonMap[key] || seasonMap[String(team.id || "")];
+    const sceneSlug = typeof raw === "string" ? raw : raw?.sceneSlug || raw?.stadiumSlug || "";
+    const cleaned = String(sceneSlug || "").trim().replace(/\.png$/i, "");
+    if (!cleaned) return;
+    team.sceneSlug = cleaned;
+    team.stadiumSlug = cleaned;
+  });
 }
 function buildPlayerKeyFromName(name, existingUsers = {}) {
   const baseSlug = slugify(name);
@@ -2663,6 +2703,8 @@ async function syncOnlineMatchesFromSheet(options = {}) {
       }
     });
 
+    applyMatchSceneOverridesToTeams();
+
     if (!state.settings.activeSeasonId && lastSeasonId) {
       state.settings.activeSeasonId = lastSeasonId;
     }
@@ -2756,9 +2798,11 @@ async function syncSeasonRegistryFromFirebase() {
     settings.resultsAutoSyncInProgressAt || 0,
   );
   state.settings.leagueStandingsCache = settings.leagueStandingsCache || state.settings.leagueStandingsCache || {};
+  state.settings.teamSceneSlugs = settings.teamSceneSlugs || state.settings.teamSceneSlugs || {};
   state.settings.welcomeCard = normalizeWelcomeCardSettings(
     settings.welcomeCard || state.settings.welcomeCard,
   );
+  applyMatchSceneOverridesToTeams(state.settings.teamSceneSlugs);
   const seasonList = rawList.map(normalizeSeasonRegistryItem).filter(Boolean);
   const remoteIds = new Set(seasonList.map((item) => String(item.id)));
 
