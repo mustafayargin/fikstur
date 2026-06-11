@@ -268,7 +268,7 @@ function setAsyncButtonState(button, state = "idle", labels = {}) {
     button.dataset.originalText || (button.textContent || "").trim();
 
   const loadingText = labels.loading || labels.pending || "Bekleniyor...";
-  const successText = labels.success || "Tamam";
+  const successText = labels.success || "⟳";
   const errorText = labels.error || "Tekrar dene";
 
   button.classList.remove("btn-loading", "btn-success", "btn-error");

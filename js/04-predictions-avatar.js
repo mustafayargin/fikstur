@@ -32,6 +32,30 @@ function desktopPredictionMatchCell(match) {
 }
 
 
+function isPredictionLockedForUserUi(matchIdOrMatch) {
+  const match =
+    typeof matchIdOrMatch === "object" && matchIdOrMatch
+      ? matchIdOrMatch
+      : state.matches.find((item) => String(item.id) === String(matchIdOrMatch));
+
+  return !!(match && isMatchLocked(match) && getCurrentRole() !== "admin");
+}
+
+function getLockedPredictionBlockReason(matchIdOrMatch, playerId) {
+  if (isPredictionLockedForUserUi(matchIdOrMatch)) {
+    return "Maç başladı, tahmin kilitli.";
+  }
+  const match =
+    typeof matchIdOrMatch === "object" && matchIdOrMatch
+      ? matchIdOrMatch
+      : state.matches.find((item) => String(item.id) === String(matchIdOrMatch));
+  if (match && !canEditPrediction(playerId, match.seasonId)) {
+    return "Bu tahmini düzenleme yetkin yok.";
+  }
+  return "";
+}
+
+
 function renderFocusedUserPredictions(container, matches) {
   if (!container) return;
   const currentPlayerId = getCurrentPlayerId();
@@ -69,9 +93,13 @@ function renderFocusedUserPredictions(container, matches) {
       const uiState = predictionUiState[uiKey] || "idle";
       const isSaving = uiState === "saving";
       const toastInfo = getPredictionToastInfo(match.id, currentPlayerId);
-      const showDeleteAction = hasPrediction || pred.remoteId || isSaving;
+      const showDeleteAction = !lockedForUi && (hasPrediction || pred.remoteId || isSaving);
       const showSaveAction =
-        canEdit && shouldShowPredictionSaveAction(match.id, currentPlayerId);
+        !lockedForUi && canEdit && shouldShowPredictionSaveAction(match.id, currentPlayerId);
+      const revealOthersOpen =
+        typeof isWeekStartedForPredictionReveal === "function" &&
+        isWeekStartedForPredictionReveal(match.weekId);
+      const revealButtonText = "Tahminleri gör";
 
       const sceneUrl =
         typeof getMatchSceneUrl === "function"
@@ -111,7 +139,7 @@ function renderFocusedUserPredictions(container, matches) {
                 data-match-id="${match.id}"
                 data-player-id="${currentPlayerId}"
                 aria-label="${escapeHtml(match.homeTeam)} tahmini"
-                ${lockedForUi || !canEdit ? "disabled" : ""}
+                ${lockedForUi || !canEdit ? 'disabled readonly aria-disabled="true" data-pred-locked="true"' : ""}
               />
               <span>:</span>
               <input
@@ -124,14 +152,14 @@ function renderFocusedUserPredictions(container, matches) {
                 data-match-id="${match.id}"
                 data-player-id="${currentPlayerId}"
                 aria-label="${escapeHtml(match.awayTeam)} tahmini"
-                ${lockedForUi || !canEdit ? "disabled" : ""}
+                ${lockedForUi || !canEdit ? 'disabled readonly aria-disabled="true" data-pred-locked="true"' : ""}
               />
             </div>
 
             <div class="prediction-scene-actions">
               ${lockedForUi ? `<div class="focused-lock-warning">🔒 Kilitli</div>` : ""}
               ${
-                canEdit
+                canEdit && !lockedForUi
                   ? `
                 <button
                 class="prediction-mobile-save-btn focused-save-btn ${
@@ -141,10 +169,7 @@ function renderFocusedUserPredictions(container, matches) {
                   data-pred-role="save-btn"
                   data-match-id="${match.id}"
                   data-player-id="${currentPlayerId}"
-                  ${lockedForUi ? "disabled" : ""}
-                  >${
-                    lockedForUi ? "🔒 Kilitli" : hasPrediction ? " " : " "
-                  }</button>
+                  >${hasPrediction ? " " : " "}</button>
                 <button
                   class="prediction-delete-btn focused-delete-btn ${showDeleteAction ? "" : "is-hidden"}"
                   type="button"
@@ -153,7 +178,6 @@ function renderFocusedUserPredictions(container, matches) {
                   data-match-id="${match.id}"
                   data-player-id="${currentPlayerId}"
                   title="Tahmini sil"
-                  ${lockedForUi ? "disabled" : ""}
                 >×</button>
               `
                   : ""
@@ -163,6 +187,16 @@ function renderFocusedUserPredictions(container, matches) {
             <div class="prediction-status-chip ${outcomeClass}" id="pred_status_${match.id}_${currentPlayerId}">
               ${statusText}
             </div>
+            ${revealOthersOpen ? `
+              <button
+                type="button"
+                class="focused-reveal-predictions-btn"
+                onclick="event.stopPropagation(); openDashboardMatchModal('${match.id}');"
+                title="Bu maçtaki diğer kullanıcı tahminlerini aç"
+              >${revealButtonText}</button>
+            ` : `
+              <div class="focused-reveal-locked-note">🔒 Diğer tahminler maç başlayınca açılır</div>
+            `}
             <div
               class="prediction-card-toast ${toastInfo ? "is-visible" : ""}"
               id="pred_toast_${match.id}_${currentPlayerId}"
@@ -187,7 +221,7 @@ function renderFocusedUserPredictions(container, matches) {
         <div>
           <span class="focused-eyebrow">Benim Tahminlerim</span>
           <h2>${escapeHtml(currentPlayer.name || "Kullanıcı")}</h2>
-          <p>Bu ekranda sadece kendi tahminlerini girersin. Diğer tahminler maç başlayınca Genel Bakış’ta görünür.</p>
+          <p>Kart görünümü sabit kalır. Maç başlayınca tahmin kilidi devam eder; diğer tahminleri görmek için karttaki butona basabilirsin.</p>
         </div>
         <div class="focused-summary">
           <span><strong>${completedCount}</strong> Girildi</span>
@@ -233,7 +267,7 @@ function renderPredictions() {
   const isAdmin = getCurrentRole() === "admin";
   const predictionsLocked = matches.some((match) => isMatchLocked(match));
 
-  if (!isAdmin && !predictionsLocked) {
+  if (!isAdmin) {
     renderFocusedUserPredictions(container, matches);
     updatePredictionShareModeButton();
     schedulePredictionViewportRestore(viewportSnapshot);
@@ -788,12 +822,15 @@ function setPredictionUiState(matchId, playerId, uiState, options = {}) {
     delete predictionUiResetTimers[key];
   }
 
+  const lockReason = getLockedPredictionBlockReason(matchId, playerId);
+  const forceLocked = !!lockReason;
+
   const button = document.getElementById(`pred_btn_${matchId}_${playerId}`);
   if (button) {
     button.textContent = getPredictionSaveLabel(matchId, playerId);
-    button.disabled = uiState === "saving" || uiState === "deleting";
+    button.disabled = forceLocked || uiState === "saving" || uiState === "deleting";
     button.setAttribute("aria-disabled", button.disabled ? "true" : "false");
-    button.style.pointerEvents = "auto";
+    button.style.pointerEvents = forceLocked ? "none" : "auto";
     button.dataset.saveState = uiState;
     button.classList.toggle(
       "is-saving",
@@ -822,7 +859,9 @@ function setPredictionUiState(matchId, playerId, uiState, options = {}) {
     `pred_delete_${matchId}_${playerId}`,
   );
   if (deleteButton) {
-    deleteButton.disabled = uiState === "saving" || uiState === "deleting";
+    deleteButton.disabled = forceLocked || uiState === "saving" || uiState === "deleting";
+    deleteButton.setAttribute("aria-disabled", deleteButton.disabled ? "true" : "false");
+    deleteButton.style.pointerEvents = forceLocked ? "none" : "auto";
     deleteButton.classList.toggle("is-working", uiState === "deleting");
   }
   updatePredictionDeleteButton(
@@ -946,6 +985,15 @@ window.queuePredictionSave = function (
   immediate = false,
   viewportSnapshot = null,
 ) {
+  const blockReason = getLockedPredictionBlockReason(matchId, playerId);
+  if (blockReason) {
+    clearPredictionDraft(matchId, playerId);
+    setPredictionUiState(matchId, playerId, "idle", { keepToast: true });
+    setPredictionCardToast(matchId, playerId, "warning", blockReason);
+    renderAll();
+    return;
+  }
+
   const key = getPredictionUiKey(matchId, playerId);
   clearTimeout(predictionTimers[key]);
 
@@ -967,6 +1015,14 @@ window.queuePredictionSave = function (
 
 window.deletePredictionEntry = async function (matchId, playerId) {
   const viewportSnapshot = capturePredictionViewport({ matchId, playerId });
+  const blockReason = getLockedPredictionBlockReason(matchId, playerId);
+  if (blockReason) {
+    setPredictionCardToast(matchId, playerId, "warning", blockReason);
+    renderAll();
+    schedulePredictionViewportRestore(viewportSnapshot);
+    return;
+  }
+
   const key = getPredictionUiKey(matchId, playerId);
   const btn = document.getElementById(`pred_delete_${matchId}_${playerId}`);
   if (!btn) return;

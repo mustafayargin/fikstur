@@ -1486,7 +1486,7 @@ function getHeaderSyncButtons() {
 function setHeaderSyncButtonsVisualState(mode = "idle") {
   const labels = {
     loading: { loading: "Eşitleniyor..." },
-    success: { success: "Güncellendi ✓" },
+    success: { success: "" },
     error: { error: "Tekrar dene" },
     idle: {},
   };
@@ -1630,7 +1630,7 @@ function ensureHeaderSyncButtons() {
       btn.setAttribute("aria-label", "Verileri yenile");
       btn.title = "Tahmin verilerini yenile";
       btn.innerHTML =
-        '<span class="sync-btn-icon" aria-hidden="true">↻</span><span>Yenile</span>';
+        '<span class="sync-btn-icon" aria-hidden="true">↻</span><span> </span>';
     }
 
     if (!actions.contains(btn)) {
@@ -5500,10 +5500,24 @@ window.openDashboardMatchModal = function (matchId) {
     (item) => String(item.id) === String(matchId),
   );
   if (!modal || !title || !meta || !body || !match) return;
-  title.textContent = `${match.homeTeam} - ${match.awayTeam}`;
+
+  // Modal normalde dashboard sekmesinin içinde duruyor. Kullanıcı Tahminler
+  // sayfasındayken o sekme gizli olduğu için pencere arkada/hiç görünmüyordu.
+  // Body'ye taşıyınca admin tarafındaki tablo ve ekran resmi alanına dokunmadan
+  // aynı pencere her sekmede en önde açılır.
+  if (modal.parentElement !== document.body) {
+    document.body.appendChild(modal);
+  }
+
+  const userCompactMode = getCurrentRole() !== "admin";
+  modal.classList.toggle("is-user-compact-prediction-modal", userCompactMode);
+
+  title.textContent = userCompactMode
+    ? `Tahminler • ${match.homeTeam} - ${match.awayTeam}`
+    : `${match.homeTeam} - ${match.awayTeam}`;
   meta.textContent = match.played
     ? `Gerçek skor: ${match.homeScore}-${match.awayScore} • ${formatDate(match.date)}`
-    : `${formatDate(match.date)} • Maç henüz oynanmadı`;
+    : `${formatDate(match.date)} • Maç başladı, tahminler kilitli`;
   body.innerHTML = buildDashboardMatchModalBody(match);
   modal.classList.remove("hidden");
   document.body.classList.add("dashboard-modal-open");
@@ -5513,6 +5527,7 @@ window.closeDashboardMatchModal = function () {
   const modal = document.getElementById("dashboardMatchModal");
   if (!modal) return;
   modal.classList.add("hidden");
+  modal.classList.remove("is-user-compact-prediction-modal");
   document.body.classList.remove("dashboard-modal-open");
 };
 
@@ -5563,13 +5578,13 @@ function renderMobilePredictions(container, matches) {
             const isSaving = uiState === "saving";
             const isOwnPlayer = player.id === currentPlayerId;
             const statusText = getPredictionBaseStatus(match.id, player.id);
-            const showDeleteAction = hasPrediction || pred.remoteId || isSaving;
+            const showDeleteAction = !lockedForUi && (hasPrediction || pred.remoteId || isSaving);
             const scoreDisplay =
               pred.homePred !== "" || pred.awayPred !== ""
                 ? `${pred.homePred !== "" ? pred.homePred : "-"} - ${pred.awayPred !== "" ? pred.awayPred : "-"}`
                 : "--";
             const showSaveAction =
-              canEdit && shouldShowPredictionSaveAction(match.id, player.id);
+              !lockedForUi && canEdit && shouldShowPredictionSaveAction(match.id, player.id);
 
             if (!isOwnPlayer && !isAdmin) {
               if (!canRevealPredictionForViewer(match, player.id)) {
@@ -5605,7 +5620,7 @@ function renderMobilePredictions(container, matches) {
                   data-pred-role="input"
                   data-match-id="${match.id}"
                   data-player-id="${player.id}"
-                  ${lockedForUi || !canEdit ? "disabled" : ""}
+                  ${lockedForUi || !canEdit ? 'disabled readonly aria-disabled="true" data-pred-locked="true"' : ""}
                 />
                 <span class="premium-dash">-</span>
                 <input
@@ -5617,7 +5632,7 @@ function renderMobilePredictions(container, matches) {
                   data-pred-role="input"
                   data-match-id="${match.id}"
                   data-player-id="${player.id}"
-                  ${lockedForUi || !canEdit ? "disabled" : ""}
+                  ${lockedForUi || !canEdit ? 'disabled readonly aria-disabled="true" data-pred-locked="true"' : ""}
                 />
               </div>
 
