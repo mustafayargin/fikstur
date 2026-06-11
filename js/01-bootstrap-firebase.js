@@ -2170,6 +2170,46 @@ function slugify(value) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
+
+const MATCH_SCENE_BASE_PATH = "images/match-scenes/";
+const MATCH_SCENE_DEFAULT = `${MATCH_SCENE_BASE_PATH}default.png`;
+const MATCH_SCENE_BY_TEAM = {
+  amedspor: "amedspor.png",
+  "amed spor": "amedspor.png",
+  basaksehir: "başakşehir.png",
+  "istanbul basaksehir": "başakşehir.png",
+  besiktas: "beşiktaş.png",
+  corumspor: "corumspor.png",
+  "corum spor": "corumspor.png",
+  erzurumspor: "erzurumspor.png",
+  "erzurum spor": "erzurumspor.png",
+  eyupspor: "eyüpspor.png",
+  fenerbahce: "fenerbahce.png",
+  galatasaray: "galatasaray.png",
+  gaziantep: "gaziantep.png",
+  "gaziantep fk": "gaziantep.png",
+  genclerbirligi: "gençlerbirliği.png",
+  goztepe: "göztepe.png",
+  kasimpasa: "kasımpaşa.png",
+  kocaelispor: "kocaelispor.png",
+  "kocaeli spor": "kocaelispor.png",
+  konyaspor: "konyaspor.png",
+  "konya spor": "konyaspor.png",
+  samsunspor: "samsunspor.png",
+  "samsun spor": "samsunspor.png",
+  trabzonspor: "trabzonspor.png",
+  "trabzon spor": "trabzonspor.png",
+  caykurrize: "çaykurrize.png",
+  "caykur rizespor": "çaykurrize.png",
+  "caykur rize": "çaykurrize.png",
+};
+
+function getMatchSceneUrl(teamName) {
+  const normalized = normalizeText(teamName);
+  const slug = slugify(teamName);
+  const fileName = MATCH_SCENE_BY_TEAM[normalized] || MATCH_SCENE_BY_TEAM[slug];
+  return fileName ? `${MATCH_SCENE_BASE_PATH}${fileName}` : MATCH_SCENE_DEFAULT;
+}
 function buildPlayerKeyFromName(name, existingUsers = {}) {
   const baseSlug = slugify(name);
   const safeBase = baseSlug || "oyuncu";
@@ -5082,7 +5122,7 @@ function renderDashboardMatchCards(container, matches) {
       <article
       class="dashboard-match-card premium-match-card master-match-card is-${visual} ${coverageClass} ${match.played ? "is-played" : ""} ${visual === "postponed" ? "postponed-row" : ""} ${visual === "played-postponed" ? "rescheduled-played-row" : ""}"
       data-match-id="${match.id}"
-      style="--match-stadium-bg:url('images/match-scenes/default.png')">
+      style="--match-stadium-bg:url('${getMatchSceneUrl(match.homeTeam)}')">
           <div class="premium-stadium-bg" aria-hidden="true"></div>
           <div class="premium-stadium-lights" aria-hidden="true"></div>
           <div class="dashboard-match-card__glow"></div>
