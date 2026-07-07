@@ -73,7 +73,7 @@ messaging.onBackgroundMessage((payload) => {
       ...(payload?.data || {}),
     },
   };
-
+  console.log("[SW] showNotification çalıştı", title, options.tag);
   self.registration.showNotification(title, options);
 });
 
