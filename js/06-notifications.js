@@ -112,6 +112,7 @@ function showPredictionReminderNotification(target, reminder) {
   const body = `${weekNumber}. hafta tahminleri yaklaşık ${reminder.label} sonra kapanacak.`;
 
   try {
+    console.log("[PAGE] new Notification çalıştı", title, dedupeKey);
     new Notification(title, {
       body,
       tag: `prediction-reminder-${target.week.id}-${reminder.id}`,
