@@ -20254,3 +20254,22 @@ input[data-pred-locked="true"] {
     width: 100%;
   }
 }
+
+/* Sezon takım aktarımı - sade tek kart düzeni */
+.seasons-top-grid--single {
+  grid-template-columns: minmax(0, 720px);
+  justify-content: center;
+}
+
+.season-team-import-card {
+  width: 100%;
+}
+
+.season-team-import-card #seasonManagerSelect {
+  width: 100%;
+}
+
+.season-team-import-card #apiImportTeamsBtn {
+  width: 100%;
+  min-height: 46px;
+}

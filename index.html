@@ -12,7 +12,7 @@
       name="apple-mobile-web-app-status-bar-style"
       content="black-translucent"
     />
-    <link rel="icon" href="/favicon1.png?v=3" />
+    <link rel="icon" href="images/favicon/favicon.png?v=3" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=3" />
   </head>
   <body>
@@ -21,7 +21,7 @@
         <div>
           <div class="brand-card">
             <div class="brand-logo-wrap">
-              <img src="favicon.png" alt="Logo" class="logo-img" />
+              <img src="images/favicon/favicon.png" alt="Logo" class="logo-img" />
             </div>
           </div>
 
@@ -157,7 +157,7 @@
         <div class="mobile-top-brand">
           <div class="mobile-top-brand__main">
             <div class="mobile-top-brand__logo">
-              <img src="favicon.png" alt="Logo" class="logo-img" />
+              <img src="/images/favicon/favicon.png" alt="Logo" class="logo-img" />
             </div>
             <div class="mobile-top-brand__copy">
               <strong>Fikstür Tahmin</strong>
@@ -340,60 +340,27 @@
             <div>
               <h2>Sezonlar & Takımlar</h2>
               <p>
-                Sezon oluştur, takım listesini yönet ve seçili sezon için API
-                ile fikstür ya da sonuç güncellemesi çek.
+                Kayıtlı sezonlardan birini seç ve o sezona ait takım bilgilerini
+                TheSportsDB üzerinden içeri aktar.
               </p>
-            </div>
-            <div class="header-actions">
-              <select id="seasonManagerSelect"></select>
             </div>
           </div>
 
-          <div class="seasons-top-grid">
-            <section class="card form-card season-create-card">
-              <div class="card-header"><h3>Yeni Sezon</h3></div>
-              <div class="form-grid three season-form-grid">
-                <div class="field">
-                  <label for="seasonName">Sezon adı</label>
-                  <input
-                    type="text"
-                    id="seasonName"
-                    placeholder="Örn: 2025-2026"
-                  />
-                </div>
-                <div class="field">
-                  <label for="seasonLeague">Lig adı</label>
-                  <input type="text" id="seasonLeague" value="Süper Lig" />
-                </div>
-                <div class="field button-field">
-                  <button id="addSeasonBtn">Sezon Ekle</button>
-                </div>
-              </div>
-            </section>
-
-            <section class="card season-api-card">
-              <div class="card-header"><h3>API ile İçeri Aktar</h3></div>
+          <div class="seasons-top-grid seasons-top-grid--single">
+            <section class="card season-api-card season-team-import-card">
+              <div class="card-header"><h3>Sezon Takımlarını Getir</h3></div>
               <div class="stack-actions season-api-stack">
                 <div class="field">
-                  <label for="apiSeasonText">API sezon etiketi</label>
-                  <input
-                    type="text"
-                    id="apiSeasonText"
-                    placeholder="Örn: 2025-2026"
-                  />
+                  <label for="seasonManagerSelect">Sezon seç</label>
+                  <select id="seasonManagerSelect"></select>
                 </div>
                 <div class="small-meta">
-                  TheSportsDB free API ile sezon fikstürü çekilir. İstersen aynı
-                  sezon için sonuç güncellemesi de yapılır.
+                  Seçilen sezonun takımları alınır. Daha önce eklenmiş takımlar
+                  çoğaltılmaz; bulunan API bilgileri güncellenir.
                 </div>
-                <div class="inline-actions compact season-api-actions">
-                  <button class="secondary" id="apiImportFixturesBtn">
-                    Fikstürü Çek
-                  </button>
-                  <button class="secondary" id="apiUpdateResultsBtn">
-                    Sonuçları Güncelle
-                  </button>
-                </div>
+                <button id="apiImportTeamsBtn">
+                  Takımları API'den Getir
+                </button>
                 <div class="status-note" id="apiStatus">Hazır.</div>
               </div>
             </section>
@@ -2073,13 +2040,6 @@
         "BOlctNJfYtPVYYvTBezBinoc66KLJNY8yAAtncF5HwKO7dYfjFW76yoK1agD35aBIqfedJBo_5Fh_5ToWRcXe9E";
     </script>
 
-    <script src="js/01-bootstrap-firebase.js"></script>
-    <script src="js/02-state-core.js"></script>
-    <script src="js/03-management-ui.js"></script>
-
-    <script src="js/04-predictions-avatar.js?v=3"></script>
-    <script src="js/05-actions-init.js"></script>
-    <script src="js/06-notifications.js"></script>
-    <script src="js/07-prediction-logs.js"></script>
+<script src="app.js"></script>
   </body>
 </html>
