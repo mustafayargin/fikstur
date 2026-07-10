@@ -20219,3 +20219,31 @@ input[data-pred-locked="true"] {
     min-height: 40px !important;
   }
 }
+
+
+/* V2.0 - Sezon takım yönetimi */
+.season-team-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.season-team-toolbar .card-subtitle {
+  margin-top: 0;
+  margin-bottom: 3px;
+}
+
+@media (max-width: 720px) {
+  .season-team-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .season-team-toolbar button {
+    width: 100%;
+  }
+}
