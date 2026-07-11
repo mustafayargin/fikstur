@@ -20134,8 +20134,11 @@ input[data-pred-locked="true"] {
     line-height: 1 !important;
   }
   body[data-role="user"] #pullLeagueStandingsBtn.league-standings-trigger-btn {
-    display: inline-flex !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
 }
+    
   body[data-role="user"] #tab-predictions > .card {
     margin-top: 0 !important;
     padding: 8px !important;
