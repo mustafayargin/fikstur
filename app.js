@@ -10555,6 +10555,13 @@ function renderPredictions() {
   const viewportSnapshot = capturePredictionViewport();
   const container = document.getElementById("predictionsTable");
   if (!container) return;
+
+  /*
+   * Seçim kutusu ilk haftayı görsel olarak gösterebilir; ancak aktif hafta
+   * state içinde boş kalmışsa tahmin ekranı "Önce bir hafta seç" der.
+   * Tahminleri çizmeden önce sezon/hafta seçimini gerçek verilerle eşitle.
+   */
+  ensureActiveSelections();
   if (typeof compactLocalPredictionRecords === "function") {
     compactLocalPredictionRecords();
   }
