@@ -1269,7 +1269,16 @@ function debounceFirebaseRealtimeRender() {
 }
 
 async function hydrateFromFirebaseRealtime(source = "manual") {
-  if (!isFirebaseReady()) return false;
+  console.log("[HYDRATE] çağrıldı:", source, {
+    firebaseReady: isFirebaseReady(),
+    authenticated: isAuthenticated(),
+    user: getAuthUser?.() || null,
+  });
+
+  if (!isFirebaseReady()) {
+    console.warn("[HYDRATE] atlandı: Firebase hazır değil.", source);
+    return false;
+  }
   if (firebaseRealtimeHydrationPromise) return firebaseRealtimeHydrationPromise;
 
   firebaseRealtimeHydrationPromise = (async () => {
@@ -1294,10 +1303,12 @@ async function hydrateFromFirebaseRealtime(source = "manual") {
         lastAction: `Canlı ${getOnlineSourceLabel()} verisi alındı (${source}).`,
         success: true,
       });
+      console.log("[HYDRATE] tamamlandı");
       debounceFirebaseRealtimeRender();
       return true;
     } catch (error) {
       console.warn("Firebase canlı veri eşitleme uyarısı:", error);
+      console.error("[HYDRATE ERROR]", error);
       return false;
     } finally {
       firebaseRealtimeHydrationPromise = null;
@@ -1312,6 +1323,10 @@ let firebaseRealtimeHydrationTimer = null;
 function scheduleFirebaseRealtimeHydration(source = "realtime") {
   clearTimeout(firebaseRealtimeHydrationTimer);
   firebaseRealtimeHydrationTimer = setTimeout(() => {
+    if (!isAuthenticated()) {
+      console.log("[REALTIME] Oturum açılmadığı için eşitleme beklendi:", source);
+      return;
+    }
     hydrateFromFirebaseRealtime(source);
   }, 250);
 }
@@ -4460,10 +4475,23 @@ async function loginUser() {
     applyRolePermissions();
     startPresenceTracking();
     if (typeof resetIdleLogoutTimer === "function") resetIdleLogoutTimer();
-
-    await runSessionHydrationWithFastOverlay({
+    console.log("[START] Session Hydration başladı");
+    const sessionHydrationOk = await runSessionHydrationWithFastOverlay({
       loadingMessage: "Kayıtlı veriler açılıyor, güncel bilgiler yükleniyor...",
     });
+    console.log("[LOGIN AUTO SYNC] Oturum eşitlemesi tamamlandı:", sessionHydrationOk);
+
+    // Manuel Firebase Güncelle butonunun yaptığı tam eşitlemeyi girişten sonra
+    // otomatik olarak bir kez daha çalıştır. Böylece adminin eklediği yeni hafta,
+    // kullanıcı ilk girişinde butona basmadan kesin olarak alınır.
+    const fullHydrationOk = await hydrateFromFirebaseRealtime("login-auto");
+    console.log("[LOGIN AUTO SYNC] Tam Firebase eşitlemesi tamamlandı:", fullHydrationOk, {
+      seasons: state.seasons?.length || 0,
+      weeks: state.weeks?.length || 0,
+      matches: state.matches?.length || 0,
+      predictions: state.predictions?.length || 0,
+    });
+    renderAll();
 
     if (typeof window.refreshFiksturFcmTokenOwner === "function") {
       window.refreshFiksturFcmTokenOwner().catch((error) => {
@@ -16251,17 +16279,30 @@ if (isFirebaseReady()) {
   );
   ensureFirebaseRealtimeBridge();
 }
-
+console.log("[START] Firebase Ready :", isFirebaseReady());
+console.log("[START] Authenticated  :", isAuthenticated());
+console.log("[START] Current User   :", getAuthUser?.());
 if (isAuthenticated()) {
   startPresenceTracking();
   renderAll();
+  console.log("[START] Session Hydration başladı");
   runSessionHydrationWithFastOverlay({
     loadingMessage:
       "Kayıtlı veriler açılıyor, güncel bilgiler arka planda senkronlanıyor...",
     sessionRestore: true,
     suppressOverlay: true,
   })
-    .then(async () => {
+  
+    .then(async (sessionHydrationOk) => {
+      console.log("[START] Session Hydration bitti:", sessionHydrationOk);
+      const fullHydrationOk = await hydrateFromFirebaseRealtime("startup-auto");
+      console.log("[START] Tam Firebase eşitlemesi bitti:", fullHydrationOk, {
+        seasons: state.seasons?.length || 0,
+        weeks: state.weeks?.length || 0,
+        matches: state.matches?.length || 0,
+        predictions: state.predictions?.length || 0,
+      });
+      renderAll();
       if ((state.settings.currentTab || "dashboard") === "dashboard") {
         await maybeAutoSyncResults();
         renderDashboardSyncCard();
@@ -16282,7 +16323,9 @@ window.toggleDashboardSyncCard = toggleDashboardSyncCard;
 window.toggleAdminSyncOverview = toggleAdminSyncOverview;
 window.handleTeamLogoError = handleTeamLogoError;
 document.addEventListener("keydown", (e) => {
-  if (e.key.toLowerCase() !== "c") return;
+  const key = String(e?.key || "").toLowerCase();
+
+  if (key !== "c") return;
 
   const standingsTab = document.getElementById("tab-standings");
   if (!standingsTab || !standingsTab.classList.contains("active")) return;
