@@ -20433,7 +20433,7 @@ body:has(#leagueStandingsModal:not(.hidden))
   position: fixed;
   inset: 0;
   z-index: 9998;
-  pointer-events: none;
+  pointer-events: auto;
   visibility: hidden;
   background: transparent;
 }
@@ -20647,29 +20647,42 @@ body:has(#leagueStandingsModal:not(.hidden))
   white-space: nowrap;
 }
 
-.league-standings-team .team-logo-wrap,
-.league-standings-logo,
-.league-standings-logo .team-logo,
-.league-standings-logo .team-logo-img,
-.league-standings-team img.team-logo-img {
-  width: 28px !important;
-  height: 28px !important;
-  min-width: 28px !important;
-  min-height: 28px !important;
-  max-width: 28px !important;
-  max-height: 28px !important;
-  flex: 0 0 20px !important;
-  padding: 0 !important;
-  object-fit: contain !important;
-}
+/* =========================================================
+   LEAGUE STANDINGS - DESKTOP
+========================================================= */
 
-.league-standings-team .team-logo-wrap {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
+@media (min-width: 769px) {
 
+  .league-standings-team .team-logo-wrap,
+  .league-standings-logo,
+  .league-standings-logo .team-logo,
+  .league-standings-logo .team-logo-img,
+  .league-standings-team img.team-logo-img {
+
+    width: 31px !important;
+    height: 31px !important;
+
+    min-width: 31px  !important;
+    min-height: 31px  !important;
+
+    max-width: 31px  !important;
+    max-height: 31px  !important;
+
+    flex: 0 0 28px !important;
+
+    padding: 0 !important;
+
+    object-fit: contain !important;
+  }
+
+  .league-standings-team .team-logo-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+}
 .league-standings-points {
   color: #00d4ff;
   font: bold;
@@ -20762,20 +20775,42 @@ body:has(#leagueStandingsModal:not(.hidden))
     transform: translateX(-4px);
   }
 
-  .league-standings-team strong {
-    font-size: 13px;
-  }
+
+
+}
+/* =========================================================
+   LEAGUE STANDINGS - MOBILE
+========================================================= */
+
+@media (max-width: 768px) {
 
   .league-standings-team .team-logo-wrap,
-  .league-standings-team .team-logo-img,
-  .league-standings-team .team-logo {
-    width: 20px !important;
-    height: 20px !important;
-    min-width: 20px !important;
-    min-height: 20px !important;
-    max-width: 20px !important;
-    max-height: 20px !important;
-    flex: 0 0 20px !important;
+  .league-standings-logo,
+  .league-standings-logo .team-logo,
+  .league-standings-logo .team-logo-img,
+  .league-standings-team img.team-logo-img {
+
+    width: 18px !important;
+    height: 18px !important;
+
+    min-width: 18px !important;
+    min-height: 18px !important;
+
+    max-width: 18px !important;
+    max-height: 18px !important;
+
+    flex: 0 0 18px !important;
+
+    padding: 0 !important;
+
     object-fit: contain !important;
   }
+
+  .league-standings-team .team-logo-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
 }

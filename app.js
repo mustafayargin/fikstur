@@ -13071,6 +13071,7 @@ async function persistLeagueStandingsCache(seasonId, rows) {
 
 function renderLeagueStandingsModal(payload) {
   const modal = document.getElementById("leagueStandingsModal");
+
   const title = document.getElementById("leagueStandingsModalTitle");
   const meta = document.getElementById("leagueStandingsModalMeta");
   const body = document.getElementById("leagueStandingsModalBody");
@@ -13078,16 +13079,26 @@ function renderLeagueStandingsModal(payload) {
 
   const season = getSeasonById(payload?.seasonId || getActiveSeasonId());
   const rows = Array.isArray(payload?.rows) ? payload.rows : [];
-  const playedTotal = rows.reduce((sum, row) => sum + normalizeLeagueStandingNumber(row.played), 0) / 2;
+  const playedTotal =
+    rows.reduce(
+      (sum, row) => sum + normalizeLeagueStandingNumber(row.played),
+      0,
+    ) / 2;
   const updatedText = payload?.updatedAt
-    ? new Date(payload.updatedAt).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" })
+    ? new Date(payload.updatedAt).toLocaleString("tr-TR", {
+        dateStyle: "short",
+        timeStyle: "short",
+      })
     : "Henüz güncellenmedi";
 
   if (title) title.textContent = `${season?.name || "Aktif sezon"} Puan Durumu`;
-  if (meta) meta.textContent = `${Math.round(playedTotal)} oynanmış maçtan hesaplandı • Son çekim: ${updatedText}`;
+  if (meta)
+    meta.textContent = `${Math.round(playedTotal)} oynanmış maçtan hesaplandı • Son çekim: ${updatedText}`;
 
   if (!rows.length) {
-    body.innerHTML = createEmptyState("Henüz oynanmış maç sonucu yok. Skorlar geldikçe burada lig puan durumu oluşacak.");
+    body.innerHTML = createEmptyState(
+      "Henüz oynanmış maç sonucu yok. Skorlar geldikçe burada lig puan durumu oluşacak.",
+    );
   } else {
     body.innerHTML = `
       <div class="league-standings-table-shell">
@@ -13099,7 +13110,8 @@ function renderLeagueStandingsModal(payload) {
           <span>P</span>
         </div>
         ${rows
-          .map((row) => `
+          .map(
+            (row) => `
             <div class="league-standings-row ${row.rank <= 4 ? "is-europe" : ""} ${row.rank >= rows.length - 3 ? "is-danger" : ""}">
               <span class="league-standings-rank">${row.rank}</span>
               <span class="league-standings-team">
@@ -13110,7 +13122,8 @@ function renderLeagueStandingsModal(payload) {
               <span>${normalizeLeagueStandingNumber(row.goalDiff) > 0 ? "+" : ""}${normalizeLeagueStandingNumber(row.goalDiff)}</span>
               <span class="league-standings-points">${normalizeLeagueStandingNumber(row.points)}</span>
             </div>
-          `)
+          `,
+          )
           .join("")}
       </div>
     `;
@@ -13325,7 +13338,20 @@ async function addSeason() {
       title: "Eksik bilgi",
       type: "warning",
     });
-
+    const leagueStandingsModal = document.getElementById("leagueStandingsModal");
+    const leagueStandingsCard = leagueStandingsModal?.querySelector(".league-standings-modal-card");
+    
+    if (leagueStandingsModal && leagueStandingsCard) {
+    
+        leagueStandingsModal.addEventListener("click", (e) => {
+    
+            if (!leagueStandingsCard.contains(e.target)) {
+                closeLeagueStandingsModal();
+            }
+    
+        });
+    
+    }
   const seasonExists = state.seasons.some(
     (s) => normalizeText(s.name) === normalizeText(name),
   );
@@ -15770,10 +15796,14 @@ function bindEvents() {
   on("pullLeagueStandingsBtn", "click", pullLeagueStandingsFromCurrentResults);
   on("leagueStandingsModalClose", "click", closeLeagueStandingsModal);
   on("leagueStandingsModal", "click", (event) => {
-    if (
-      event.target?.id === "leagueStandingsModal" &&
-      window.matchMedia("(max-width: 768px)").matches
-    ) {
+    const card = event.currentTarget.querySelector(
+      ".league-standings-modal-card",
+    );
+
+    if (!card) return;
+
+    // Kartın DIŞINA tıklanırsa kapat
+    if (!card.contains(event.target)) {
       closeLeagueStandingsModal();
     }
   });
