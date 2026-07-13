@@ -549,7 +549,12 @@
             <div id="matchesList"></div>
           </div>
         </section>
-
+        <button
+        id="pullLeagueStandingsBtn"
+        type="button"
+        class="secondary league-standings-trigger-btn"
+      >
+      </button>
         <section class="tab-panel" id="tab-predictions">
           <div class="page-header">
             <div>
@@ -560,13 +565,7 @@
                 <select id="predictionSeasonSelect"></select>
                 <select id="predictionWeekSelect"></select>
               </div>
-              <button
-                id="pullLeagueStandingsBtn"
-                type="button"
-                class="secondary league-standings-trigger-btn"
-              >
-                Puanları Çek
-              </button>
+
               <button
                 id="toggleShareModeBtn"
                 type="button"
@@ -1820,6 +1819,8 @@
       class="league-standings-modal hidden"
       id="leagueStandingsModal"
       aria-hidden="true"
+      role="dialog"
+      aria-labelledby="leagueStandingsModalTitle"
     >
       <div class="league-standings-modal-card">
         <div class="league-standings-modal-head">

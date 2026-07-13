@@ -13112,29 +13112,50 @@ function renderLeagueStandingsModal(payload) {
 
   modal.classList.remove("hidden");
   modal.setAttribute("aria-hidden", "false");
+
+  requestAnimationFrame(() => {
+    modal.classList.add("is-open");
+  });
 }
+
+let leagueStandingsCloseTimer = null;
 
 function closeLeagueStandingsModal() {
   const modal = document.getElementById("leagueStandingsModal");
-  if (!modal) return;
-  modal.classList.add("hidden");
+  if (!modal || modal.classList.contains("hidden")) return;
+
+  modal.classList.remove("is-open");
   modal.setAttribute("aria-hidden", "true");
+
+  window.clearTimeout(leagueStandingsCloseTimer);
+  leagueStandingsCloseTimer = window.setTimeout(() => {
+    if (!modal.classList.contains("is-open")) {
+      modal.classList.add("hidden");
+    }
+  }, 300);
 }
 
 async function pullLeagueStandingsFromCurrentResults(buttonOrEvent) {
   const actionButton = getActionButtonFromArg(buttonOrEvent);
+  const modal = document.getElementById("leagueStandingsModal");
+
+  if (modal?.classList.contains("is-open")) {
+    closeLeagueStandingsModal();
+    return;
+  }
+
   const seasonId = getActiveSeasonId();
   if (!seasonId) {
     return showAlert("Önce aktif sezon seçmelisin.", { title: "Eksik seçim", type: "warning" });
   }
 
-  setAsyncButtonState(actionButton, "loading", { loading: "Çekiliyor..." });
+  setAsyncButtonState(actionButton, "loading", { loading: "" });
   try {
     const rows = buildLeagueStandingsFromResults(seasonId);
     const playedTeamRows = rows.filter((row) => normalizeLeagueStandingNumber(row.played) > 0);
     const payload = await persistLeagueStandingsCache(seasonId, rows);
     renderLeagueStandingsModal(payload);
-    setAsyncButtonState(actionButton, "success", { success: "Çekildi" });
+    setAsyncButtonState(actionButton, "success", { success: "" });
     if (!playedTeamRows.length) {
       showAlert("Puan durumu hazırlandı ama henüz oynanmış maç sonucu bulunamadı.", { title: "Bilgi", type: "info" });
     }
@@ -13414,7 +13435,7 @@ function setAsyncButtonState(button, state = "idle", labels = {}) {
   const original =
     button.dataset.originalText || (button.textContent || "").trim();
 
-  const loadingText = labels.loading || labels.pending || "Bekleniyor...";
+  const loadingText = labels.loading || labels.pending || "";
   const successText = labels.success || "⟳";
   const errorText = labels.error || "Tekrar dene";
 
@@ -15742,8 +15763,15 @@ function bindEvents() {
   on("pullLeagueStandingsBtn", "click", pullLeagueStandingsFromCurrentResults);
   on("leagueStandingsModalClose", "click", closeLeagueStandingsModal);
   on("leagueStandingsModal", "click", (event) => {
-    if (event.target?.id === "leagueStandingsModal")
+    if (
+      event.target?.id === "leagueStandingsModal" &&
+      window.matchMedia("(max-width: 768px)").matches
+    ) {
       closeLeagueStandingsModal();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeLeagueStandingsModal();
   });
   on("toggleShareModeBtn", "click", togglePredictionShareMode);
   document.addEventListener("click", (event) => {
