@@ -346,7 +346,22 @@
             </div>
           </div>
 
-          <div class="seasons-top-grid seasons-top-grid--single">
+          <div class="seasons-top-grid">
+            <section class="card form-card season-create-card">
+              <div class="card-header"><h3>Sezon Oluştur</h3></div>
+              <div class="stack-actions season-api-stack">
+                <div class="field">
+                  <label for="seasonName">Sezon adı</label>
+                  <input type="text" id="seasonName" placeholder="Örn: 2026-2027" />
+                </div>
+                <div class="field">
+                  <label for="seasonLeague">Lig adı</label>
+                  <input type="text" id="seasonLeague" placeholder="Örn: Süper Lig" />
+                </div>
+                <button type="button" id="addSeasonBtn">Sezon Oluştur</button>
+              </div>
+            </section>
+
             <section class="card season-api-card season-team-import-card">
               <div class="card-header"><h3>Sezon Takımlarını Getir</h3></div>
               <div class="stack-actions season-api-stack">

@@ -233,21 +233,19 @@ async function ensureFirebaseDefaults() {
     await firebaseWrite("users", seededUsers);
   }
 
-  if (!Object.keys(matches).length) {
-    await firebaseWrite("matches", matches);
-  }
-
-  if (!Object.keys(predictions).length) {
-    await firebaseWrite("predictions", predictions);
-  }
+  // Realtime Database boş nesne/dizileri kalıcı düğüm olarak saklamaz.
+  // Bu koleksiyonlara her HYDRATE sırasında {} veya [] yazmak, value
+  // listener'larını yeniden tetikleyerek sonsuz HYDRATE döngüsü oluşturur.
+  // matches ve predictions boşken oluşturulmaları gerekmez; ilk gerçek kayıt
+  // ilgili düğümü zaten oluşturacaktır.
 
   if (!settings || settings.init === true || !Object.keys(settings).length) {
+    const now = new Date().toISOString();
     await firebaseWrite("settings", {
       init: false,
       source: "firebase",
-      createdAt: new Date().toISOString(),
+      createdAt: now,
       defaultUsersSeeded: true,
-      seasonsMeta: [],
       welcomeCard: {
         enabled: true,
         title: "Hoş geldin!",
@@ -255,12 +253,12 @@ async function ensureFirebaseDefaults() {
         imageFile: "",
         imageFit: "cover",
         showOnce: false,
-        updatedAt: new Date().toISOString(),
+        updatedAt: now,
       },
     });
-  } else if (!Array.isArray(settings.seasonsMeta)) {
+  } else if (!settings.welcomeCard) {
+    const now = new Date().toISOString();
     await firebaseUpdate("settings", {
-      seasonsMeta: [],
       welcomeCard: {
         enabled: true,
         title: "Hoş geldin!",
@@ -268,7 +266,7 @@ async function ensureFirebaseDefaults() {
         imageFile: "",
         imageFit: "cover",
         showOnce: false,
-        updatedAt: new Date().toISOString(),
+        updatedAt: now,
       },
     });
   }
@@ -1327,12 +1325,6 @@ function debounceFirebaseRealtimeRender() {
 }
 
 async function hydrateFromFirebaseRealtime(source = "manual") {
-  console.log("[HYDRATE] çağrıldı:", source, {
-    firebaseReady: isFirebaseReady(),
-    authenticated: isAuthenticated(),
-    user: getAuthUser?.() || null,
-  });
-
   if (!isFirebaseReady()) {
     console.warn("[HYDRATE] atlandı: Firebase hazır değil.", source);
     return false;
@@ -1365,7 +1357,6 @@ async function hydrateFromFirebaseRealtime(source = "manual") {
         lastAction: `Canlı ${getOnlineSourceLabel()} verisi alındı (${source}).`,
         success: true,
       });
-      console.log("[HYDRATE] tamamlandı");
       debounceFirebaseRealtimeRender();
       return true;
     } catch (error) {
@@ -13748,14 +13739,21 @@ function renderAll() {
   }
 }
 
-async function addSeason() {
+async function addSeason(event) {
   if (isReadOnlyMode())
     return showAlert("Kullanıcı görünümünde bu alan sadece görüntülenir.", {
       title: "Yetki yok",
       type: "warning",
     });
-  const name = document.getElementById("seasonName").value.trim();
-  const leagueName = document.getElementById("seasonLeague").value.trim();
+
+  const button = event?.currentTarget || document.getElementById("addSeasonBtn");
+  if (button?.disabled) return;
+
+  const nameInput = document.getElementById("seasonName");
+  const leagueInput = document.getElementById("seasonLeague");
+  const name = String(nameInput?.value || "").trim();
+  const leagueName = String(leagueInput?.value || "").trim();
+
   if (!name)
     return showAlert("Sezon adı boş olamaz.", {
       title: "Eksik bilgi",
@@ -13766,22 +13764,9 @@ async function addSeason() {
       title: "Eksik bilgi",
       type: "warning",
     });
-    const leagueStandingsModal = document.getElementById("leagueStandingsModal");
-    const leagueStandingsCard = leagueStandingsModal?.querySelector(".league-standings-modal-card");
-    
-    if (leagueStandingsModal && leagueStandingsCard) {
-    
-        leagueStandingsModal.addEventListener("click", (e) => {
-    
-            if (!leagueStandingsCard.contains(e.target)) {
-                closeLeagueStandingsModal();
-            }
-    
-        });
-    
-    }
+
   const seasonExists = state.seasons.some(
-    (s) => normalizeText(s.name) === normalizeText(name),
+    (season) => normalizeText(season.name) === normalizeText(name),
   );
   if (seasonExists)
     return showAlert("Bu sezon zaten var.", {
@@ -13791,23 +13776,47 @@ async function addSeason() {
 
   const seasonId = uid("season");
   const newSeason = { id: seasonId, name, leagueName };
+  const previousSeasons = state.seasons.map((season) => ({ ...season }));
+  const previousPlayers = state.players.map((player) => ({
+    ...player,
+    seasonStates: { ...getPlayerSeasonStateMap(player) },
+  }));
+  const previousActiveSeasonId = state.settings.activeSeasonId;
+  const previousActiveWeekId = state.settings.activeWeekId;
 
-  state.seasons.push(newSeason);
-  state.players = state.players.map((player) => {
-    if (getPlayerRole(player) === "admin") return player;
-    const seasonStates = {
-      ...createDefaultSeasonStateMap(true),
-      ...getPlayerSeasonStateMap(player),
-      [seasonId]: true,
-    };
-    return { ...player, seasonStates };
-  });
-  state.settings.activeSeasonId = seasonId;
-  state.settings.activeWeekId = null;
+  if (button) {
+    button.disabled = true;
+    button.dataset.originalText = button.textContent;
+    button.textContent = "Oluşturuluyor...";
+  }
 
-  if (useOnlineMode && isFirebaseReady()) {
-    try {
+  try {
+    state.seasons.push(newSeason);
+    state.players = state.players.map((player) => {
+      if (getPlayerRole(player) === "admin") return player;
+      return {
+        ...player,
+        seasonStates: {
+          ...createDefaultSeasonStateMap(true),
+          ...getPlayerSeasonStateMap(player),
+          [seasonId]: true,
+        },
+      };
+    });
+    state.settings.activeSeasonId = seasonId;
+    state.settings.activeWeekId = null;
+
+    if (useOnlineMode && isFirebaseReady()) {
       await persistSeasonRegistryToFirebase();
+
+      const remoteSettings = (await firebaseRead("settings")) || {};
+      const remoteSeasons = Array.isArray(remoteSettings.seasonsMeta)
+        ? remoteSettings.seasonsMeta.map(normalizeSeasonRegistryItem).filter(Boolean)
+        : [];
+      if (!remoteSeasons.some((season) => season.id === seasonId)) {
+        throw new Error("Sezon Firebase'e doğrulanmış şekilde kaydedilemedi.");
+      }
+
       for (const player of state.players) {
         if (getPlayerRole(player) === "admin") continue;
         await updateOnlineUser({
@@ -13815,34 +13824,41 @@ async function addSeason() {
           seasonStates: getPlayerSeasonStateMap(player),
         });
       }
-      await hydrateFromFirebaseRealtime("season-add");
-      if (typeof window.writeAppAuditLogEntry === "function") {
-        window.writeAppAuditLogEntry({
-          actionType: "season_create",
-          actionLabel: "Sezon eklendi",
-          detail: `${name} sezonu eklendi`,
-          entityType: "season",
-          entityId: seasonId,
-          newValue: { season: name, leagueName },
-        });
-      }
-    } catch (error) {
-      state.seasons = state.seasons.filter((item) => item.id !== seasonId);
-      state.players = state.players.map((player) => {
-        const nextStates = { ...getPlayerSeasonStateMap(player) };
-        delete nextStates[seasonId];
-        return { ...player, seasonStates: nextStates };
-      });
-      return showAlert(error?.message || "Sezon Firebase'e kaydedilemedi.", {
-        title: "Kayıt Hatası",
-        type: "warning",
+    }
+
+    if (nameInput) nameInput.value = "";
+    if (leagueInput) leagueInput.value = "";
+    saveState(true);
+    renderAll();
+
+    if (typeof window.writeAppAuditLogEntry === "function") {
+      window.writeAppAuditLogEntry({
+        actionType: "season_create",
+        actionLabel: "Sezon eklendi",
+        detail: `${name} sezonu eklendi`,
+        entityType: "season",
+        entityId: seasonId,
+        newValue: { season: name, leagueName },
       });
     }
+  } catch (error) {
+    state.seasons = previousSeasons;
+    state.players = previousPlayers;
+    state.settings.activeSeasonId = previousActiveSeasonId;
+    state.settings.activeWeekId = previousActiveWeekId;
+    saveState(true);
+    renderAll();
+    return showAlert(error?.message || "Sezon Firebase'e kaydedilemedi.", {
+      title: "Kayıt Hatası",
+      type: "warning",
+    });
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = button.dataset.originalText || "Sezon Oluştur";
+      delete button.dataset.originalText;
+    }
   }
-
-  document.getElementById("seasonName").value = "";
-  saveState(true);
-  renderAll();
 }
 
 function addSeasonTeam() {
@@ -16226,6 +16242,7 @@ function bindEvents() {
     true,
   );
 
+  on("addSeasonBtn", "click", addSeason);
   on("addSeasonTeamBtn", "click", addSeasonTeam);
   on("addPlayerBtn", "click", (event) => addPlayer(event.currentTarget));
   on("addWeekBtn", "click", addWeek);

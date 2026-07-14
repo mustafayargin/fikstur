@@ -21126,3 +21126,12 @@ body:has(#leagueStandingsModal:not(.hidden))
 @media (max-width: 760px) {
   .week-unpublish-btn { flex: 1; }
 }
+/* Varsayılan olarak butonu herkesten gizle */
+#toggleShareModeBtn {
+    display: none !important;
+}
+
+/* Eğer kullanıcı admin ise butonu göster */
+.is-admin #toggleShareModeBtn {
+    display: inline-block !important; /* veya block */
+}
