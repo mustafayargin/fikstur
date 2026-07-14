@@ -437,8 +437,7 @@
             <div>
               <h2>Haftalar</h2>
               <p>
-                Aktif sezona hafta oluşturabilir, aktif haftayı seçebilir ve
-                durum takibi yapabilirsin.
+                Haftayı hazırlıkta oluştur, maçları kontrol et ve hazır olduğunda tek tıkla yayınla.
               </p>
             </div>
             <div class="header-actions double-selects">
@@ -447,8 +446,15 @@
             </div>
           </div>
 
-          <div class="card form-card">
-            <div class="form-grid three">
+          <div class="card form-card week-create-card">
+            <div class="week-create-intro">
+              <div>
+                <strong>Yeni hafta oluştur</strong>
+                <span>Yeni haftalar önce hazırlıkta açılır. Maçları kontrol ettikten sonra yayınlayabilirsin.</span>
+              </div>
+              <span class="week-flow-pill">Hazırlanıyor → Yayınla → Otomatik tamamlanır</span>
+            </div>
+            <div class="form-grid two week-create-grid">
               <div class="field">
                 <label for="weekNumber">Hafta no</label>
                 <input
@@ -458,16 +464,8 @@
                   placeholder="Örn: 1"
                 />
               </div>
-              <div class="field">
-                <label for="weekStatus">Durum</label>
-                <select id="weekStatus">
-                  <option value="aktif">Aktif</option>
-                  <option value="hazirlaniyor">Hazırlanıyor</option>
-                  <option value="tamamlandi">Tamamlandı</option>
-                </select>
-              </div>
               <div class="field button-field">
-                <button id="addWeekBtn">Hafta Ekle</button>
+                <button id="addWeekBtn">Hazırlıkta Hafta Oluştur</button>
               </div>
             </div>
           </div>
@@ -828,7 +826,7 @@
                   >Hafta lideri bekleniyor</span
                 >
               </div>
-              <div id="weeklyStandings"></div>
+              <div id="weeklyStandings" class="standings-card-body"></div>
             </section>
             <section class="card standings-board-card">
               <div class="card-header standings-card-head standings-list-head">
@@ -842,7 +840,7 @@
                   >Sezon lideri bekleniyor</span
                 >
               </div>
-              <div id="standingsTable"></div>
+              <div id="standingsTable" class="standings-card-body"></div>
             </section>
 
             <aside class="standings-side-stack standings-side-stack--luxury">
@@ -857,7 +855,7 @@
                     <p class="card-subtitle">Yarışın nabzı ve anlık özet.</p>
                   </div>
                 </div>
-                <div id="standingsInsights"></div>
+                <div id="standingsInsights" class="standings-card-body"></div>
               </section>
             </aside>
           </div>

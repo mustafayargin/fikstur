@@ -332,7 +332,7 @@ option {
 
 .stats-grid,
 .dashboard-grid,
-.standings-layout,
+
 .backup-layout {
   display: grid;
   gap: 14px;
@@ -362,17 +362,8 @@ option {
   grid-template-columns: 1.25fr 0.75fr;
 }
 
-.standings-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 14px;
-  align-items: stretch;
-}
 
-.standings-layout > .card {
-  min-width: 0;
-  height: 100%;
-}
+
 
 #standingsTable,
 #weeklyStandings {
@@ -1877,7 +1868,6 @@ option {
 
 @media (max-width: 1320px) {
   .dashboard-grid,
-  .standings-layout,
   .form-grid.two,
   .form-grid.three,
   .form-grid.four {
@@ -11645,7 +11635,7 @@ body.player-modal-open {
   #tab-standings .standings-board-card,
   #tab-standings .standings-week-card,
   #tab-standings .standings-insight-card--luxury {
-    border-radius: 50px;
+    border-radius: 30px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     background:
       radial-gradient(
@@ -12081,82 +12071,178 @@ body.player-modal-open {
   }
 }
 /* =========================================
-   STANDINGS - LEFT / RIGHT EQUAL WIDTH FIX
-   bunu styles.css dosyasının EN ALTINA ekle
+   STANDINGS - THREE CARD DESKTOP LAYOUT
+   Haftalık Yarış / Genel Sıralama / Hafta Özeti
 ========================================= */
 
-#tab-standings .standings-layout,
-#tab-standings .standings-luxury-layout,
-#tab-standings .standings-hero-shell {
-  display: grid !important;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-  gap: 18px !important;
-  align-items: stretch !important;
+/* Ortak kart ölçüleri ve iç düzen */
+#tab-standings .standings-luxury-layout {
+  display: grid;
+  gap: 18px;
+  align-items: stretch;
+  margin-top: 18px;
 }
 
-#tab-standings .standings-layout > *,
-#tab-standings .standings-luxury-layout > *,
-#tab-standings .standings-hero-shell > * {
-  min-width: 0 !important;
-  width: 100% !important;
+#tab-standings .standings-luxury-layout > * {
+  min-width: 0;
+  width: 100%;
 }
 
-#tab-standings .standings-layout > .card,
+/* Global .card + .card kuralının ikinci kartı aşağı itmesini engeller. */
 #tab-standings .standings-luxury-layout > .card,
-#tab-standings .standings-hero-shell > .card {
-  height: 100% !important;
+#tab-standings .standings-luxury-layout > .standings-side-stack,
+#tab-standings .standings-side-stack--luxury > .card {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+#tab-standings .standings-week-card,
+#tab-standings .standings-board-card,
+#tab-standings .standings-insight-card--luxury {
+  box-sizing: border-box;
+  height: 100%;
+  min-width: 0;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.06), transparent 24%),
+    linear-gradient(180deg, rgba(10, 18, 34, 0.96), rgba(5, 11, 22, 0.98));
+  box-shadow:
+    0 18px 38px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
+}
+
+#tab-standings .standings-side-stack--luxury {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+}
+
+#tab-standings .standings-side-stack--luxury > .standings-insight-card--luxury {
+  flex: 1 1 auto;
+}
+
+/* Üç kartın başlık bölümü aynı hizada başlar ve biter */
+#tab-standings .standings-luxury-layout .standings-list-head {
+  box-sizing: border-box;
+  min-height: 88px;
+  margin: 0 0 18px;
+  padding: 0;
+  align-items: flex-start;
+}
+
+#tab-standings .standings-luxury-layout .standings-list-head > div {
+  min-width: 0;
+}
+
+#tab-standings .standings-luxury-layout .standings-list-head h3,
+#tab-standings .standings-luxury-layout .standings-list-head .card-subtitle {
+  margin-top: 0;
+}
+
+#tab-standings #standingsTable,
+#tab-standings #weeklyStandings,
+#tab-standings #standingsInsights {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Üç kartta başlık ve içerik birbirinden bağımsız, ortak bir iskelet kullanır. */
+#tab-standings .standings-card-body {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 #tab-standings #standingsTable,
 #tab-standings #weeklyStandings {
-  display: grid !important;
-  gap: 14px !important;
-  width: 100% !important;
-  min-width: 0 !important;
+  display: grid;
+  gap: 14px;
 }
 
 #tab-standings #standingsTable .leaderboard-row,
 #tab-standings #weeklyStandings .leaderboard-row {
-  width: 100% !important;
-  min-height: 110px !important;
-  box-sizing: border-box !important;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 110px;
 }
 
 #tab-standings .leaderboard-row-left,
 #tab-standings .leaderboard-main-content,
 #tab-standings .leaderboard-person {
-  min-width: 0 !important;
+  min-width: 0;
 }
 
 #tab-standings .leaderboard-progress {
-  width: 100% !important;
-  max-width: 240px !important;
+  width: 100%;
+  max-width: 240px;
 }
 
 #tab-standings .leaderboard-score-block {
-  flex: 0 0 86px !important;
-  min-width: 86px !important;
-  text-align: right !important;
+  flex: 0 0 86px;
+  min-width: 86px;
+  text-align: right;
 }
 
-@media (max-width: 1180px) {
-  #tab-standings .standings-layout,
-  #tab-standings .standings-luxury-layout,
-  #tab-standings .standings-hero-shell {
-    grid-template-columns: 1fr !important;
+/* Masaüstü: üç kart tek satırda, 40 / 40 / 20 oranında */
+@media (min-width: 1181px) {
+  #tab-standings .standings-luxury-layout {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) minmax(220px, 1fr);
+  }
+
+  #tab-standings .standings-week-card,
+  #tab-standings .standings-board-card,
+  #tab-standings .standings-side-stack--luxury {
+    grid-row: 1;
+  }
+
+  #tab-standings .standings-week-card,
+  #tab-standings .standings-board-card,
+  #tab-standings .standings-insight-card--luxury {
+    align-self: stretch;
+  }
+
+  #tab-standings .standings-week-card:hover,
+  #tab-standings .standings-board-card:hover,
+  #tab-standings .standings-insight-card--luxury:hover {
+    transform: translateY(-3px);
+    border-color: rgba(255, 255, 255, 0.13);
+    box-shadow:
+      0 24px 48px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
 }
+
+/* Tablet ve mobil: mevcut alt alta görünüm korunur */
+@media (max-width: 1180px) {
+  #tab-standings .standings-luxury-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #tab-standings .standings-luxury-layout .standings-list-head {
+    min-height: 0;
+  }
+}
+
 #tab-standings .leaderboard-row:hover {
   transform: translateY(-2px);
   box-shadow:
     0 10px 30px rgba(0, 0, 0, 0.35),
     0 0 12px rgba(56, 189, 248, 0.15);
 }
+
 #tab-standings .leaderboard-row.tone-gold {
   box-shadow:
     0 12px 40px rgba(255, 200, 80, 0.25),
     inset 0 0 0 1px rgba(255, 200, 80, 0.2);
 }
+
 /* =========================================
    STANDINGS - PREMIUM PLUS EFFECTS
    styles.css dosyasının EN ALTINA ekle
@@ -12193,8 +12279,9 @@ body.player-modal-open {
 
 #tab-standings .leaderboard-supported-team-logo img,
 #tab-standings .leaderboard-supported-team-logo .team-logo-img img {
-  filter: blur(1.4px) saturate(0.95);
-  opacity: 0.85;
+  filter: blur(0.9px) saturate(1.05);
+  opacity: 0.35;
+  transform: scale(1.08);
 }
 
 /* Logonun üstüne hafif mask */
@@ -12926,7 +13013,7 @@ img.team-logo-img {
   right: -42px !important;
   width: 145px !important;
   height: 145px !important;
-  opacity: 0.075 !important;
+  opacity: 0.60 !important;
 }
 
 #tab-standings .leaderboard-supported-team-logo .team-logo-img,
@@ -20813,4 +20900,229 @@ body:has(#leagueStandingsModal:not(.hidden))
     overflow: hidden;
   }
 
+}
+/* Hafta yayınlama akışı */
+.week-create-card {
+  overflow: hidden;
+}
+.week-create-intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+}
+.week-create-intro > div {
+  display: grid;
+  gap: 5px;
+}
+.week-create-intro strong {
+  font-size: 15px;
+}
+.week-create-intro span {
+  color: #9fb6d5;
+  font-size: 12px;
+}
+.week-flow-pill {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.09);
+  border: 1px solid rgba(56, 189, 248, 0.18);
+  color: #8bd8ff !important;
+  white-space: nowrap;
+}
+.week-create-grid {
+  align-items: end;
+}
+.week-publish-list {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+}
+.week-publish-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: linear-gradient(135deg, rgba(25, 39, 59, 0.96), rgba(18, 31, 49, 0.96));
+  overflow: hidden;
+}
+.week-publish-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: #64748b;
+}
+.week-publish-card.week-status-preparing::before { background: #f59e0b; }
+.week-publish-card.week-status-active::before { background: #22c55e; }
+.week-publish-card.week-status-completed::before { background: #94a3b8; }
+.week-publish-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  flex: 1;
+}
+.week-publish-number {
+  width: 58px;
+  height: 58px;
+  flex: 0 0 58px;
+  border-radius: 17px;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+}
+.week-publish-number span {
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 800;
+  color: #f8fafc;
+}
+.week-publish-number small {
+  font-size: 8px;
+  letter-spacing: 1.2px;
+  color: #7f95b3;
+  margin-top: 4px;
+}
+.week-publish-info {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 6px;
+}
+.week-publish-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.week-publish-title-row strong {
+  font-size: 15px;
+  color: #f8fafc;
+}
+.week-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  background: rgba(100, 116, 139, 0.16);
+  color: #cbd5e1;
+}
+.week-status-preparing .week-status-chip { background: rgba(245, 158, 11, 0.13); color: #fbbf24; }
+.week-status-active .week-status-chip { background: rgba(34, 197, 94, 0.13); color: #4ade80; }
+.week-status-completed .week-status-chip { background: rgba(148, 163, 184, 0.13); color: #cbd5e1; }
+.week-publish-detail,
+.week-publish-info > small {
+  color: #8fa6c5;
+  font-size: 11px;
+}
+.week-progress-line {
+  height: 4px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(148, 163, 184, 0.11);
+  max-width: 320px;
+}
+.week-progress-line span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #38bdf8, #22c55e);
+}
+.week-publish-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.week-publish-btn {
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #052e16;
+  background: linear-gradient(135deg, #4ade80, #22c55e);
+  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.2);
+}
+.week-publish-btn:hover { transform: translateY(-1px); filter: brightness(1.04); }
+.week-live-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #4ade80;
+  font-size: 11px;
+  font-weight: 700;
+}
+.week-live-note::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.08);
+}
+.week-delete-btn { opacity: 0.78; }
+@media (max-width: 760px) {
+  .week-create-intro,
+  .week-publish-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .week-flow-pill { white-space: normal; }
+  .week-publish-actions { justify-content: stretch; }
+  .week-publish-btn { flex: 1; }
+}
+
+/* Hafta yönetimi durum kartları */
+.week-publish-card.week-status-preparing {
+  background: linear-gradient(135deg, rgba(120, 83, 10, 0.34), rgba(52, 39, 12, 0.96));
+  border-color: rgba(245, 158, 11, 0.34);
+}
+.week-publish-card.week-status-active {
+  background: linear-gradient(135deg, rgba(20, 83, 45, 0.42), rgba(13, 48, 31, 0.96));
+  border-color: rgba(34, 197, 94, 0.34);
+}
+.week-publish-card.week-status-completed {
+  background: linear-gradient(135deg, rgba(31, 41, 55, 0.98), rgba(15, 23, 42, 0.98));
+  border-color: rgba(100, 116, 139, 0.38);
+}
+.week-publish-card.week-status-completed::before { background: #475569; }
+.week-unpublish-btn {
+  border: 1px solid rgba(251, 191, 36, 0.32);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fde68a;
+  background: rgba(120, 53, 15, 0.34);
+}
+.week-unpublish-btn:hover { transform: translateY(-1px); filter: brightness(1.08); }
+.week-locked-note {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 12px;
+  border-radius: 12px;
+  color: #cbd5e1;
+  background: rgba(15, 23, 42, 0.58);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  font-size: 12px;
+  font-weight: 800;
+}
+@media (max-width: 760px) {
+  .week-unpublish-btn { flex: 1; }
 }

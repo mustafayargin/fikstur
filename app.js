@@ -1298,6 +1298,10 @@ async function hydrateFromFirebaseRealtime(source = "manual") {
         seasonLabel: "",
         weekNumber: "",
       });
+      validateFreshActiveSelection({
+        forceNewestPublished: /login|startup|session-restore/.test(String(source)),
+      });
+      saveState(true);
       if (isAuthenticated()) startPresenceTracking();
       recordAdminSyncActivity({
         lastAction: `Canlı ${getOnlineSourceLabel()} verisi alındı (${source}).`,
@@ -2714,6 +2718,10 @@ function pruneLocalMatchesAgainstRemote(rows = [], requestedSeasonLabel = "") {
 
   const removedMatchIds = state.matches
     .filter((match) => {
+      // Hazırlanmakta olan haftaların maçları admin taslağıdır.
+      // Kullanıcı Firebase alanında henüz bulunmadıkları için uzak listeye göre silinmez.
+      if (isWeekPreparing(match.weekId)) return false;
+
       const seasonLabel = normalizeText(
         getSeasonById(match.seasonId)?.name || "",
       );
@@ -2968,11 +2976,35 @@ function normalizeSeasonRegistryItem(item) {
   return { id, name, leagueName };
 }
 
+function normalizeWeekRegistryItem(item) {
+  if (!item) return null;
+  const id = String(item.id || "").trim();
+  const seasonId = String(item.seasonId || "").trim();
+  const number = Number(item.number || item.weekNo || 0);
+  const rawStatus = String(item.status || "hazirlaniyor").toLowerCase();
+  const status = ["hazirlaniyor", "aktif", "tamamlandi"].includes(rawStatus)
+    ? rawStatus
+    : "hazirlaniyor";
+  if (!id || !seasonId || !number) return null;
+  return {
+    id,
+    seasonId,
+    number,
+    status,
+    publishedAt: item.publishedAt || "",
+    publishedBy: item.publishedBy || "",
+    completedAt: item.completedAt || "",
+  };
+}
+
 async function syncSeasonRegistryFromFirebase() {
   if (!isFirebaseReady()) return [];
   const settings = (await firebaseRead("settings")) || {};
   const rawList = Array.isArray(settings.seasonsMeta)
     ? settings.seasonsMeta
+    : [];
+  const rawWeekList = Array.isArray(settings.weeksMeta)
+    ? settings.weeksMeta
     : [];
   state.settings.resultsLastAutoSyncAt = Number(
     settings.resultsLastAutoSyncAt || 0,
@@ -2991,9 +3023,20 @@ async function syncSeasonRegistryFromFirebase() {
   );
   applyMatchSceneOverridesToTeams(state.settings.teamSceneSlugs);
   const seasonList = rawList.map(normalizeSeasonRegistryItem).filter(Boolean);
+  const weekList = rawWeekList.map(normalizeWeekRegistryItem).filter(Boolean);
   const remoteIds = new Set(seasonList.map((item) => String(item.id)));
 
   state.seasons = seasonList.map((item) => ({ ...item }));
+
+  const localWeekMap = new Map(
+    state.weeks.map((week) => [`${week.seasonId}__${Number(week.number)}`, week]),
+  );
+  weekList.forEach((remoteWeek) => {
+    const key = `${remoteWeek.seasonId}__${Number(remoteWeek.number)}`;
+    const localWeek = localWeekMap.get(key);
+    if (localWeek) Object.assign(localWeek, remoteWeek);
+    else state.weeks.push({ ...remoteWeek });
+  });
   state.teams = state.teams.filter((team) =>
     remoteIds.has(String(team.seasonId)),
   );
@@ -3021,6 +3064,27 @@ async function syncSeasonRegistryFromFirebase() {
     state.settings.activeSeasonId = seasonList[0].id;
   }
   return seasonList;
+}
+
+async function persistWeekRegistryToFirebase() {
+  if (!isFirebaseReady()) return false;
+  const weeksMeta = state.weeks
+    .map((week) => ({
+      id: String(week.id || "").trim(),
+      seasonId: String(week.seasonId || "").trim(),
+      number: Number(week.number || 0),
+      status: String(week.status || "hazirlaniyor"),
+      publishedAt: week.publishedAt || "",
+      publishedBy: week.publishedBy || "",
+      completedAt: week.completedAt || "",
+    }))
+    .filter((week) => week.id && week.seasonId && week.number);
+
+  await firebaseUpdate("settings", {
+    weeksMeta,
+    weeksMetaUpdatedAt: new Date().toISOString(),
+  });
+  return true;
 }
 
 async function persistSeasonRegistryToFirebase() {
@@ -4383,7 +4447,15 @@ function closeLoginOverlay() {
 function logoutUser() {
   closeAccountMenus();
   if (typeof stopIdleLogoutTimer === "function") stopIdleLogoutTimer();
+  clearSessionRuntimeCaches();
   stopPresenceTracking({ removeSession: true });
+
+  try {
+    const firebaseAuth = window.firebase?.auth?.();
+    if (firebaseAuth?.currentUser) firebaseAuth.signOut().catch(() => {});
+  } catch (error) {
+    console.warn("Firebase Auth oturumu kapatılamadı:", error);
+  }
 
   currentSessionUser = null;
   state.settings.auth.isAuthenticated = false;
@@ -4485,6 +4557,8 @@ async function loginUser() {
     // otomatik olarak bir kez daha çalıştır. Böylece adminin eklediği yeni hafta,
     // kullanıcı ilk girişinde butona basmadan kesin olarak alınır.
     const fullHydrationOk = await hydrateFromFirebaseRealtime("login-auto");
+    validateFreshActiveSelection({ forceNewestPublished: true });
+    saveState(true);
     console.log("[LOGIN AUTO SYNC] Tam Firebase eşitlemesi tamamlandı:", fullHydrationOk, {
       seasons: state.seasons?.length || 0,
       weeks: state.weeks?.length || 0,
@@ -6225,10 +6299,16 @@ function getTeamById(id) {
 function getActiveSeasonId() {
   return state.settings.activeSeasonId || state.seasons[0]?.id || null;
 }
-function getWeeksBySeasonId(seasonId) {
+function getAllWeeksBySeasonId(seasonId) {
   return state.weeks
     .filter((w) => w.seasonId === seasonId)
     .sort((a, b) => a.number - b.number);
+}
+
+function getWeeksBySeasonId(seasonId) {
+  const weeks = getAllWeeksBySeasonId(seasonId);
+  if (!isReadOnlyMode()) return weeks;
+  return weeks.filter((week) => String(week.status || "hazirlaniyor") !== "hazirlaniyor");
 }
 function getMatchesByWeekId(weekId) {
   return state.matches
@@ -6238,6 +6318,15 @@ function getMatchesByWeekId(weekId) {
         (a.date || "").localeCompare(b.date || "") ||
         a.homeTeam.localeCompare(b.homeTeam, "tr"),
     );
+}
+
+function isWeekPreparing(weekId) {
+  const week = getWeekById(weekId);
+  return String(week?.status || "hazirlaniyor") === "hazirlaniyor";
+}
+
+function shouldPublishMatchChanges(weekId) {
+  return !isWeekPreparing(weekId);
 }
 function getApiSeasonLabel() {
   const season = getSeasonById(getActiveSeasonId());
@@ -6787,14 +6876,60 @@ function isWeekCompleted(weekId) {
   return matches.every((match) => match.played);
 }
 
-function getPreferredWeekIdForSeason(seasonId) {
-  const weeks = getWeeksBySeasonId(seasonId).sort(
-    (a, b) => Number(a.number) - Number(b.number),
-  );
+function getWeekPublishTime(week) {
+  const timestamp = Date.parse(week?.publishedAt || week?.completedAt || "");
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
 
+function getPreferredWeekIdForSeason(seasonId) {
+  const weeks = getWeeksBySeasonId(seasonId).slice();
   if (!weeks.length) return null;
 
-  return weeks[weeks.length - 1].id;
+  const byNewestPublication = (a, b) =>
+    getWeekPublishTime(b) - getWeekPublishTime(a) ||
+    Number(b.number) - Number(a.number);
+
+  const activeWeeks = weeks
+    .filter((week) => String(week.status || "") === "aktif")
+    .sort(byNewestPublication);
+  if (activeWeeks.length) return activeWeeks[0].id;
+
+  const publishedWeeks = weeks
+    .filter((week) => String(week.status || "hazirlaniyor") !== "hazirlaniyor")
+    .sort(byNewestPublication);
+  if (publishedWeeks.length) return publishedWeeks[0].id;
+
+  // Admin hazırlık ekranlarında çalışmaya devam edebilsin; normal kullanıcıda
+  // getWeeksBySeasonId zaten hazırlanıyor haftalarını filtreler.
+  return weeks.sort((a, b) => Number(b.number) - Number(a.number))[0]?.id || null;
+}
+
+function validateFreshActiveSelection({ forceNewestPublished = false } = {}) {
+  const seasons = Array.isArray(state.seasons) ? state.seasons : [];
+  const allEligibleWeeks = seasons.flatMap((season) =>
+    getWeeksBySeasonId(season.id).map((week) => ({ season, week })),
+  );
+
+  const sortCandidates = (a, b) =>
+    (String(b.week.status || "") === "aktif" ? 1 : 0) -
+      (String(a.week.status || "") === "aktif" ? 1 : 0) ||
+    getWeekPublishTime(b.week) - getWeekPublishTime(a.week) ||
+    Number(b.week.number) - Number(a.week.number);
+
+  const currentWeek = getWeekById(state.settings.activeWeekId);
+  const currentIsEligible =
+    currentWeek &&
+    allEligibleWeeks.some(({ week }) => String(week.id) === String(currentWeek.id));
+
+  if (!forceNewestPublished && currentIsEligible) {
+    state.settings.activeSeasonId = currentWeek.seasonId;
+    return currentWeek.id;
+  }
+
+  const preferred = allEligibleWeeks.sort(sortCandidates)[0] || null;
+  state.settings.activeSeasonId = preferred?.season?.id || seasons[0]?.id || null;
+  state.settings.activeWeekId = preferred?.week?.id || null;
+  return state.settings.activeWeekId;
 }
 
 function forceDefaultLandingAfterLogin(reason = "login") {
@@ -8721,53 +8856,222 @@ window.removeSeasonTeam = async function (teamId) {
   renderAll();
 };
 
+function getWeekStatusMeta(week) {
+  const status = String(week?.status || "hazirlaniyor");
+  if (status === "tamamlandi") {
+    return { label: "Tamamlandı", className: "week-status-completed", icon: "⚫", detail: "Tüm maçlar oynandı" };
+  }
+  if (status === "aktif") {
+    return { label: "Aktif", className: "week-status-active", icon: "🟢", detail: "Tahminler kullanıcılara açık" };
+  }
+  return { label: "Hazırlanıyor", className: "week-status-preparing", icon: "🟡", detail: "Henüz kullanıcılara yayınlanmadı" };
+}
+
 function renderWeeks() {
   const seasonId = getActiveSeasonId();
   const container = document.getElementById("weeksList");
-  const weeks = getWeeksBySeasonId(seasonId);
+  const weeks = getAllWeeksBySeasonId(seasonId);
   if (!weeks.length)
     return (container.innerHTML = createEmptyState("Henüz hafta eklenmedi."));
-  container.innerHTML = `<div class="excel-list week-list-scroll">${weeks
-    .map(
-      (week) => `
-    <div class="excel-list-row week-row">
-      <div><strong>${week.number}. Hafta</strong><div class="small-meta">${getMatchesByWeekId(week.id).length} maç</div></div>
-      <span class="badge ${week.status === "tamamlandi" ? "" : week.status === "hazirlaniyor" ? "warn" : "gray"}">${escapeHtml(week.status)}</span>
-      <div class="inline-actions compact">
-        <button class="small secondary" onclick="setActiveWeek('${week.id}')">Aktif Yap</button>
-        <button class="small secondary" onclick="changeWeekStatus('${week.id}')">Durum</button>
-        <button class="small danger" onclick="removeWeek('${week.id}')">Sil</button>
-      </div>
-    </div>`,
-    )
+
+  container.innerHTML = `<div class="week-publish-list">${weeks
+    .map((week) => {
+      const matches = getMatchesByWeekId(week.id);
+      const playedCount = matches.filter((match) => match.played).length;
+      const meta = getWeekStatusMeta(week);
+      const isPreparing = String(week.status || "hazirlaniyor") === "hazirlaniyor";
+      const isActive = String(week.status || "") === "aktif";
+      const publishedLabel = week.publishedAt
+        ? `Yayınlandı: ${formatAdminPanelDateTime(week.publishedAt)}`
+        : meta.detail;
+      return `
+        <article class="week-publish-card ${meta.className}">
+          <div class="week-publish-main">
+            <div class="week-publish-number"><span>${week.number}</span><small>HAFTA</small></div>
+            <div class="week-publish-info">
+              <div class="week-publish-title-row">
+                <strong>${week.number}. Hafta</strong>
+                <span class="week-status-chip"><b>${meta.icon}</b>${meta.label}</span>
+              </div>
+              <span class="week-publish-detail">${escapeHtml(publishedLabel)}</span>
+              <div class="week-progress-line"><span style="width:${matches.length ? Math.round((playedCount / matches.length) * 100) : 0}%"></span></div>
+              <small>${playedCount}/${matches.length} maç oynandı</small>
+            </div>
+          </div>
+          <div class="week-publish-actions">
+            ${isPreparing ? `<button class="small danger week-delete-btn" onclick="removeWeek('${week.id}')">🗑️ Sil</button>` : ""}
+            ${isPreparing ? `<button class="week-publish-btn" onclick="publishWeek('${week.id}', this)">🚀 Haftayı Yayınla</button>` : ""}
+            ${isActive ? `<button class="week-unpublish-btn" onclick="unpublishWeek('${week.id}', this)">📥 Yayından Kaldır</button>` : ""}
+            ${String(week.status || "") === "tamamlandi" ? `<span class="week-locked-note">🔒 Kilitlendi</span>` : ""}
+          </div>
+        </article>`;
+    })
     .join("")}</div>`;
 }
 
-window.changeWeekStatus = async function (id) {
-  if (isReadOnlyMode())
-    return showAlert("Kullanıcı görünümünde hafta durumu değiştirilemez.", {
-      title: "Yetki yok",
-      type: "warning",
-    });
+async function queueWeekPublishedNotification(week) {
+  if (!isFirebaseReady() || !week) return false;
+  const season = getSeasonById(week.seasonId);
+  const id = sanitizeFirebaseKey(`week_publish_${week.id}_${Date.now()}`);
+  const now = new Date().toISOString();
+  const iconMeta = typeof getAdminNotificationIconMeta === "function"
+    ? getAdminNotificationIconMeta("announce")
+    : { emoji: "📢" };
+  const assetUrls = typeof getAdminNotificationAssetUrls === "function"
+    ? getAdminNotificationAssetUrls("announce")
+    : {};
+  await firebaseWrite(`adminNotificationQueue/${id}`, {
+    id,
+    type: "week_published",
+    status: "pending",
+    title: `${week.number}. Hafta Yayınlandı!`,
+    message: `${season?.name ? `${season.name} · ` : ""}${week.number}. hafta tahminlere açıldı. Tahminlerini yapmayı unutma, bol şans!`,
+    target: "all",
+    targetMode: "all",
+    targetUserIds: [],
+    icon: "announce",
+    iconEmoji: iconMeta.emoji || "📢",
+    iconUrl: assetUrls.iconUrl || "",
+    badgeUrl: assetUrls.badgeUrl || "",
+    seasonId: week.seasonId,
+    season: season?.name || "",
+    weekId: week.id,
+    weekNo: Number(week.number || 0),
+    createdAt: now,
+    createdBy: getCurrentUsername?.() || "admin",
+  });
+  return true;
+}
+
+window.publishWeek = async function (id, actionButton = null) {
+  if (isReadOnlyMode()) return;
   const week = getWeekById(id);
-  if (!week) return;
-  const status = await showPrompt(
-    "Yeni durum: aktif / hazirlaniyor / tamamlandi",
-    week.status || "aktif",
-    {
-      title: "Hafta durumu değiştir",
-      placeholder: "aktif / hazirlaniyor / tamamlandi",
-    },
-  );
-  if (!status || !["aktif", "hazirlaniyor", "tamamlandi"].includes(status))
-    return showAlert("Geçerli bir durum gir.", {
-      title: "Geçersiz değer",
+  if (!week || String(week.status || "hazirlaniyor") !== "hazirlaniyor") return;
+  const matches = getMatchesByWeekId(id);
+  if (!matches.length) {
+    return showAlert("Haftayı yayınlamadan önce maçları API'den getir veya manuel ekle.", {
+      title: "Maç bulunamadı",
       type: "warning",
     });
-  week.status = status;
-  saveState();
-  renderAll();
+  }
+  const confirmed = await showConfirm(
+    `Bu hafta yayınlansın mı?\n\nKullanıcılara bildirim gönderilecektir.`,
+    { title: "Haftayı Yayınla", type: "confirm", confirmText: "Yayınla" },
+  );
+  if (!confirmed) return;
+
+  try {
+    if (actionButton) setAsyncButtonState(actionButton, "loading", { loading: "Yayınlanıyor..." });
+
+    // Maçları kullanıcıların okuduğu Firebase alanına yalnızca yayınlama anında aktar.
+    // Hafta bu sırada hâlâ "hazirlaniyor" olduğundan kullanıcı ekranında görünmez.
+    if (useOnlineMode) {
+      window.__ALLOW_MATCH_WRITE__ = true;
+      try {
+        const syncResult = await syncWeekMatchesToSheet(week.id);
+        if (!syncResult?.success) {
+          throw new Error(syncResult?.message || "Hafta maçları Firebase'e aktarılamadı.");
+        }
+      } finally {
+        window.__ALLOW_MATCH_WRITE__ = false;
+      }
+    }
+
+    week.status = "aktif";
+    week.publishedAt = new Date().toISOString();
+    week.publishedBy = getCurrentUsername?.() || "admin";
+    state.settings.activeWeekId = week.id;
+    state.settings.activeSeasonId = week.seasonId;
+    saveState();
+    if (isFirebaseReady()) {
+      await persistWeekRegistryToFirebase();
+      await queueWeekPublishedNotification(week);
+    }
+    if (typeof window.writeAppAuditLogEntry === "function") {
+      const season = getSeasonById(week.seasonId);
+      window.writeAppAuditLogEntry({
+        actionType: "week_publish",
+        actionLabel: "Hafta yayınlandı",
+        detail: `${season?.name || "Sezon"} · ${week.number}. hafta yayınlandı`,
+        entityType: "week",
+        entityId: week.id,
+        newValue: { status: "aktif", publishedAt: week.publishedAt },
+      });
+    }
+    renderAll();
+    showAlert(`${week.number}. hafta yayınlandı. Bildirim gönderim kuyruğuna alındı.`, {
+      title: "Hafta yayında",
+      type: "success",
+    });
+  } catch (error) {
+    week.status = "hazirlaniyor";
+    week.publishedAt = "";
+    saveState();
+    renderAll();
+    console.error("Hafta yayınlama hatası:", error);
+    showAlert(error?.message || "Hafta yayınlanamadı.", { title: "Yayınlama hatası", type: "danger" });
+  }
 };
+
+window.unpublishWeek = async function (id, actionButton = null) {
+  if (isReadOnlyMode()) return;
+  const week = getWeekById(id);
+  if (!week || String(week.status || "") !== "aktif") return;
+
+  const confirmed = await showConfirm(
+    `Bu hafta yayından kaldırılacak.\n\nGirilen tahminler korunacaktır.`,
+    { title: "Yayından Kaldır", type: "warning", confirmText: "Yayından Kaldır" },
+  );
+  if (!confirmed) return;
+
+  const previousActiveWeekId = state.settings.activeWeekId;
+  try {
+    if (actionButton) setAsyncButtonState(actionButton, "loading", { loading: "Kaldırılıyor..." });
+    week.status = "hazirlaniyor";
+    week.publishedAt = "";
+    week.publishedBy = "";
+
+    if (state.settings.activeWeekId === week.id) {
+      const replacementWeek = getAllWeeksBySeasonId(week.seasonId).find(
+        (item) => item.id !== week.id && String(item.status || "hazirlaniyor") === "aktif",
+      );
+      state.settings.activeWeekId = replacementWeek?.id || null;
+    }
+
+    saveState();
+    if (isFirebaseReady()) await persistWeekRegistryToFirebase();
+
+    if (typeof window.writeAppAuditLogEntry === "function") {
+      const season = getSeasonById(week.seasonId);
+      window.writeAppAuditLogEntry({
+        actionType: "week_unpublish",
+        actionLabel: "Hafta yayından kaldırıldı",
+        detail: `${season?.name || "Sezon"} · ${week.number}. hafta yayından kaldırıldı; tahminler korundu`,
+        entityType: "week",
+        entityId: week.id,
+        oldValue: { status: "aktif" },
+        newValue: { status: "hazirlaniyor" },
+      });
+    }
+
+    renderAll();
+    showAlert(`${week.number}. hafta yayından kaldırıldı. Girilen tahminler korunmuştur.`, {
+      title: "Hafta yayından kaldırıldı",
+      type: "success",
+    });
+  } catch (error) {
+    week.status = "aktif";
+    state.settings.activeWeekId = previousActiveWeekId;
+    saveState();
+    renderAll();
+    console.error("Haftayı yayından kaldırma hatası:", error);
+    showAlert(error?.message || "Hafta yayından kaldırılamadı.", {
+      title: "İşlem hatası",
+      type: "danger",
+    });
+  }
+};
+
 window.removeWeek = async function (id) {
   if (isReadOnlyMode()) {
     return showAlert("Kullanıcı görünümünde hafta silinemez.", {
@@ -8778,11 +9082,17 @@ window.removeWeek = async function (id) {
 
   const week = getWeekById(id);
   if (!week) return;
+  if (String(week.status || "hazirlaniyor") !== "hazirlaniyor") {
+    return showAlert("Yalnızca hazırlanıyor durumundaki haftalar silinebilir.", {
+      title: "Hafta silinemez",
+      type: "warning",
+    });
+  }
 
   if (
     !(await showConfirm(
-      `${week.number}. haftayı ve bu haftadaki tüm maç/tahminleri silmek istiyor musun?`,
-      { title: "Hafta silinsin mi?", type: "danger", confirmText: "Sil" },
+      `Bu hafta tamamen silinecek.\n\nDevam etmek istiyor musun?`,
+      { title: "Sil", type: "danger", confirmText: "Sil" },
     ))
   ) {
     return;
@@ -8841,6 +9151,13 @@ window.removeWeek = async function (id) {
     }
 
     state.weeks = state.weeks.filter((w) => w.id !== id);
+  if (isFirebaseReady()) {
+    try {
+      await persistWeekRegistryToFirebase();
+    } catch (error) {
+      console.warn("Hafta listesi Firebase'de güncellenemedi:", error);
+    }
+  }
     state.matches = state.matches.filter((m) => m.weekId !== id);
     state.predictions = state.predictions.filter(
       (p) => !matchIds.includes(String(p.matchId)),
@@ -8970,7 +9287,7 @@ window.saveResult = async function (matchId) {
   saveState();
   renderAll();
 
-  if (!useOnlineMode) return;
+  if (!useOnlineMode || !shouldPublishMatchChanges(match.weekId)) return;
 
   try {
     window.__ALLOW_MATCH_WRITE__ = true;
@@ -9047,7 +9364,7 @@ async function saveSingleMatchChange(match, successMessage) {
   saveState();
   renderAll();
 
-  if (!useOnlineMode) {
+  if (!useOnlineMode || !shouldPublishMatchChanges(match.weekId)) {
     showAlert(successMessage, {
       title: "İşlem tamamlandı",
       type: "success",
@@ -10596,6 +10913,12 @@ function renderPredictions() {
   const weekId = state.settings.activeWeekId;
 
   renderPredictionLockBanner(weekId);
+
+  if ((currentHydrationPromise || firebaseRealtimeHydrationPromise) && !weekId) {
+    container.innerHTML = `<div class="empty-state prediction-loading-state"><span class="app-loading-spinner"></span><strong>Aktif hafta yükleniyor...</strong><small>Sezon ve hafta bilgileri Firebase üzerinden doğrulanıyor.</small></div>`;
+    schedulePredictionViewportRestore(viewportSnapshot);
+    return;
+  }
 
   if (!weekId) {
     container.innerHTML = createEmptyState("Önce bir hafta seç.");
@@ -13709,7 +14032,7 @@ async function addUserOnline(player, actionButton = null) {
   }
 }
 
-function addWeek() {
+async function addWeek() {
   if (isReadOnlyMode())
     return showAlert("Kullanıcı görünümünde bu alan sadece görüntülenir.", {
       title: "Yetki yok",
@@ -13717,7 +14040,7 @@ function addWeek() {
     });
   const seasonId = getActiveSeasonId();
   const number = Number(document.getElementById("weekNumber").value);
-  const status = document.getElementById("weekStatus").value;
+  const status = "hazirlaniyor";
   if (!seasonId)
     return showAlert("Önce sezon seç.", {
       title: "Eksik seçim",
@@ -13738,6 +14061,13 @@ function addWeek() {
   state.settings.activeWeekId = week.id;
   document.getElementById("weekNumber").value = "";
   saveState();
+  if (isFirebaseReady()) {
+    try {
+      await persistWeekRegistryToFirebase();
+    } catch (error) {
+      console.warn("Hafta hazırlık kaydı Firebase'e yazılamadı:", error);
+    }
+  }
   if (typeof window.writeAppAuditLogEntry === "function") {
     const season = getSeasonById(seasonId);
     window.writeAppAuditLogEntry({
@@ -13795,7 +14125,7 @@ function addMatch() {
     awayScore: null,
   };
   state.matches.push(newMatch);
-  if (useOnlineMode) {
+  if (useOnlineMode && shouldPublishMatchChanges(newMatch.weekId)) {
     window.__ALLOW_MATCH_WRITE__ = true;
     sendMatchesToSheet([newMatch], { force: true })
       .catch((error) => console.error("Tek maç Sheets senkron hatası:", error))
@@ -14927,8 +15257,11 @@ async function fetchRoundEvents(seasonLabel, weekNumber) {
 }
 
 function inferWeekStatusFromMatches(weekId) {
+  const week = getWeekById(weekId);
+  const currentStatus = String(week?.status || "hazirlaniyor");
   const matches = getMatchesByWeekId(weekId);
-  if (!matches.length) return "hazirlaniyor";
+  if (currentStatus === "hazirlaniyor") return "hazirlaniyor";
+  if (!matches.length) return currentStatus === "tamamlandi" ? "tamamlandi" : "aktif";
   if (matches.every((match) => match.played)) return "tamamlandi";
   return "aktif";
 }
@@ -14936,7 +15269,18 @@ function inferWeekStatusFromMatches(weekId) {
 function syncWeekStatus(weekId) {
   const week = getWeekById(weekId);
   if (!week) return;
-  week.status = inferWeekStatusFromMatches(weekId);
+  const previousStatus = String(week.status || "hazirlaniyor");
+  const nextStatus = inferWeekStatusFromMatches(weekId);
+  if (previousStatus === nextStatus) return;
+  week.status = nextStatus;
+  if (nextStatus === "tamamlandi" && !week.completedAt) {
+    week.completedAt = new Date().toISOString();
+  }
+  if (!isReadOnlyMode() && isFirebaseReady()) {
+    persistWeekRegistryToFirebase().catch((error) =>
+      console.warn("Otomatik hafta durumu Firebase'e yazılamadı:", error),
+    );
+  }
 }
 
 function findExistingMatchForApiEvent(seasonId, weekId, event) {
@@ -15305,10 +15649,12 @@ async function syncSelectedWeekFromApi(options = {}) {
 
     let sheetSyncResult = null;
 
-    try {
-      sheetSyncResult = await syncWeekMatchesToSheet(week.id);
-    } catch (sheetError) {
-      console.warn("Hafta Sheets senkron uyarısı:", sheetError);
+    if (shouldPublishMatchChanges(week.id)) {
+      try {
+        sheetSyncResult = await syncWeekMatchesToSheet(week.id);
+      } catch (sheetError) {
+        console.warn("Hafta Firebase senkron uyarısı:", sheetError);
+      }
     }
 
     const finishedAt = Date.now();
@@ -15990,8 +16336,9 @@ function bindEvents() {
   });
 }
 
-const IDLE_LOGOUT_LIMIT_MS = 15 * 60 * 1000;
+const IDLE_LOGOUT_LIMIT_MS = 1 * 60 * 1000;
 const IDLE_LOGOUT_STORAGE_KEY = "fikstur:lastUserActivityAt";
+const BACKGROUND_ENTERED_AT_STORAGE_KEY = "fikstur:backgroundEnteredAt";
 let idleLogoutTimer = null;
 
 function getLastUserActivityAt() {
@@ -16008,9 +16355,34 @@ function clearIdleLogoutTimer() {
   }
 }
 
+function clearSessionRuntimeCaches() {
+  localStorage.removeItem(IDLE_LOGOUT_STORAGE_KEY);
+  localStorage.removeItem(BACKGROUND_ENTERED_AT_STORAGE_KEY);
+
+  try {
+    Object.keys(sessionStorage).forEach((key) => {
+      if (key.startsWith("fikstur_presence_") || key.startsWith("fikstur_session_")) {
+        sessionStorage.removeItem(key);
+      }
+    });
+  } catch (error) {
+    console.warn("Oturum önbelleği temizlenemedi:", error);
+  }
+
+  if (window.caches?.keys) {
+    window.caches.keys().then((keys) =>
+      Promise.all(
+        keys
+          .filter((key) => /fikstur|firebase/i.test(key))
+          .map((key) => window.caches.delete(key)),
+      ),
+    ).catch(() => {});
+  }
+}
+
 function performIdleLogout() {
   clearIdleLogoutTimer();
-  localStorage.removeItem(IDLE_LOGOUT_STORAGE_KEY);
+  clearSessionRuntimeCaches();
 
   if (!isAuthenticated()) return;
 
@@ -16043,13 +16415,19 @@ function markUserActivityForIdleLogout() {
 function checkIdleLogoutAfterResume() {
   if (!isAuthenticated()) return false;
 
+  const backgroundEnteredAt = Number(
+    localStorage.getItem(BACKGROUND_ENTERED_AT_STORAGE_KEY) || 0,
+  );
   const lastActivityAt = getLastUserActivityAt();
-  if (lastActivityAt && Date.now() - lastActivityAt >= IDLE_LOGOUT_LIMIT_MS) {
+  const referenceAt = backgroundEnteredAt || lastActivityAt;
+
+  if (referenceAt && Date.now() - referenceAt >= IDLE_LOGOUT_LIMIT_MS) {
     performIdleLogout();
     return true;
   }
 
-  scheduleIdleLogoutCheck();
+  localStorage.removeItem(BACKGROUND_ENTERED_AT_STORAGE_KEY);
+  markUserActivityForIdleLogout();
   return false;
 }
 
@@ -16072,6 +16450,12 @@ function bindIdleLogoutHooks() {
   });
 
   document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      localStorage.setItem(BACKGROUND_ENTERED_AT_STORAGE_KEY, String(Date.now()));
+      clearIdleLogoutTimer();
+      return;
+    }
+
     if (document.visibilityState === "visible") {
       checkIdleLogoutAfterResume();
     }
