@@ -16413,7 +16413,7 @@ function bindEvents() {
   });
 }
 
-const IDLE_LOGOUT_LIMIT_MS = 1 * 60 * 1000;
+const IDLE_LOGOUT_LIMIT_MS = 15 * 60 * 1000;
 const IDLE_LOGOUT_STORAGE_KEY = "fikstur:lastUserActivityAt";
 const BACKGROUND_ENTERED_AT_STORAGE_KEY = "fikstur:backgroundEnteredAt";
 let idleLogoutTimer = null;
