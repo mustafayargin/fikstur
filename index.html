@@ -2037,8 +2037,19 @@
       // bölümünden oluşturduğun VAPID key buraya yazılacak.
       window.FIKSTUR_FIREBASE_VAPID_KEY =
         "BOlctNJfYtPVYYvTBezBinoc66KLJNY8yAAtncF5HwKO7dYfjFW76yoK1agD35aBIqfedJBo_5Fh_5ToWRcXe9E";
+
+      // Firebase, ana uygulama kodu çalışmadan önce tek sefer başlatılır.
+      // app.js aynı uygulama örneğini kullanır; ikinci initialize oluşturmaz.
+      if (!window.firebase || typeof window.firebase.initializeApp !== "function") {
+        throw new Error("Firebase SDK yüklenemedi. Uygulama başlatılamıyor.");
+      }
+      window.__fiksturFirebaseApp = window.firebase.apps.length
+        ? window.firebase.app()
+        : window.firebase.initializeApp(window.FIKSTUR_FIREBASE_CONFIG);
+      window.__fiksturFirebaseDb = window.firebase.database(window.__fiksturFirebaseApp);
+      window.__fiksturFirebaseReady = true;
     </script>
 
-<script src="app.js"></script>
+<script src="app.js?v=20260714-bootstrap-fix"></script>
   </body>
 </html>
