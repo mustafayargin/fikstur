@@ -19201,8 +19201,8 @@ body[data-role="user"] #tab-players .page-header p {
   background: none !important;
   -webkit-background-clip: initial !important;
   background-clip: initial !important;
-  font-size: clamp(2.35rem, 8vw, 3.35rem) !important;
-  line-height: 0.94 !important;
+  font-size: clamp(1.35rem, 8vw, 1.35rem) !important;
+  line-height: 1.60 !important;
   letter-spacing: -0.055em !important;
   font-weight: 1000 !important;
   text-transform: uppercase !important;
@@ -19281,9 +19281,7 @@ body[data-role="user"] #tab-players .page-header p {
     border-radius: 18px !important;
   }
 
-  .welcome-card__title {
-    font-size: clamp(2.05rem, 11vw, 2.65rem) !important;
-  }
+ 
 
   .welcome-card__message {
     max-width: 276px !important;
@@ -19307,9 +19305,7 @@ body[data-role="user"] #tab-players .page-header p {
     height: min(252px, 38vh) !important;
   }
 
-  .welcome-card__title {
-    font-size: clamp(1.86rem, 10vw, 2.25rem) !important;
-  }
+
 }
 
 @media (prefers-reduced-motion: reduce) {

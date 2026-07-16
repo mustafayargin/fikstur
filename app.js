@@ -4087,6 +4087,7 @@ function hideWelcomeOverlay(immediate = false) {
 }
 
 function showWelcomeOverlay(user = getAuthUser(), options = {}) {
+  
   let config = normalizeWelcomeCardSettings(
     options.config || getWelcomeCardSettings(),
   );
@@ -4113,6 +4114,8 @@ function showWelcomeOverlay(user = getAuthUser(), options = {}) {
   const message = document.getElementById("welcomeMessage");
   const mediaWrap = document.getElementById("welcomeMediaWrap");
   const image = document.getElementById("welcomeImage");
+  const eyebrow = document.querySelector(".welcome-card__eyebrow");
+  const stats = document.querySelector(".welcome-card__stats");
   if (!overlay || !avatar || !title || !message) return;
 
   const displayName = getWelcomeDisplayName(user) || "Hoş geldin";
@@ -4149,30 +4152,45 @@ function showWelcomeOverlay(user = getAuthUser(), options = {}) {
     .replace(/^images\/welcome\//i, "")
     .replace(/^images\//i, "");
 
-  const welcomeAvatarSrc = getWelcomeImageSrc(welcomeCleanImageName);
+    if (config.enabled && config.imageFile) {
+      if (eyebrow) eyebrow.classList.add("hidden");
+      if (stats) stats.classList.add("hidden");
+      avatar.classList.add("hidden");
 
-  const avatarSource = `
-      <span class="app-avatar welcome-hero-avatar">
-      <img
-      class="welcome-profile-image"
-      src="${escapeHtml(welcomeAvatarSrc)}"
-          alt="${escapeHtml(String(welcomePlayer.name || shortName || "Profil"))}"
-          loading="lazy"
-          decoding="async"
-          onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';"
-        >
-        <span class="app-avatar-fallback" style="display:none">${escapeHtml(shortName.charAt(0) || "?")}</span>
-      </span>
-    `;
+      title.textContent = config.title || "";
 
-  avatar.innerHTML = avatarSource;
-  const premiumWelcomeTitle = String(
-    shortName || displayName || "Oyuncu",
-  ).toLocaleUpperCase("tr-TR");
-  title.textContent = premiumWelcomeTitle;
-  message.textContent =
-    selectedMessage || "Sezon hazır. Tahminlerini oluşturmaya başlayalım.";
+      message.textContent = config.message || "";
+    } else {
+      if (eyebrow) eyebrow.classList.remove("hidden");
+      if (stats) stats.classList.remove("hidden");
+      
+      avatar.classList.remove("hidden");
 
+      const welcomeAvatarSrc = getWelcomeImageSrc(welcomeCleanImageName);
+
+      avatar.innerHTML = `
+          <span class="app-avatar welcome-hero-avatar">
+              <img
+                  class="welcome-profile-image"
+                  src="${escapeHtml(welcomeAvatarSrc)}"
+                  alt="${escapeHtml(String(welcomePlayer.name || shortName || "Profil"))}"
+                  loading="lazy"
+                  decoding="async"
+                  onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';"
+              >
+              <span class="app-avatar-fallback" style="display:none">
+                  ${escapeHtml(shortName.charAt(0) || "?")}
+              </span>
+          </span>
+      `;
+
+      title.textContent = String(
+        shortName || displayName || "Oyuncu",
+      ).toLocaleUpperCase("tr-TR");
+
+      message.textContent =
+        selectedMessage || "Sezon hazır. Tahminlerini oluşturmaya başlayalım.";
+    }
   const imageSrc = getWelcomeImageSrc(config.imageFile);
   if (image && mediaWrap && imageSrc) {
     image.src = imageSrc;
