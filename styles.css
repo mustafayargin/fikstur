@@ -21123,15 +21123,7 @@ body:has(#leagueStandingsModal:not(.hidden))
   font-size: 12px;
   font-weight: 800;
 }
-@media (max-width: 760px) {
-  .week-unpublish-btn { flex: 1; }
-}
-/* Varsayılan olarak butonu herkesten gizle */
-#toggleShareModeBtn {
-    display: none !important;
-}
-
-/* Eğer kullanıcı admin ise butonu göster */
-.is-admin #toggleShareModeBtn {
-    display: inline-block !important; /* veya block */
+body[data-role="user"] .prediction-header-actions .share-mode-btn,
+body[data-role="user"] #predictionShareToolbar {
+  display: none !important;
 }

@@ -58,7 +58,10 @@ function waitForFirebaseSdk(timeoutMs = 15000) {
   return new Promise((resolve, reject) => {
     const startedAt = Date.now();
     const timer = window.setInterval(() => {
-      if (window.firebase && typeof window.firebase.initializeApp === "function") {
+      if (
+        window.firebase &&
+        typeof window.firebase.initializeApp === "function"
+      ) {
         window.clearInterval(timer);
         resolve(window.firebase);
         return;
@@ -81,9 +84,10 @@ async function initializeFirebaseOnce() {
     }
 
     const firebaseSdk = await waitForFirebaseSdk();
-    const app = firebaseSdk.apps && firebaseSdk.apps.length
-      ? firebaseSdk.app()
-      : firebaseSdk.initializeApp(getFirebaseConfig());
+    const app =
+      firebaseSdk.apps && firebaseSdk.apps.length
+        ? firebaseSdk.app()
+        : firebaseSdk.initializeApp(getFirebaseConfig());
 
     window.__fiksturFirebaseApp = app;
     window.__fiksturFirebaseDb = firebaseSdk.database(app);
@@ -102,10 +106,12 @@ async function initializeFirebaseOnce() {
 function getFirebaseDb() {
   if (window.__fiksturFirebaseDb) return window.__fiksturFirebaseDb;
   if (!isFirebaseConfigured()) return null;
-  if (!window.firebase || typeof window.firebase.initializeApp !== "function") return null;
+  if (!window.firebase || typeof window.firebase.initializeApp !== "function")
+    return null;
 
   try {
-    const app = window.__fiksturFirebaseApp ||
+    const app =
+      window.__fiksturFirebaseApp ||
       (window.firebase.apps && window.firebase.apps.length
         ? window.firebase.app()
         : window.firebase.initializeApp(getFirebaseConfig()));
@@ -1276,14 +1282,20 @@ function registerPresenceWindowHooks() {
 
   window.addEventListener("pagehide", () => {
     if (isAuthenticated()) {
-      localStorage.setItem(BACKGROUND_ENTERED_AT_STORAGE_KEY, String(Date.now()));
+      localStorage.setItem(
+        BACKGROUND_ENTERED_AT_STORAGE_KEY,
+        String(Date.now()),
+      );
     }
     stopPresenceTracking({ removeSession: true });
   });
 
   window.addEventListener("beforeunload", () => {
     if (isAuthenticated()) {
-      localStorage.setItem(BACKGROUND_ENTERED_AT_STORAGE_KEY, String(Date.now()));
+      localStorage.setItem(
+        BACKGROUND_ENTERED_AT_STORAGE_KEY,
+        String(Date.now()),
+      );
     }
     stopPresenceTracking({ removeSession: true });
   });
@@ -1349,7 +1361,9 @@ async function hydrateFromFirebaseRealtime(source = "manual") {
         weekNumber: "",
       });
       validateFreshActiveSelection({
-        forceNewestPublished: /login|startup|session-restore/.test(String(source)),
+        forceNewestPublished: /login|startup|session-restore/.test(
+          String(source),
+        ),
       });
       saveState(true);
       if (isAuthenticated()) startPresenceTracking();
@@ -1378,7 +1392,10 @@ function scheduleFirebaseRealtimeHydration(source = "realtime") {
   clearTimeout(firebaseRealtimeHydrationTimer);
   firebaseRealtimeHydrationTimer = setTimeout(() => {
     if (!isAuthenticated()) {
-      console.log("[REALTIME] Oturum açılmadığı için eşitleme beklendi:", source);
+      console.log(
+        "[REALTIME] Oturum açılmadığı için eşitleme beklendi:",
+        source,
+      );
       return;
     }
     hydrateFromFirebaseRealtime(source);
@@ -3079,7 +3096,10 @@ async function syncSeasonRegistryFromFirebase() {
   state.seasons = seasonList.map((item) => ({ ...item }));
 
   const localWeekMap = new Map(
-    state.weeks.map((week) => [`${week.seasonId}__${Number(week.number)}`, week]),
+    state.weeks.map((week) => [
+      `${week.seasonId}__${Number(week.number)}`,
+      week,
+    ]),
   );
   weekList.forEach((remoteWeek) => {
     const key = `${remoteWeek.seasonId}__${Number(remoteWeek.number)}`;
@@ -4601,7 +4621,10 @@ async function loginUser() {
     const sessionHydrationOk = await runSessionHydrationWithFastOverlay({
       loadingMessage: "Kayıtlı veriler açılıyor, güncel bilgiler yükleniyor...",
     });
-    console.log("[LOGIN AUTO SYNC] Oturum eşitlemesi tamamlandı:", sessionHydrationOk);
+    console.log(
+      "[LOGIN AUTO SYNC] Oturum eşitlemesi tamamlandı:",
+      sessionHydrationOk,
+    );
 
     // Manuel Firebase Güncelle butonunun yaptığı tam eşitlemeyi girişten sonra
     // otomatik olarak bir kez daha çalıştır. Böylece adminin eklediği yeni hafta,
@@ -4609,12 +4632,16 @@ async function loginUser() {
     const fullHydrationOk = await hydrateFromFirebaseRealtime("login-auto");
     validateFreshActiveSelection({ forceNewestPublished: true });
     saveState(true);
-    console.log("[LOGIN AUTO SYNC] Tam Firebase eşitlemesi tamamlandı:", fullHydrationOk, {
-      seasons: state.seasons?.length || 0,
-      weeks: state.weeks?.length || 0,
-      matches: state.matches?.length || 0,
-      predictions: state.predictions?.length || 0,
-    });
+    console.log(
+      "[LOGIN AUTO SYNC] Tam Firebase eşitlemesi tamamlandı:",
+      fullHydrationOk,
+      {
+        seasons: state.seasons?.length || 0,
+        weeks: state.weeks?.length || 0,
+        matches: state.matches?.length || 0,
+        predictions: state.predictions?.length || 0,
+      },
+    );
     renderAll();
 
     if (typeof window.refreshFiksturFcmTokenOwner === "function") {
@@ -6359,7 +6386,9 @@ function getAllWeeksBySeasonId(seasonId) {
 function getWeeksBySeasonId(seasonId) {
   const weeks = getAllWeeksBySeasonId(seasonId);
   if (!isReadOnlyMode()) return weeks;
-  return weeks.filter((week) => String(week.status || "hazirlaniyor") !== "hazirlaniyor");
+  return weeks.filter(
+    (week) => String(week.status || "hazirlaniyor") !== "hazirlaniyor",
+  );
 }
 function getMatchesByWeekId(weekId) {
   return state.matches
@@ -6410,7 +6439,9 @@ function compactLocalPredictionRecords() {
   const map = new Map();
   state.predictions.forEach((pred) => {
     const matchId = normalizeEntityId(pred.matchId || pred.localMatchId);
-    const playerId = normalizeEntityId(pred.playerId || pred.kullaniciId || pred.userId);
+    const playerId = normalizeEntityId(
+      pred.playerId || pred.kullaniciId || pred.userId,
+    );
     if (!matchId || !playerId) return;
 
     pred.matchId = matchId;
@@ -6553,7 +6584,8 @@ function getTeamMetaByName(name, seasonId = getActiveSeasonId()) {
 }
 
 function getStoredTeamLogoCache() {
-  if (!state.settings || typeof state.settings !== "object") state.settings = {};
+  if (!state.settings || typeof state.settings !== "object")
+    state.settings = {};
   if (
     !state.settings.teamLogoCache ||
     typeof state.settings.teamLogoCache !== "object"
@@ -6630,13 +6662,31 @@ function parseMatchDateTimestamp(value) {
   const isoLocal = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})/);
   if (isoLocal) {
     const [, y, m, d, h, min] = isoLocal;
-    return new Date(Number(y), Number(m) - 1, Number(d), Number(h), Number(min), 0, 0).getTime();
+    return new Date(
+      Number(y),
+      Number(m) - 1,
+      Number(d),
+      Number(h),
+      Number(min),
+      0,
+      0,
+    ).getTime();
   }
 
-  const trLocal = raw.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})(?:\s+(\d{1,2}):(\d{2}))?/);
+  const trLocal = raw.match(
+    /^(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})(?:\s+(\d{1,2}):(\d{2}))?/,
+  );
   if (trLocal) {
     const [, d, m, y, h = "0", min = "0"] = trLocal;
-    return new Date(Number(y), Number(m) - 1, Number(d), Number(h), Number(min), 0, 0).getTime();
+    return new Date(
+      Number(y),
+      Number(m) - 1,
+      Number(d),
+      Number(h),
+      Number(min),
+      0,
+      0,
+    ).getTime();
   }
 
   const parsed = new Date(raw).getTime();
@@ -6704,7 +6754,9 @@ const predictionRevealSignatureCache = {};
 
 function getPredictionRevealSignature(weekId) {
   if (!weekId) return "";
-  return isWeekStartedForPredictionReveal(weekId) ? "week-started" : "week-hidden";
+  return isWeekStartedForPredictionReveal(weekId)
+    ? "week-started"
+    : "week-hidden";
 }
 
 function refreshPredictionViewsAfterRevealChange(weekId) {
@@ -6718,8 +6770,10 @@ function refreshPredictionViewsAfterRevealChange(weekId) {
 
   setTimeout(() => {
     predictionLockRerenderPending = false;
-    if ((state.settings.currentTab || "dashboard") === "predictions" &&
-        typeof renderPredictions === "function") {
+    if (
+      (state.settings.currentTab || "dashboard") === "predictions" &&
+      typeof renderPredictions === "function"
+    ) {
       renderPredictions();
     }
     if (typeof renderDashboard === "function") renderDashboard();
@@ -6856,8 +6910,10 @@ function isMatchStartedForPredictionReveal(match) {
   if (!match) return false;
   if (match.played) return true;
 
-  const visual = typeof getMatchVisualState === "function" ? getMatchVisualState(match) : "";
-  if (visual === "live" || visual === "played" || visual === "played-postponed") return true;
+  const visual =
+    typeof getMatchVisualState === "function" ? getMatchVisualState(match) : "";
+  if (visual === "live" || visual === "played" || visual === "played-postponed")
+    return true;
 
   const statusText = String(match.statusText || "").toLowerCase();
   if (
@@ -6898,7 +6954,8 @@ function isWeekStartedForPredictionReveal(weekId) {
 
 function canRevealPredictionForViewer(match, playerId) {
   if (getCurrentRole() === "admin") return true;
-  if (String(playerId || "") === String(getCurrentPlayerId() || "")) return true;
+  if (String(playerId || "") === String(getCurrentPlayerId() || ""))
+    return true;
   if (!match) return false;
   return isWeekStartedForPredictionReveal(match.weekId);
 }
@@ -6969,7 +7026,9 @@ function getPreferredWeekIdForSeason(seasonId) {
 
   // Admin hazırlık ekranlarında çalışmaya devam edebilsin; normal kullanıcıda
   // getWeeksBySeasonId zaten hazırlanıyor haftalarını filtreler.
-  return weeks.sort((a, b) => Number(b.number) - Number(a.number))[0]?.id || null;
+  return (
+    weeks.sort((a, b) => Number(b.number) - Number(a.number))[0]?.id || null
+  );
 }
 
 function validateFreshActiveSelection({ forceNewestPublished = false } = {}) {
@@ -6987,7 +7046,9 @@ function validateFreshActiveSelection({ forceNewestPublished = false } = {}) {
   const currentWeek = getWeekById(state.settings.activeWeekId);
   const currentIsEligible =
     currentWeek &&
-    allEligibleWeeks.some(({ week }) => String(week.id) === String(currentWeek.id));
+    allEligibleWeeks.some(
+      ({ week }) => String(week.id) === String(currentWeek.id),
+    );
 
   if (!forceNewestPublished && currentIsEligible) {
     state.settings.activeSeasonId = currentWeek.seasonId;
@@ -6995,7 +7056,8 @@ function validateFreshActiveSelection({ forceNewestPublished = false } = {}) {
   }
 
   const preferred = allEligibleWeeks.sort(sortCandidates)[0] || null;
-  state.settings.activeSeasonId = preferred?.season?.id || seasons[0]?.id || null;
+  state.settings.activeSeasonId =
+    preferred?.season?.id || seasons[0]?.id || null;
   state.settings.activeWeekId = preferred?.week?.id || null;
   return state.settings.activeWeekId;
 }
@@ -7010,7 +7072,6 @@ function forceDefaultLandingAfterLogin(reason = "login") {
     state.settings.activeSeasonId = seasonId;
     state.settings.activeWeekId = getPreferredWeekIdForSeason(seasonId);
   }
-
 }
 function ensureWeekForSeason(seasonId, weekNumber) {
   if (!weekNumber) return null;
@@ -7039,12 +7100,20 @@ function isPostponedStatus(statusText = "") {
 function getMatchRuntimeInfo(match, nowMs = Date.now()) {
   const startTs = parseMatchDateTimestamp(match?.date);
   if (Number.isNaN(startTs)) {
-    return { startTs: NaN, diffMs: null, elapsedMs: null, minute: null, phase: "unknown" };
+    return {
+      startTs: NaN,
+      diffMs: null,
+      elapsedMs: null,
+      minute: null,
+      phase: "unknown",
+    };
   }
 
   const diffMs = startTs - nowMs;
   const elapsedMs = nowMs - startTs;
-  const liveMinutes = Number(match?.liveMinutes || match?.durationMinutes || 120);
+  const liveMinutes = Number(
+    match?.liveMinutes || match?.durationMinutes || 120,
+  );
   const liveMs = Math.max(90, liveMinutes) * 60 * 1000;
 
   if (diffMs > 0) {
@@ -7052,7 +7121,10 @@ function getMatchRuntimeInfo(match, nowMs = Date.now()) {
   }
 
   if (elapsedMs <= liveMs) {
-    const minute = Math.max(1, Math.min(120, Math.floor(elapsedMs / 60000) + 1));
+    const minute = Math.max(
+      1,
+      Math.min(120, Math.floor(elapsedMs / 60000) + 1),
+    );
     return { startTs, diffMs, elapsedMs, minute, phase: "live" };
   }
 
@@ -7065,10 +7137,18 @@ function getMatchVisualState(match) {
   if (match.postponed) return "postponed";
 
   const statusText = String(match.statusText || "").toLowerCase();
-  if (statusText.includes("finished") || statusText.includes("full time") || statusText.includes("bitti")) {
+  if (
+    statusText.includes("finished") ||
+    statusText.includes("full time") ||
+    statusText.includes("bitti")
+  ) {
     return "finished-time";
   }
-  if (statusText.includes("live") || statusText.includes("in play") || statusText.includes("canlı")) {
+  if (
+    statusText.includes("live") ||
+    statusText.includes("in play") ||
+    statusText.includes("canlı")
+  ) {
     return "live";
   }
 
@@ -7084,7 +7164,8 @@ function getMatchBadge(match) {
   if (visual === "played-postponed")
     return { text: "Ertelendi / Oynandı", cls: "info" };
   if (visual === "played") return { text: "Bitti", cls: "" };
-  if (visual === "finished-time") return { text: "Sonuç Bekliyor", cls: "warn" };
+  if (visual === "finished-time")
+    return { text: "Sonuç Bekliyor", cls: "warn" };
   if (visual === "postponed") return { text: "Ertelendi", cls: "warn" };
   if (visual === "live") return { text: "Canlı", cls: "red" };
   if (visual === "locked") return { text: "🔒 Kilitli", cls: "red" };
@@ -7145,13 +7226,21 @@ function isMatchResolvedForScoring(match) {
   if (!match) return false;
   if (match.played) return true;
 
-  const hasHomeScore = match.homeScore !== "" && match.homeScore !== null && match.homeScore !== undefined;
-  const hasAwayScore = match.awayScore !== "" && match.awayScore !== null && match.awayScore !== undefined;
+  const hasHomeScore =
+    match.homeScore !== "" &&
+    match.homeScore !== null &&
+    match.homeScore !== undefined;
+  const hasAwayScore =
+    match.awayScore !== "" &&
+    match.awayScore !== null &&
+    match.awayScore !== undefined;
   return hasHomeScore && hasAwayScore;
 }
 
 function getResolvedWeekMatches(weekId) {
-  return getMatchesByWeekId(weekId).filter((match) => isMatchResolvedForScoring(match));
+  return getMatchesByWeekId(weekId).filter((match) =>
+    isMatchResolvedForScoring(match),
+  );
 }
 
 function getWeeklyStandings(weekId) {
@@ -7465,13 +7554,12 @@ function formatDashboardAutoSyncTime(timestamp) {
       month: "2-digit",
       hour: "2-digit",
       minute: "2-digit",
-      second: "2-digit"
+      second: "2-digit",
     });
   } catch {
     return "Henüz yapılmadı";
   }
 }
-
 
 function ensureAutoSyncDebugStore() {
   if (!Array.isArray(window.__autoSyncDebugLog)) {
@@ -7834,9 +7922,7 @@ function getPlayerSupportedTeamName(player) {
   const teamId = String(player.teamId || "").trim();
   if (!teamId) return "";
 
-  return (
-    state.teams.find((team) => String(team.id) === teamId)?.name || ""
-  );
+  return state.teams.find((team) => String(team.id) === teamId)?.name || "";
 }
 function getPlayerSupportedTeamPalette(player) {
   const supportedTeam = getPlayerSupportedTeamName(player);
@@ -7865,8 +7951,11 @@ function getPlayerSupportedTeamPalette(player) {
 }
 function buildPlayerSupportedTeamOptions(player) {
   const selectedTeam = getPlayerSupportedTeamName(player);
-  const teamNames = [...new Set(state.teams.map((team) => String(team.name || "").trim()).filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b, "tr"));
+  const teamNames = [
+    ...new Set(
+      state.teams.map((team) => String(team.name || "").trim()).filter(Boolean),
+    ),
+  ].sort((a, b) => a.localeCompare(b, "tr"));
 
   return [
     '<option value="">Takım seç</option>',
@@ -7912,18 +8001,18 @@ function renderPlayers() {
           const lastSeenText = presence.lastSeen
             ? formatAdminPanelDateTime(presence.lastSeen)
             : "Henüz giriş yok";
-            const supportedTeam = getPlayerSupportedTeamName(player);
-            const supportedPalette = getPlayerSupportedTeamPalette(player);
+          const supportedTeam = getPlayerSupportedTeamName(player);
+          const supportedPalette = getPlayerSupportedTeamPalette(player);
 
-            const supportedTeamBackground = supportedTeam
-              ? `
+          const supportedTeamBackground = supportedTeam
+            ? `
     <div class="player-card-supported-team-bg" aria-hidden="true">
       ${teamLogoHtml(supportedTeam, getActiveSeasonId(), "player-card-supported-team-bg__wrap")}
     </div>
   `
-              : "";
+            : "";
 
-            const teamGlowStyle = `
+          const teamGlowStyle = `
   --team-glow-a: ${supportedPalette.colorA};
   --team-glow-b: ${supportedPalette.colorB};
   --team-border-color: ${supportedPalette.border};
@@ -8030,7 +8119,7 @@ function buildPlayerDetailModalContent(player) {
             .join("")}
         </div>
       `
-      : `<div class="player-empty-seasons">Önce sezon ekle. Sezonlar oluştukça burada kutular çıkacak.</div>`;
+        : `<div class="player-empty-seasons">Önce sezon ekle. Sezonlar oluştukça burada kutular çıkacak.</div>`;
 
   const presence = getPresenceStatusForUser(player.id);
   const statusClass = presence.isOnline ? "is-online" : "is-offline";
@@ -8086,12 +8175,16 @@ function buildPlayerDetailModalContent(player) {
             <span class="player-stat-label">Son giriş</span>
             <strong>${presence.lastSeen ? formatAdminPanelDateTime(presence.lastSeen) : "Henüz giriş yok"}</strong>
           </div>
-          ${canManageThisProfile ? `
+          ${
+            canManageThisProfile
+              ? `
           <div class="player-stat-pill">
             <span class="player-stat-label">Şifre</span>
             <strong>${escapeHtml(player.password || "1234")}</strong>
           </div>
-          ` : ""}
+          `
+              : ""
+          }
           <div class="player-stat-pill">
             <span class="player-stat-label">Tahmin</span>
             <strong>${predictionCount}</strong>
@@ -8102,35 +8195,49 @@ function buildPlayerDetailModalContent(player) {
       <div class="player-card-team-block">
         <div class="player-card-section-title">Takım kartı</div>
         ${supportedTeamMarkup}
-        ${canManageThisProfile ? `
+        ${
+          canManageThisProfile
+            ? `
         <div class="player-team-editor-row">
           <select id="player_team_${player.id}" class="player-team-select user-self-control">
             ${teamSelectorOptions}
           </select>
           <button class="small secondary user-self-control" onclick="savePlayerSupportedTeam('${player.id}', this)">Takımı Kaydet</button>
         </div>
-        ` : ""}
+        `
+            : ""
+        }
       </div>
 
-      ${isAdminMode ? `
+      ${
+        isAdminMode
+          ? `
       <div class="player-card-seasons">
         <div class="player-card-section-title">Sezon katılımı</div>
         ${seasonMembershipMarkup}
       </div>
-      ` : ""}
+      `
+          : ""
+      }
 
       <div class="player-card-actions">
-        ${isAdminMode ? `
+        ${
+          isAdminMode
+            ? `
           <button class="small secondary" onclick="renamePlayer('${player.id}', this)">Düzenle</button>
           <button class="small secondary" onclick="changePlayerPassword('${player.id}', this)">Ş. Değiştir</button>
           ${isAdminUser ? "" : `<button class="small secondary" onclick="togglePanelAdmin('${player.id}', this)">${player.panelAdmin ? "Admin Yetkisini Kaldır" : "Admin Yap"}</button>`}
           ${isAdminUser ? "" : `<button class="small secondary" onclick="forceLogoutUserSession('${player.id}', this)">Sistemden At</button>`}
           ${isAdminUser ? "" : `<button class="small danger" onclick="removePlayer('${player.id}', this)">Sil</button>`}
-        ` : isOwnUserProfile ? `
+        `
+            : isOwnUserProfile
+              ? `
           <button class="small secondary user-self-control" onclick="changePlayerPassword('${player.id}', this)">Şifremi Değiştir</button>
-        ` : `
+        `
+              : `
           <span class="player-readonly-note">Bu kart sadece görüntülenebilir.</span>
-        `}
+        `
+        }
       </div>
     </div>
   `;
@@ -8681,7 +8788,11 @@ window.saveSeasonTeamSceneSlug = async function (teamId, buttonOrEvent) {
   const team = getTeamById(teamId);
   if (!team) return;
   const nextSceneSlug = String(
-    team._draftSceneSlug || getEffectiveMatchSceneSlug(team) || team.slug || slugify(team.name) || "",
+    team._draftSceneSlug ||
+      getEffectiveMatchSceneSlug(team) ||
+      team.slug ||
+      slugify(team.name) ||
+      "",
   ).trim();
   if (!nextSceneSlug) {
     return showAlert("Stadyum dosya adı boş olamaz.", {
@@ -8692,13 +8803,18 @@ window.saveSeasonTeamSceneSlug = async function (teamId, buttonOrEvent) {
   team.sceneSlug = nextSceneSlug.replace(/\.png$/i, "");
   team.stadiumSlug = team.sceneSlug;
 
-  if (!state.settings || typeof state.settings !== "object") state.settings = {};
-  if (!state.settings.teamSceneSlugs || typeof state.settings.teamSceneSlugs !== "object") {
+  if (!state.settings || typeof state.settings !== "object")
+    state.settings = {};
+  if (
+    !state.settings.teamSceneSlugs ||
+    typeof state.settings.teamSceneSlugs !== "object"
+  ) {
     state.settings.teamSceneSlugs = {};
   }
   const seasonId = String(team.seasonId || getActiveSeasonId() || "");
   const sceneKey = getMatchSceneOverrideKey(team.name);
-  if (!state.settings.teamSceneSlugs[seasonId]) state.settings.teamSceneSlugs[seasonId] = {};
+  if (!state.settings.teamSceneSlugs[seasonId])
+    state.settings.teamSceneSlugs[seasonId] = {};
   state.settings.teamSceneSlugs[seasonId][sceneKey] = {
     teamName: team.name,
     sceneSlug: team.sceneSlug,
@@ -8715,14 +8831,19 @@ window.saveSeasonTeamSceneSlug = async function (teamId, buttonOrEvent) {
       });
     }
     renderAll();
-    setAsyncButtonState(actionButton, "success", { success: "Firebase'e kaydedildi" });
+    setAsyncButtonState(actionButton, "success", {
+      success: "Firebase'e kaydedildi",
+    });
   } catch (error) {
     console.error("Stadyum dosya adı Firebase'e kaydedilemedi:", error);
     renderAll();
-    showAlert("Stadyum adı bu cihazda güncellendi ama Firebase'e yazılamadı. Rules tarafında settings yazma iznini kontrol et.", {
-      title: "Firebase kayıt uyarısı",
-      type: "warning",
-    });
+    showAlert(
+      "Stadyum adı bu cihazda güncellendi ama Firebase'e yazılamadı. Rules tarafında settings yazma iznini kontrol et.",
+      {
+        title: "Firebase kayıt uyarısı",
+        type: "warning",
+      },
+    );
     setAsyncButtonState(actionButton, "error", { error: "Firebase hatası" });
   }
 };
@@ -8787,9 +8908,12 @@ window.removeSeason = async function (id) {
           const related =
             typeof isSeasonRelatedBackupRecord === "function"
               ? isSeasonRelatedBackupRecord(row, seasonDeleteContext)
-              : normalizeText(row.season || row.sezon || row.seasonName || "") ===
-                  normalizeText(season.name || "") ||
-                remoteMatchIdsToDelete.has(String(row.matchId || row.localMatchId || "").trim());
+              : normalizeText(
+                  row.season || row.sezon || row.seasonName || "",
+                ) === normalizeText(season.name || "") ||
+                remoteMatchIdsToDelete.has(
+                  String(row.matchId || row.localMatchId || "").trim(),
+                );
           if (!related) continue;
           const rowKey = sanitizeFirebaseKey(row._firebaseKey || row.id || "");
           if (rowKey) await firebaseRemove(`${path}/${rowKey}`);
@@ -8888,13 +9012,21 @@ window.renameSeasonTeam = async function (teamId) {
     title: "Logo dosya adı",
     placeholder: "örn: fenerbahce",
   });
-  const sceneSlug = await showPrompt("Stadyum dosya adı:", getEffectiveMatchSceneSlug(team) || slugify(name), {
-    title: "Stadyum dosya adı",
-    placeholder: "örn: galatasaray veya beşiktaş",
-  });
+  const sceneSlug = await showPrompt(
+    "Stadyum dosya adı:",
+    getEffectiveMatchSceneSlug(team) || slugify(name),
+    {
+      title: "Stadyum dosya adı",
+      placeholder: "örn: galatasaray veya beşiktaş",
+    },
+  );
   team.name = name.trim();
   team.slug = (slug || slugify(name)).trim();
-  team.sceneSlug = String(sceneSlug || getEffectiveMatchSceneSlug(team) || team.slug || slugify(name)).trim().replace(/\.png$/i, "");
+  team.sceneSlug = String(
+    sceneSlug || getEffectiveMatchSceneSlug(team) || team.slug || slugify(name),
+  )
+    .trim()
+    .replace(/\.png$/i, "");
   team.stadiumSlug = team.sceneSlug;
   saveState();
   renderAll();
@@ -8927,12 +9059,27 @@ window.removeSeasonTeam = async function (teamId) {
 function getWeekStatusMeta(week) {
   const status = String(week?.status || "hazirlaniyor");
   if (status === "tamamlandi") {
-    return { label: "Tamamlandı", className: "week-status-completed", icon: "⚫", detail: "Tüm maçlar oynandı" };
+    return {
+      label: "Tamamlandı",
+      className: "week-status-completed",
+      icon: "⚫",
+      detail: "Tüm maçlar oynandı",
+    };
   }
   if (status === "aktif") {
-    return { label: "Aktif", className: "week-status-active", icon: "🟢", detail: "Tahminler kullanıcılara açık" };
+    return {
+      label: "Aktif",
+      className: "week-status-active",
+      icon: "🟢",
+      detail: "Tahminler kullanıcılara açık",
+    };
   }
-  return { label: "Hazırlanıyor", className: "week-status-preparing", icon: "🟡", detail: "Henüz kullanıcılara yayınlanmadı" };
+  return {
+    label: "Hazırlanıyor",
+    className: "week-status-preparing",
+    icon: "🟡",
+    detail: "Henüz kullanıcılara yayınlanmadı",
+  };
 }
 
 function renderWeeks() {
@@ -8947,7 +9094,8 @@ function renderWeeks() {
       const matches = getMatchesByWeekId(week.id);
       const playedCount = matches.filter((match) => match.played).length;
       const meta = getWeekStatusMeta(week);
-      const isPreparing = String(week.status || "hazirlaniyor") === "hazirlaniyor";
+      const isPreparing =
+        String(week.status || "hazirlaniyor") === "hazirlaniyor";
       const isActive = String(week.status || "") === "aktif";
       const publishedLabel = week.publishedAt
         ? `Yayınlandı: ${formatAdminPanelDateTime(week.publishedAt)}`
@@ -8982,12 +9130,14 @@ async function queueWeekPublishedNotification(week) {
   const season = getSeasonById(week.seasonId);
   const id = sanitizeFirebaseKey(`week_publish_${week.id}_${Date.now()}`);
   const now = new Date().toISOString();
-  const iconMeta = typeof getAdminNotificationIconMeta === "function"
-    ? getAdminNotificationIconMeta("announce")
-    : { emoji: "📢" };
-  const assetUrls = typeof getAdminNotificationAssetUrls === "function"
-    ? getAdminNotificationAssetUrls("announce")
-    : {};
+  const iconMeta =
+    typeof getAdminNotificationIconMeta === "function"
+      ? getAdminNotificationIconMeta("announce")
+      : { emoji: "📢" };
+  const assetUrls =
+    typeof getAdminNotificationAssetUrls === "function"
+      ? getAdminNotificationAssetUrls("announce")
+      : {};
   await firebaseWrite(`adminNotificationQueue/${id}`, {
     id,
     type: "week_published",
@@ -9017,10 +9167,13 @@ window.publishWeek = async function (id, actionButton = null) {
   if (!week || String(week.status || "hazirlaniyor") !== "hazirlaniyor") return;
   const matches = getMatchesByWeekId(id);
   if (!matches.length) {
-    return showAlert("Haftayı yayınlamadan önce maçları API'den getir veya manuel ekle.", {
-      title: "Maç bulunamadı",
-      type: "warning",
-    });
+    return showAlert(
+      "Haftayı yayınlamadan önce maçları API'den getir veya manuel ekle.",
+      {
+        title: "Maç bulunamadı",
+        type: "warning",
+      },
+    );
   }
   const confirmed = await showConfirm(
     `Bu hafta yayınlansın mı?\n\nKullanıcılara bildirim gönderilecektir.`,
@@ -9029,7 +9182,10 @@ window.publishWeek = async function (id, actionButton = null) {
   if (!confirmed) return;
 
   try {
-    if (actionButton) setAsyncButtonState(actionButton, "loading", { loading: "Yayınlanıyor..." });
+    if (actionButton)
+      setAsyncButtonState(actionButton, "loading", {
+        loading: "Yayınlanıyor...",
+      });
 
     // Maçları kullanıcıların okuduğu Firebase alanına yalnızca yayınlama anında aktar.
     // Hafta bu sırada hâlâ "hazirlaniyor" olduğundan kullanıcı ekranında görünmez.
@@ -9038,7 +9194,9 @@ window.publishWeek = async function (id, actionButton = null) {
       try {
         const syncResult = await syncWeekMatchesToSheet(week.id);
         if (!syncResult?.success) {
-          throw new Error(syncResult?.message || "Hafta maçları Firebase'e aktarılamadı.");
+          throw new Error(
+            syncResult?.message || "Hafta maçları Firebase'e aktarılamadı.",
+          );
         }
       } finally {
         window.__ALLOW_MATCH_WRITE__ = false;
@@ -9067,17 +9225,23 @@ window.publishWeek = async function (id, actionButton = null) {
       });
     }
     renderAll();
-    showAlert(`${week.number}. hafta yayınlandı. Bildirim gönderim kuyruğuna alındı.`, {
-      title: "Hafta yayında",
-      type: "success",
-    });
+    showAlert(
+      `${week.number}. hafta yayınlandı. Bildirim gönderim kuyruğuna alındı.`,
+      {
+        title: "Hafta yayında",
+        type: "success",
+      },
+    );
   } catch (error) {
     week.status = "hazirlaniyor";
     week.publishedAt = "";
     saveState();
     renderAll();
     console.error("Hafta yayınlama hatası:", error);
-    showAlert(error?.message || "Hafta yayınlanamadı.", { title: "Yayınlama hatası", type: "danger" });
+    showAlert(error?.message || "Hafta yayınlanamadı.", {
+      title: "Yayınlama hatası",
+      type: "danger",
+    });
   }
 };
 
@@ -9088,20 +9252,29 @@ window.unpublishWeek = async function (id, actionButton = null) {
 
   const confirmed = await showConfirm(
     `Bu hafta yayından kaldırılacak.\n\nGirilen tahminler korunacaktır.`,
-    { title: "Yayından Kaldır", type: "warning", confirmText: "Yayından Kaldır" },
+    {
+      title: "Yayından Kaldır",
+      type: "warning",
+      confirmText: "Yayından Kaldır",
+    },
   );
   if (!confirmed) return;
 
   const previousActiveWeekId = state.settings.activeWeekId;
   try {
-    if (actionButton) setAsyncButtonState(actionButton, "loading", { loading: "Kaldırılıyor..." });
+    if (actionButton)
+      setAsyncButtonState(actionButton, "loading", {
+        loading: "Kaldırılıyor...",
+      });
     week.status = "hazirlaniyor";
     week.publishedAt = "";
     week.publishedBy = "";
 
     if (state.settings.activeWeekId === week.id) {
       const replacementWeek = getAllWeeksBySeasonId(week.seasonId).find(
-        (item) => item.id !== week.id && String(item.status || "hazirlaniyor") === "aktif",
+        (item) =>
+          item.id !== week.id &&
+          String(item.status || "hazirlaniyor") === "aktif",
       );
       state.settings.activeWeekId = replacementWeek?.id || null;
     }
@@ -9123,10 +9296,13 @@ window.unpublishWeek = async function (id, actionButton = null) {
     }
 
     renderAll();
-    showAlert(`${week.number}. hafta yayından kaldırıldı. Girilen tahminler korunmuştur.`, {
-      title: "Hafta yayından kaldırıldı",
-      type: "success",
-    });
+    showAlert(
+      `${week.number}. hafta yayından kaldırıldı. Girilen tahminler korunmuştur.`,
+      {
+        title: "Hafta yayından kaldırıldı",
+        type: "success",
+      },
+    );
   } catch (error) {
     week.status = "aktif";
     state.settings.activeWeekId = previousActiveWeekId;
@@ -9151,10 +9327,13 @@ window.removeWeek = async function (id) {
   const week = getWeekById(id);
   if (!week) return;
   if (String(week.status || "hazirlaniyor") !== "hazirlaniyor") {
-    return showAlert("Yalnızca hazırlanıyor durumundaki haftalar silinebilir.", {
-      title: "Hafta silinemez",
-      type: "warning",
-    });
+    return showAlert(
+      "Yalnızca hazırlanıyor durumundaki haftalar silinebilir.",
+      {
+        title: "Hafta silinemez",
+        type: "warning",
+      },
+    );
   }
 
   if (
@@ -9219,13 +9398,13 @@ window.removeWeek = async function (id) {
     }
 
     state.weeks = state.weeks.filter((w) => w.id !== id);
-  if (isFirebaseReady()) {
-    try {
-      await persistWeekRegistryToFirebase();
-    } catch (error) {
-      console.warn("Hafta listesi Firebase'de güncellenemedi:", error);
+    if (isFirebaseReady()) {
+      try {
+        await persistWeekRegistryToFirebase();
+      } catch (error) {
+        console.warn("Hafta listesi Firebase'de güncellenemedi:", error);
+      }
     }
-  }
     state.matches = state.matches.filter((m) => m.weekId !== id);
     state.predictions = state.predictions.filter(
       (p) => !matchIds.includes(String(p.matchId)),
@@ -9282,9 +9461,14 @@ function renderMatches(
         .map((match) => {
           const badge = getMatchBadge(match);
           const visual = getMatchVisualState(match);
-          const scoreText = match.played ? `${match.homeScore} - ${match.awayScore}` : "- -";
+          const scoreText = match.played
+            ? `${match.homeScore} - ${match.awayScore}`
+            : "- -";
           const statusClass =
-            match.played || visual === "played" || visual === "finished-time" || visual === "played-postponed"
+            match.played ||
+            visual === "played" ||
+            visual === "finished-time" ||
+            visual === "played-postponed"
               ? "is-played"
               : visual === "live"
                 ? "is-live"
@@ -9870,13 +10054,18 @@ function fillRoundedRect(
   fillStyle,
   strokeStyle = "",
 ) {
-  const r = Math.min(radius, width / 2, height / 2);
+  const safeWidth = Math.max(0, Number(width) || 0);
+  const safeHeight = Math.max(0, Number(height) || 0);
+  const r = Math.max(
+    0,
+    Math.min(Number(radius) || 0, safeWidth / 2, safeHeight / 2),
+  );
   ctx.beginPath();
   ctx.moveTo(x + r, y);
-  ctx.arcTo(x + width, y, x + width, y + height, r);
-  ctx.arcTo(x + width, y + height, x, y + height, r);
-  ctx.arcTo(x, y + height, x, y, r);
-  ctx.arcTo(x, y, x + width, y, r);
+  ctx.arcTo(x + safeWidth, y, x + safeWidth, y + safeHeight, r);
+  ctx.arcTo(x + safeWidth, y + safeHeight, x, y + safeHeight, r);
+  ctx.arcTo(x, y + safeHeight, x, y, r);
+  ctx.arcTo(x, y, x + safeWidth, y, r);
   ctx.closePath();
   if (fillStyle) {
     ctx.fillStyle = fillStyle;
@@ -9884,44 +10073,80 @@ function fillRoundedRect(
   }
   if (strokeStyle) {
     ctx.strokeStyle = strokeStyle;
+    ctx.lineWidth = 1;
     ctx.stroke();
   }
 }
 
 const shareLogoImageCache = new Map();
 
+function getCanvasSafeTeamLogoUrl(src) {
+  const cleanSrc = String(src || "").trim();
+  if (!cleanSrc) return "";
+  if (/^(data:|blob:)/i.test(cleanSrc)) return cleanSrc;
+
+  const proxyUrl = new URL("https://wsrv.nl/");
+  proxyUrl.searchParams.set("url", cleanSrc);
+  proxyUrl.searchParams.set("w", "256");
+  proxyUrl.searchParams.set("h", "256");
+  proxyUrl.searchParams.set("fit", "contain");
+  proxyUrl.searchParams.set("output", "png");
+  return proxyUrl.toString();
+}
+
 function getTeamLogoCandidateSources(teamName, seasonId = getActiveSeasonId()) {
-  return [getTeamLogoUrl(teamName, seasonId)].filter(Boolean);
+  const directUrl = getTeamLogoUrl(teamName, seasonId);
+  if (!directUrl) return [];
+
+  const canvasSafeUrl = getCanvasSafeTeamLogoUrl(directUrl);
+  return [...new Set([canvasSafeUrl, directUrl].filter(Boolean))];
 }
 
 function loadCanvasImage(src) {
   return new Promise((resolve) => {
     if (!src) return resolve(null);
+
     const img = new Image();
     img.decoding = "async";
     img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
-    img.onerror = () => resolve(null);
+    img.referrerPolicy = "no-referrer";
+
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeoutId);
+      img.onload = null;
+      img.onerror = null;
+      resolve(value);
+    };
+
+    const timeoutId = window.setTimeout(() => finish(null), 12000);
+    img.onload = () => finish(img);
+    img.onerror = () => finish(null);
     img.src = src;
   });
 }
 
 async function getTeamLogoImage(teamName, seasonId = getActiveSeasonId()) {
-  const cacheKey = `${seasonId || "global"}__${teamName || ""}`;
+  const cacheKey = `${seasonId || "global"}__${normalizeText(teamName || "")}`;
   if (shareLogoImageCache.has(cacheKey)) {
-    return shareLogoImageCache.get(cacheKey);
+    return await shareLogoImageCache.get(cacheKey);
   }
 
-  for (const src of getTeamLogoCandidateSources(teamName, seasonId)) {
-    const img = await loadCanvasImage(src);
-    if (img) {
-      shareLogoImageCache.set(cacheKey, img);
-      return img;
+  const logoPromise = (async () => {
+    for (const src of getTeamLogoCandidateSources(teamName, seasonId)) {
+      const img = await loadCanvasImage(src);
+      if (img) return img;
     }
-  }
+    return null;
+  })();
 
-  shareLogoImageCache.set(cacheKey, null);
-  return null;
+  shareLogoImageCache.set(cacheKey, logoPromise);
+
+  const result = await logoPromise;
+  if (!result) shareLogoImageCache.delete(cacheKey);
+  return result;
 }
 
 async function drawTeamBadgeOnCanvas(
@@ -9933,54 +10158,81 @@ async function drawTeamBadgeOnCanvas(
   seasonId = getActiveSeasonId(),
 ) {
   const logoImg = await getTeamLogoImage(teamName, seasonId);
-  if (logoImg) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
-    ctx.closePath();
-    ctx.fillStyle = "rgba(255,255,255,0.98)";
-    ctx.fill();
-    ctx.clip();
-    const inset = Math.max(3, Math.round(size * 0.08));
-    ctx.drawImage(
-      logoImg,
-      x + inset,
-      y + inset,
-      size - inset * 2,
-      size - inset * 2,
-    );
-    ctx.restore();
-    ctx.save();
-    ctx.strokeStyle = "rgba(255,255,255,0.22)";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(x + size / 2, y + size / 2, size / 2 - 0.75, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-    return;
-  }
-
+  const centerX = x + size / 2,
+    centerY = y + size / 2;
   const [colorA, colorB] = getTeamPalette(teamName);
-  const gradient = ctx.createLinearGradient(x, y, x + size, y + size);
-  gradient.addColorStop(0, colorA);
-  gradient.addColorStop(1, colorB);
-  fillRoundedRect(
-    ctx,
-    x,
-    y,
-    size,
-    size,
-    size / 2,
-    gradient,
-    "rgba(255,255,255,0.18)",
-  );
-  ctx.fillStyle = "#f8fafc";
-  ctx.font = `800 ${Math.max(14, Math.round(size * 0.32))}px Inter, Arial, sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(teamInitials(teamName), x + size / 2, y + size / 2 + 1);
-  ctx.textAlign = "left";
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.55)";
+  ctx.shadowBlur = Math.max(18, size * 0.28);
+  ctx.shadowOffsetY = Math.max(6, size * 0.08);
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, size / 2, 0, Math.PI * 2);
+  ctx.fillStyle = "#fff";
+  ctx.fill();
+  ctx.restore();
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, size / 2 - 1.5, 0, Math.PI * 2);
+  ctx.strokeStyle = colorA;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.restore();
+  if (logoImg) {
+    const nw = Math.max(1, logoImg.naturalWidth || logoImg.width || size);
+    const nh = Math.max(1, logoImg.naturalHeight || logoImg.height || size);
+    const inset = Math.max(4, Math.round(size * 0.05));
+    const avail = size - inset * 2;
+    const s = Math.min(avail / nw, avail / nh);
+    const dw = nw * s,
+      dh = nh * s;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, size / 2 - 1, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(logoImg, centerX - dw / 2, centerY - dh / 2, dw, dh);
+    const shine = ctx.createRadialGradient(
+      centerX,
+      centerY - size * 0.15,
+      size * 0.05,
+      centerX,
+      centerY,
+      size / 2,
+    );
+    shine.addColorStop(0, "rgba(255,255,255,0.18)");
+    shine.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = shine;
+    ctx.fillRect(x, y, size, size);
+    ctx.restore();
+  } else {
+    const g = ctx.createLinearGradient(x, y, x + size, y + size);
+    g.addColorStop(0, colorA);
+    g.addColorStop(1, colorB);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, size / 2 - 2, 0, Math.PI * 2);
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.font = `900 ${Math.max(18, Math.round(size * 0.28))}px Inter, Arial, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const t =
+      teamInitials(teamName) ||
+      String(teamName || "?")
+        .slice(0, 3)
+        .toUpperCase();
+    ctx.fillText(t, centerX, centerY + 1);
+    ctx.restore();
+  }
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, size / 2 - 1, 0, Math.PI * 2);
+  ctx.strokeStyle = "rgba(255,255,255,0.95)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
 }
+
 
 function drawPredictionShareHeader(
   ctx,
@@ -9991,108 +10243,151 @@ function drawPredictionShareHeader(
   subtitle,
   pageText,
 ) {
-  const headGradient = ctx.createLinearGradient(x, y, x + width, y + 80);
-  headGradient.addColorStop(0, "rgba(15,23,42,0.96)");
-  headGradient.addColorStop(1, "rgba(12,36,74,0.96)");
+  const headerH = 142;
+  const gradient = ctx.createLinearGradient(x, y, x + width, y + headerH);
+  gradient.addColorStop(0, "#0f2b55");
+  gradient.addColorStop(0.52, "#0b1e3c");
+  gradient.addColorStop(1, "#07162c");
+
+  ctx.save();
+  ctx.shadowColor = "rgba(2,6,23,0.42)";
+  ctx.shadowBlur = 28;
+  ctx.shadowOffsetY = 12;
   fillRoundedRect(
     ctx,
     x,
     y,
     width,
-    88,
-    24,
-    headGradient,
-    "rgba(148,163,184,0.16)",
+    headerH,
+    30,
+    gradient,
+    "rgba(125,211,252,0.18)",
   );
-  ctx.fillStyle = "#38bdf8";
-  ctx.font = "800 22px Inter, Arial, sans-serif";
-  ctx.fillText("PAYLAŞIM EKRANI", x + 24, y + 28);
-  ctx.fillStyle = "#f8fafc";
-  ctx.font = "900 42px Inter, Arial, sans-serif";
-  ctx.fillText(title, x + 24, y + 62);
-  ctx.fillStyle = "#94a3b8";
-  ctx.font = "600 18px Inter, Arial, sans-serif";
-  ctx.fillText(subtitle, x + 360, y + 62);
+  ctx.restore();
+
   fillRoundedRect(
     ctx,
-    x + width - 150,
-    y + 22,
-    126,
-    40,
-    20,
-    "rgba(15,23,42,0.88)",
+    x + 26,
+    y + 24,
+    176,
+    34,
+    17,
+    "rgba(56,189,248,0.15)",
+    "rgba(125,211,252,0.26)",
+  );
+  ctx.fillStyle = "#7dd3fc";
+  ctx.font = "900 15px Inter, Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("TAHMİN ARENASI", x + 114, y + 47);
+
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "900 48px Inter, Arial, sans-serif";
+  ctx.fillText(title, x + 26, y + 104);
+
+  ctx.fillStyle = "#a9bdd8";
+  ctx.font = "700 20px Inter, Arial, sans-serif";
+  ctx.fillText(
+    truncateCanvasText(ctx, subtitle, width - 420),
+    x + 288,
+    y + 103,
+  );
+
+  fillRoundedRect(
+    ctx,
+    x + width - 174,
+    y + 37,
+    142,
+    54,
+    27,
+    "rgba(2,6,23,0.38)",
     "rgba(255,255,255,0.16)",
   );
-  ctx.fillStyle = "#e2e8f0";
-  ctx.font = "800 18px Inter, Arial, sans-serif";
+  ctx.fillStyle = "#e0f2fe";
+  ctx.font = "900 18px Inter, Arial, sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText(pageText, x + width - 87, y + 47);
+  ctx.fillText(pageText, x + width - 103, y + 70);
   ctx.textAlign = "left";
 }
 
 function getShareCellPalette(pred, match, shareView) {
-  const hasPrediction = pred && pred.homePred !== "" && pred.awayPred !== "";
-  const neutralCard = {
-    bg: "rgba(15,23,42,0.72)",
-    border: "rgba(148,163,184,0.12)",
-  };
+  const hasPrediction =
+    pred &&
+    pred.homePred !== "" &&
+    pred.homePred !== null &&
+    pred.homePred !== undefined &&
+    pred.awayPred !== "" &&
+    pred.awayPred !== null &&
+    pred.awayPred !== undefined;
 
   if (!hasPrediction) {
     return {
-      ...neutralCard,
+      bg: "rgba(30,41,59,0.72)",
+      border: "rgba(148,163,184,0.20)",
       accent: "#94a3b8",
-      scoreBg: "rgba(15,23,42,0.82)",
-      scoreBorder: "rgba(148,163,184,0.14)",
-      chipBg: "rgba(15,23,42,0.82)",
-      chipBorder: "rgba(148,163,184,0.14)",
-      label: shareView === "pre" ? "—" : "Boş",
+      icon: "—",
+      label: "-",
+      pointsText: "",
     };
   }
 
-  if (!match.played || shareView === "pre") {
+  if (shareView === "pre" || !match.played) {
     return {
-      bg: "rgba(15,23,42,0.82)",
-      border: "rgba(56,189,248,0.22)",
-      accent: "#e2e8f0",
-      scoreBg: "rgba(15,23,42,0.86)",
-      scoreBorder: "rgba(56,189,248,0.22)",
-      chipBg: "rgba(15,23,42,0.84)",
-      chipBorder: "rgba(56,189,248,0.18)",
+      bg: "rgba(14,38,69,0.92)",
+      border: "rgba(56,189,248,0.30)",
+      accent: "#e0f2fe",
+      icon: "•",
       label: "Tahmin",
+      pointsText: "",
     };
   }
 
-  const pts = Number(pred.points || 0);
-  if (pts >= 3) {
+  const points = Number(pred.points || 0);
+  if (points >= 3) {
     return {
-      ...neutralCard,
+      bg: "rgba(20,83,45,0.86)",
+      border: "rgba(74,222,128,0.52)",
       accent: "#dcfce7",
-      scoreBg: "rgba(22,101,52,0.72)",
-      scoreBorder: "rgba(74,222,128,0.42)",
-      chipBg: "rgba(22,101,52,0.70)",
-      chipBorder: "rgba(74,222,128,0.34)",
-      label: "Tam skor",
+      icon: "🏆",
+      label: "Tam tahmin",
+      pointsText: `${points} Puan`,
     };
   }
-  if (pts >= 1) {
+  if (points >= 1) {
     return {
-      ...neutralCard,
+      bg: "rgba(133,77,14,0.86)",
+      border: "rgba(250,204,21,0.52)",
       accent: "#fef3c7",
-      scoreBg: "rgba(202,138,4,0.75)",
-      scoreBorder: "rgba(250,204,21,0.50)",
-      chipBg: "rgba(202,138,4,0.70)",
-      chipBorder: "rgba(250,204,21,0.40)",
-      label: "Yakın",
+      icon: "🎯",
+      label: "Sonucu bilen",
+      pointsText: `${points} Puan`,
     };
   }
+
+  const homeDifference = Math.abs(
+    Number(pred.homePred) - Number(match.homeScore),
+  );
+  const awayDifference = Math.abs(
+    Number(pred.awayPred) - Number(match.awayScore),
+  );
+  if (homeDifference <= 1 && awayDifference <= 1) {
+    return {
+      bg: "rgba(30,64,175,0.78)",
+      border: "rgba(96,165,250,0.48)",
+      accent: "#dbeafe",
+      icon: "✔",
+      label: "Yakın tahmin",
+      pointsText: "0 Puan",
+    };
+  }
+
   return {
-    ...neutralCard,
+    bg: "rgba(127,29,29,0.82)",
+    border: "rgba(248,113,113,0.44)",
     accent: "#fee2e2",
-    scoreBg: "rgba(153,27,27,0.70)",
-    scoreBorder: "rgba(248,113,113,0.40)",
-    chipBg: "rgba(153,27,27,0.64)",
-    chipBorder: "rgba(248,113,113,0.32)",
-    label: "0 puan",
+    icon: "✖",
+    label: "Yanlış",
+    pointsText: "0 Puan",
   };
 }
 
@@ -10102,48 +10397,73 @@ async function createPredictionShareExportCanvas(
   options = {},
 ) {
   const shareView = options.shareView === "post" ? "post" : "pre";
-  const seasonName = getSeasonById(getActiveSeasonId())?.name || "Sezon";
+  const seasonId = getActiveSeasonId();
+  const seasonName = getSeasonById(seasonId)?.name || "Sezon";
   const weekNumber = getWeekNumberById(state.settings.activeWeekId) || "?";
   const pageIndex = Number(options.pageIndex || 0);
   const totalPages = Number(options.totalPages || 1);
   const weeklyStandings =
     shareView === "post" ? getWeeklyStandings(state.settings.activeWeekId) : [];
-  const summaryRows =
-    shareView === "post"
-      ? players
-          .map((player) => {
-            const row = weeklyStandings.find(
-              (item) => item.id === player.id,
-            ) || {
-              id: player.id,
-              total: 0,
-              exact: 0,
-              resultOnly: 0,
-            };
-            return { ...row, id: player.id, name: player.name };
-          })
-          .sort(
-            (a, b) =>
-              Number(b.total || 0) - Number(a.total || 0) ||
-              Number(b.exact || 0) - Number(a.exact || 0) ||
-              Number(b.resultOnly || 0) - Number(a.resultOnly || 0) ||
-              String(a.name || "").localeCompare(String(b.name || ""), "tr"),
-          )
-      : [];
-  const margin = 28;
-  const headerH = 106;
-  const tableHeadH = 54;
-  const rowH = shareView === "post" ? 88 : 78;
-  const footerH = 18;
-  const matchColW = shareView === "post" ? 560 : 540;
-  const playerColW = shareView === "post" ? 152 : 140;
-  const summaryW = shareView === "post" ? 340 : 0;
-  const width = margin * 2 + matchColW + players.length * playerColW + summaryW;
+  const weekLeader = weeklyStandings[0] || null;
+  const width = 1600;
+  const margin = 42;
+
+  const contentW = width - margin * 2;
+
+  const headerH = 150;
+  const topGap = 22;
+
+  const columns = 3;
+
+  /* Kartlar arası boşluğu artır */
+  const cardGap = 28;
+
+  const cardW = (contentW - cardGap * (columns - 1)) / columns;
+
+  const playerRowH = shareView === "post" ? 48 : 46;
+  const playerGap = 5;
+
+  /* Kartın iç boşluğu artsın */
+  const cardPadding = 20;
+
+  /* Üst alan biraz küçülsün */
+  const matchTopH = 210;
+
+  const cardH =
+    cardPadding * 2 +
+    matchTopH +
+    players.length * playerRowH +
+    Math.max(0, players.length - 1) * playerGap;
+
+  const gridRows = Math.max(1, Math.ceil(matches.length / columns));
+
+  const leaderH = shareView === "post" && weekLeader ? 185 : 0;
+  const leaderGap = leaderH ? 22 : 0;
+
+  const footerH = 48;
+
   const height =
-    margin * 2 + headerH + tableHeadH + matches.length * rowH + footerH;
+    margin +
+    headerH +
+    topGap +
+    gridRows * cardH +
+    Math.max(0, gridRows - 1) * cardGap +
+    leaderGap +
+    leaderH +
+    footerH +
+    margin;
+  const uniqueTeams = [
+    ...new Set(
+      matches
+        .flatMap((match) => [match.homeTeam, match.awayTeam])
+        .filter(Boolean),
+    ),
+  ];
+  await Promise.all(
+    uniqueTeams.map((teamName) => getTeamLogoImage(teamName, seasonId)),
+  );
 
   const canvas = document.createElement("canvas");
-
   const exportScale = Math.max(
     2,
     Math.min(3, Math.round(window.devicePixelRatio || 2)),
@@ -10158,437 +10478,336 @@ async function createPredictionShareExportCanvas(
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
 
-  const bgGradient = ctx.createLinearGradient(0, 0, width, height);
-  bgGradient.addColorStop(0, "#031124");
-  bgGradient.addColorStop(0.55, "#071833");
-  bgGradient.addColorStop(1, "#04101e");
-  ctx.fillStyle = bgGradient;
+  const bg = ctx.createLinearGradient(0, 0, width, height);
+  bg.addColorStop(0, "#020b18");
+  bg.addColorStop(0.5, "#071a32");
+  bg.addColorStop(1, "#020914");
+  ctx.fillStyle = bg;
   ctx.fillRect(0, 0, width, height);
+
+  const topGlow = ctx.createRadialGradient(
+    width * 0.2,
+    80,
+    20,
+    width * 0.2,
+    80,
+    650,
+  );
+  topGlow.addColorStop(0, "rgba(14,165,233,0.20)");
+  topGlow.addColorStop(1, "rgba(14,165,233,0)");
+  ctx.fillStyle = topGlow;
+  ctx.fillRect(0, 0, width, Math.min(height, 900));
 
   drawPredictionShareHeader(
     ctx,
     margin,
     margin,
-    width - margin * 2,
+    contentW,
     `${weekNumber}. Hafta`,
-    seasonName,
-    `${pageIndex + 1}/${totalPages}`,
+    `${seasonName} • ${shareView === "post" ? "Maç Sonrası" : "Maç Öncesi"}`,
+    `${pageIndex + 1} / ${totalPages}`,
   );
 
-  const tableX = margin;
-  const tableY = margin + headerH;
-  const tableW = matchColW + players.length * playerColW;
-  const panelH = tableHeadH + matches.length * rowH;
+  const gridY = margin + headerH + topGap;
 
-  fillRoundedRect(
-    ctx,
-    tableX,
-    tableY,
-    tableW,
-    panelH,
-    22,
-    "rgba(15,23,42,0.86)",
-    "rgba(148,163,184,0.16)",
-  );
-  fillRoundedRect(
-    ctx,
-    tableX,
-    tableY,
-    tableW,
-    tableHeadH,
-    22,
-    "rgba(17,24,39,0.94)",
-    "",
-  );
-  ctx.fillStyle = "#e2e8f0";
-  ctx.font = "800 22px Inter, Arial, sans-serif";
-  ctx.fillText("MAÇ", tableX + 18, tableY + 34);
+  for (let matchIndex = 0; matchIndex < matches.length; matchIndex += 1) {
+    const match = matches[matchIndex];
+    const column = matchIndex % columns;
+    const row = Math.floor(matchIndex / columns);
+    const cardX = margin + column * (cardW + cardGap);
+    const cardY = gridY + row * (cardH + cardGap);
 
-  players.forEach((player, index) => {
-    const cellX = tableX + matchColW + index * playerColW;
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.48)";
+    ctx.shadowBlur = 24;
+    ctx.shadowOffsetY = 10;
+    const cardGradient = ctx.createLinearGradient(
+      cardX,
+      cardY,
+      cardX,
+      cardY + cardH,
+    );
+    cardGradient.addColorStop(0, "rgba(13,34,63,0.99)");
+    cardGradient.addColorStop(1, "rgba(6,18,36,0.99)");
     fillRoundedRect(
       ctx,
-      cellX + 12,
-      tableY + 10,
-      playerColW - 24,
-      34,
-      17,
-      "rgba(30,41,59,0.96)",
-      "rgba(148,163,184,0.18)",
+      cardX,
+      cardY,
+      cardW,
+      cardH,
+      24,
+      cardGradient,
+      "rgba(125,211,252,0.14)",
     );
-    ctx.fillStyle = "#f8fafc";
-    ctx.font = "900 18px Inter, Arial, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(
-      String(player.name || "").toUpperCase(),
-      cellX + playerColW / 2,
-      tableY + 32,
-    );
-    ctx.textAlign = "left";
-  });
+    ctx.restore();
 
-  for (const [rowIndex, match] of matches.entries()) {
-    const rowY = tableY + tableHeadH + rowIndex * rowH;
-    const isOdd = rowIndex % 2 === 1;
-    fillRoundedRect(
-      ctx,
-      tableX,
-      rowY,
-      matchColW,
-      rowH,
-      0,
-      isOdd ? "rgba(15,23,42,0.68)" : "rgba(12,18,34,0.76)",
-      "rgba(148,163,184,0.08)",
-    );
-
-    const leftX = tableX + 18;
-    const badgeSize = 40;
-    const centerScoreW = 92;
-    const leftTeamMaxW = 150;
-    const rightTeamMaxW = 150;
-    const centerX = tableX + matchColW / 2;
+    const centerX = cardX + cardW / 2;
+    const logoSize = 72;
+    const logoY = cardY + 18;
+    const homeLogoX = cardX + 42;
+    const awayLogoX = cardX + cardW - 42 - logoSize;
 
     await drawTeamBadgeOnCanvas(
       ctx,
       match.homeTeam,
-      leftX,
-      rowY + 20,
-      badgeSize,
+      homeLogoX,
+      logoY,
+      logoSize,
+      seasonId,
     );
-    ctx.fillStyle = "#f8fafc";
-    ctx.font = "800 18px Inter, Arial, sans-serif";
-    ctx.fillText(
-      truncateCanvasText(ctx, match.homeTeam, leftTeamMaxW),
-      leftX + badgeSize + 12,
-      rowY + 42,
-    );
-
-    const rightBadgeX = tableX + matchColW - 18 - badgeSize;
     await drawTeamBadgeOnCanvas(
       ctx,
       match.awayTeam,
-      rightBadgeX,
-      rowY + 20,
-      badgeSize,
+      awayLogoX,
+      logoY,
+      logoSize,
+      seasonId,
     );
-    const awayText = truncateCanvasText(ctx, match.awayTeam, rightTeamMaxW);
-    const awayWidth = ctx.measureText(awayText).width;
-    ctx.fillText(awayText, rightBadgeX - 12 - awayWidth, rowY + 42);
 
-    const scoreValue = match.played
-      ? `${match.homeScore ?? 0} - ${match.awayScore ?? 0}`
-      : shareView === "pre"
-        ? formatDate(match.date).replace(",", "")
-        : "- -";
-
-    fillRoundedRect(
-      ctx,
-      centerX - centerScoreW / 2,
-      rowY + 10,
-      centerScoreW,
-      40,
-      16,
-      "rgba(37, 51, 79, 0.94)",
-      "rgba(148,163,184,0.18)",
-    );
-    ctx.fillStyle = "#ffffff";
-    ctx.font = match.played
-      ? "900 24px Inter, Arial, sans-serif"
-      : "700 14px Inter, Arial, sans-serif";
-    ctx.textAlign = "center";
-    if (match.played) {
-      ctx.fillText(scoreValue, centerX, rowY + 36);
-    } else {
-      const [datePart, timePart] = scoreValue.split(" ");
-      ctx.fillText(datePart || "", centerX, rowY + 28);
-      ctx.font = "700 13px Inter, Arial, sans-serif";
-      ctx.fillStyle = "#cbd5e1";
-      ctx.fillText(timePart || "", centerX, rowY + 44);
-    }
-    ctx.textAlign = "left";
-
-    if (shareView === "post") {
+    if (shareView === "post" && match.played) {
       fillRoundedRect(
         ctx,
-        centerX - 46,
-        rowY + 56,
-        92,
-        20,
-        10,
-        "rgba(15,23,42,0.92)",
-        "rgba(148,163,184,0.12)",
+        centerX - 54,
+        cardY + 27,
+        108,
+        56,
+        18,
+        "rgba(2,6,23,0.68)",
+        "rgba(125,211,252,0.30)",
       );
-      ctx.fillStyle = match.played ? "#bfdbfe" : "#94a3b8";
-      ctx.font = "700 11px Inter, Arial, sans-serif";
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "900 36px Inter, Arial, sans-serif";
       ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
       ctx.fillText(
-        match.played ? "Fikstür skoru" : "Bekleniyor",
+        `${match.homeScore ?? 0} - ${match.awayScore ?? 0}`,
         centerX,
-        rowY + 70,
+        cardY + 55,
       );
-      ctx.textAlign = "left";
+    } else {
+      fillRoundedRect(
+        ctx,
+        centerX - 38,
+        cardY + 31,
+        76,
+        44,
+        18,
+        "rgba(2,6,23,0.62)",
+        "rgba(125,211,252,0.26)",
+      );
+      ctx.fillStyle = "#7dd3fc";
+      ctx.font = "900 17px Inter, Arial, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("VS", centerX, cardY + 53);
     }
 
-    players.forEach((player, colIndex) => {
-      const cellX = tableX + matchColW + colIndex * playerColW;
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "900 17px Inter, Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(
+      truncateCanvasText(
+        ctx,
+        String(match.homeTeam || "").toUpperCase(),
+        cardW * 0.34,
+      ),
+      homeLogoX + logoSize / 2,
+      cardY + 112,
+    );
+    ctx.fillText(
+      truncateCanvasText(
+        ctx,
+        String(match.awayTeam || "").toUpperCase(),
+        cardW * 0.34,
+      ),
+      awayLogoX + logoSize / 2,
+      cardY + 112,
+    );
+
+    const formattedMatchDate = formatDate(match.date).replace(",", "");
+    const dateParts = formattedMatchDate.split(" ");
+    const timeText = dateParts.length > 1 ? dateParts.pop() : "";
+    const dateText = dateParts.join(" ") || formattedMatchDate;
+    fillRoundedRect(
+      ctx,
+      cardX + 38,
+      cardY + 130,
+      cardW - 56,
+      34,
+      14,
+      "rgba(30,41,59,0.70)",
+      "rgba(148,163,184,0.14)",
+    );
+    ctx.fillStyle = "#cbd5e1";
+    ctx.font = "800 17px Inter, Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(
+      `${dateText}${timeText ? `  •  ${timeText}` : ""}`,
+      centerX,
+      cardY + 152,
+    );
+
+    let playerY = cardY + cardPadding + matchTopH;
+    const rowX = cardX + cardPadding;
+    const rowW = cardW - cardPadding * 2;
+
+    for (const player of players) {
       const pred =
         getPrediction(match.id, player.id) ||
         createEmptyPredictionRecord(match.id, player.id);
       const palette = getShareCellPalette(pred, match, shareView);
+
       fillRoundedRect(
         ctx,
-        cellX,
-        rowY,
-        playerColW,
-        rowH,
-        0,
+        rowX,
+        playerY,
+        rowW,
+        playerRowH,
+        12,
         palette.bg,
-        "rgba(148,163,184,0.08)",
-      );
-      fillRoundedRect(
-        ctx,
-        cellX + 10,
-        rowY + 10,
-        playerColW - 20,
-        rowH - 20,
-        16,
-        shareView === "post" ? "rgba(2,6,23,0.10)" : "rgba(2,6,23,0.12)",
         palette.border,
       );
 
-      const scoreBoxW = Math.min(playerColW - 48, 92);
-      const scoreBoxH = 34;
-      fillRoundedRect(
-        ctx,
-        cellX + playerColW / 2 - scoreBoxW / 2,
-        rowY + 15,
-        scoreBoxW,
-        scoreBoxH,
-        17,
-        shareView === "post" ? palette.scoreBg : "rgba(15,23,42,0.86)",
-        shareView === "post" ? palette.scoreBorder : palette.border,
-      );
       ctx.fillStyle = palette.accent;
-      ctx.font = "900 24px Inter, Arial, sans-serif";
+      ctx.font = "900 14px Inter, Arial, sans-serif";
       ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(palette.icon, rowX + 16, playerY + playerRowH / 2);
+
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#f8fafc";
+      ctx.font = "900 14px Inter, Arial, sans-serif";
       ctx.fillText(
-        getPredictionDisplayValue(pred),
-        cellX + playerColW / 2,
-        rowY + 39,
+        truncateCanvasText(ctx, String(player.name || "").toUpperCase(), 88),
+        rowX + 28,
+        playerY + playerRowH / 2,
       );
 
-      const status =
-        shareView === "post"
-          ? palette.label
-          : pred.homePred !== "" && pred.awayPred !== ""
-            ? "Tahmin var"
-            : "Tahmin yok";
-      const chipW = Math.min(playerColW - 44, 104);
-      fillRoundedRect(
-        ctx,
-        cellX + playerColW / 2 - chipW / 2,
-        rowY + 55,
-        chipW,
-        20,
-        10,
-        shareView === "post" ? palette.chipBg : "rgba(15,23,42,0.84)",
-        shareView === "post" ? palette.chipBorder : "rgba(56,189,248,0.18)",
-      );
-      ctx.font = "800 12px Inter, Arial, sans-serif";
-      ctx.fillStyle = shareView === "post" ? palette.accent : "#bfdbfe";
-      ctx.fillText(status, cellX + playerColW / 2, rowY + 69);
-      ctx.textAlign = "left";
-    });
+      const predictionText = getPredictionDisplayValue(pred).replace("—", "-");
+      ctx.textAlign = "right";
+      ctx.fillStyle = palette.accent;
+      ctx.font = "900 19px Inter, Arial, sans-serif";
+      ctx.fillText(predictionText, rowX + rowW - 10, playerY + playerRowH / 2);
+
+      if (shareView === "post" && palette.pointsText) {
+        ctx.textAlign = "right";
+        ctx.fillStyle = palette.accent;
+        ctx.font = "800 11px Inter, Arial, sans-serif";
+        ctx.fillText(
+          palette.pointsText.replace(" Puan", "P"),
+          rowX + rowW - 76,
+          playerY + playerRowH / 2,
+        );
+      }
+
+      ctx.textBaseline = "alphabetic";
+      playerY += playerRowH + playerGap;
+    }
   }
 
-  if (shareView === "post") {
-    const sumX = margin + tableW + 18;
-    const sumWidth = summaryW - 18;
-    const summaryCardH = 78;
-    const summaryGap = 10;
-    const sumHeight = Math.min(
-      panelH,
-      84 + summaryRows.length * (summaryCardH + summaryGap),
+  let cursorY = gridY + gridRows * cardH + Math.max(0, gridRows - 1) * cardGap;
+
+  if (leaderH && weekLeader) {
+    cursorY += leaderGap;
+    const leaderY = cursorY;
+    const leaderGradient = ctx.createLinearGradient(
+      margin,
+      leaderY,
+      margin + contentW,
+      leaderY + leaderH,
     );
+    leaderGradient.addColorStop(0, "rgba(120,74,8,0.98)");
+    leaderGradient.addColorStop(0.5, "rgba(63,38,8,0.98)");
+    leaderGradient.addColorStop(1, "rgba(15,29,49,0.98)");
+
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.48)";
+    ctx.shadowBlur = 28;
+    ctx.shadowOffsetY = 12;
     fillRoundedRect(
       ctx,
-      sumX,
-      tableY,
-      sumWidth,
-      sumHeight,
-      22,
-      "rgba(248,250,252,0.96)",
-      "rgba(148,163,184,0.22)",
+      margin,
+      leaderY,
+      contentW,
+      leaderH,
+      28,
+      leaderGradient,
+      "rgba(250,204,21,0.42)",
     );
-    ctx.fillStyle = "#0f172a";
+    ctx.restore();
+
+    fillRoundedRect(
+      ctx,
+      margin + 24,
+      leaderY + 24,
+      116,
+      116,
+      28,
+      "rgba(255,255,255,0.10)",
+      "rgba(250,204,21,0.34)",
+    );
+    ctx.fillStyle = "#fde68a";
+    ctx.font = "900 64px Inter, Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("🏆", margin + 82, leaderY + 82);
+
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = "#fde68a";
+    ctx.font = "900 19px Inter, Arial, sans-serif";
+    ctx.fillText("HAFTANIN LİDERİ", margin + 164, leaderY + 43);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "900 36px Inter, Arial, sans-serif";
+    ctx.fillText(
+      truncateCanvasText(ctx, String(weekLeader.name || "").toUpperCase(), 420),
+      margin + 164,
+      leaderY + 84,
+    );
+    ctx.fillStyle = "#fef3c7";
     ctx.font = "900 24px Inter, Arial, sans-serif";
-    ctx.fillText("Puan Özeti", sumX + 16, tableY + 32);
-    ctx.fillStyle = "#475569";
-    ctx.font = "700 13px Inter, Arial, sans-serif";
-    ctx.fillText("Bu sayfadaki kullanıcılar", sumX + 16, tableY + 52);
+    ctx.fillText(`${weekLeader.total || 0} PUAN`, margin + 164, leaderY + 119);
+    ctx.fillStyle = "#dbeafe";
+    ctx.font = "800 17px Inter, Arial, sans-serif";
+    ctx.fillText(
+      `Tam ${weekLeader.exact || 0}  •  Sonuç ${weekLeader.resultOnly || 0}`,
+      margin + 310,
+      leaderY + 118,
+    );
 
-    summaryRows.forEach((row, index) => {
-      const rank = index + 1;
-      const cardY = tableY + 68 + index * (summaryCardH + summaryGap);
-      const cardX = sumX + 12;
-      const cardW = sumWidth - 24;
-      const rankFill =
-        rank === 1
-          ? "rgba(255,215,64,0.26)"
-          : rank === 2
-            ? "rgba(226,232,240,0.82)"
-            : rank === 3
-              ? "rgba(251,191,116,0.30)"
-              : "rgba(15,23,42,0.06)";
-
-      const rankStroke =
-        rank === 1
-          ? "rgba(234,179,8,0.55)"
-          : rank === 2
-            ? "rgba(148,163,184,0.40)"
-            : rank === 3
-              ? "rgba(180,83,9,0.36)"
-              : "rgba(148,163,184,0.18)";
-
-      fillRoundedRect(
-        ctx,
-        cardX,
-        cardY,
-        cardW,
-        summaryCardH,
-        16,
-        rankFill,
-        rankStroke,
-      );
-      if (rank === 1) {
-        const goldGlow = ctx.createLinearGradient(
-          cardX,
-          cardY,
-          cardX + cardW,
-          cardY + summaryCardH,
-        );
-        goldGlow.addColorStop(0, "rgba(255,255,255,0.22)");
-        goldGlow.addColorStop(0.45, "rgba(255,255,255,0.06)");
-        goldGlow.addColorStop(1, "rgba(255,215,64,0.10)");
-
-        fillRoundedRect(
-          ctx,
-          cardX + 1,
-          cardY + 1,
-          cardW - 2,
-          summaryCardH - 2,
-          15,
-          goldGlow,
-          "",
-        );
-      }
-      fillRoundedRect(
-        ctx,
-        cardX + 12,
-        cardY + 12,
-        30,
-        30,
-        15,
-        rank === 1
-          ? "#facc15"
-          : rank === 2
-            ? "#cbd5e1"
-            : rank === 3
-              ? "#d97706"
-              : "#334155",
-        rank === 1
-          ? "rgba(234,179,8,0.65)"
-          : rank === 2
-            ? "rgba(148,163,184,0.55)"
-            : rank === 3
-              ? "rgba(146,64,14,0.45)"
-              : "",
-      );
-      ctx.fillStyle = rank === 2 ? "#0f172a" : "#ffffff";
-      ctx.font = "900 15px Inter, Arial, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(rank === 1 ? "1" : String(rank), cardX + 27, cardY + 32);
-      ctx.textAlign = "left";
-
-      if (rank === 1) {
-        ctx.font = "900 13px Inter, Arial, sans-serif";
-        ctx.fillText("👑", cardX + 19, cardY + 10);
-      }
-
-      ctx.fillStyle = "#0f172a";
-      ctx.font =
-        rank === 1
-          ? "900 17px Inter, Arial, sans-serif"
-          : "900 16px Inter, Arial, sans-serif";
-      const summaryName = truncateCanvasText(
-        ctx,
-        String(row.name || "").toUpperCase(),
-        cardW - 68,
-      );
-      ctx.fillText(summaryName, cardX + 50, cardY + 24);
-
-      const chips = [
-        {
-          label: `Hafta ${row.total || 0}P`,
-          x: cardX + 50,
-          y: cardY + 40,
-          w: 84,
-          fill: "rgba(16,185,129,0.14)",
-          stroke: "rgba(16,185,129,0.26)",
-          text: "#047857",
-        },
-        {
-          label: `Tam ${row.exact || 0}`,
-          x: cardX + 142,
-          y: cardY + 40,
-          w: 68,
-          fill: "rgba(56,189,248,0.14)",
-          stroke: "rgba(56,189,248,0.24)",
-          text: "#0369a1",
-        },
-        {
-          label: `Yakın ${row.resultOnly || 0}`,
-          x: cardX + 218,
-          y: cardY + 40,
-          w: 78,
-          fill: "rgba(245,158,11,0.14)",
-          stroke: "rgba(245,158,11,0.24)",
-          text: "#b45309",
-        },
-      ];
-
-      chips.forEach((chip) => {
-        fillRoundedRect(
-          ctx,
-          chip.x,
-          chip.y,
-          chip.w,
-          24,
-          12,
-          chip.fill,
-          chip.stroke,
-        );
-        ctx.fillStyle = chip.text;
-        ctx.font = "800 11px Inter, Arial, sans-serif";
-        ctx.fillText(chip.label, chip.x + 9, chip.y + 16);
-      });
-    });
+    fillRoundedRect(
+      ctx,
+      margin + contentW - 300,
+      leaderY + 48,
+      266,
+      78,
+      22,
+      "rgba(2,6,23,0.40)",
+      "rgba(255,255,255,0.13)",
+    );
+    ctx.fillStyle = "#e0f2fe";
+    ctx.font = "900 18px Inter, Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("TÜM SIRALAMA", margin + contentW - 167, leaderY + 81);
+    ctx.fillStyle = "#93c5fd";
+    ctx.font = "800 17px Inter, Arial, sans-serif";
+    ctx.fillText("UYGULAMADA", margin + contentW - 167, leaderY + 106);
   }
 
-  ctx.fillStyle = "rgba(148,163,184,0.72)";
-  ctx.font = "700 12px Inter, Arial, sans-serif";
-  ctx.textAlign = "right";
+  ctx.fillStyle = "rgba(148,163,184,0.82)";
+  ctx.font = "700 11px Inter, Arial, sans-serif";
+  ctx.textAlign = "center";
   ctx.fillText(
     `Oluşturuldu: ${formatDate(new Date())}`,
-    width - margin,
-    height - 8,
+    width / 2,
+    height - 24,
   );
   ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
 
   return canvas;
 }
-
-
 async function exportPredictionShareImage() {
   const button = document.getElementById("downloadShareImageBtn");
   if (button) {
@@ -10735,7 +10954,11 @@ function desktopPredictionMatchCell(match) {
   const scoreText = match.played
     ? `${match.homeScore} <span>-</span> ${match.awayScore}`
     : "VS";
-  const centerLabel = match.played ? "Skor" : locked ? "Kilitli" : "Tahmin açık";
+  const centerLabel = match.played
+    ? "Skor"
+    : locked
+      ? "Kilitli"
+      : "Tahmin açık";
 
   return `
     <div class="desktop-prediction-match-card prediction-fixture-card ${visual === "postponed" ? "fixture-postponed" : visual === "played-postponed" ? "fixture-rescheduled-played" : ""}">
@@ -10759,12 +10982,13 @@ function desktopPredictionMatchCell(match) {
   `;
 }
 
-
 function isPredictionLockedForUserUi(matchIdOrMatch) {
   const match =
     typeof matchIdOrMatch === "object" && matchIdOrMatch
       ? matchIdOrMatch
-      : state.matches.find((item) => String(item.id) === String(matchIdOrMatch));
+      : state.matches.find(
+          (item) => String(item.id) === String(matchIdOrMatch),
+        );
 
   return !!(match && isMatchLocked(match) && getCurrentRole() !== "admin");
 }
@@ -10776,13 +11000,14 @@ function getLockedPredictionBlockReason(matchIdOrMatch, playerId) {
   const match =
     typeof matchIdOrMatch === "object" && matchIdOrMatch
       ? matchIdOrMatch
-      : state.matches.find((item) => String(item.id) === String(matchIdOrMatch));
+      : state.matches.find(
+          (item) => String(item.id) === String(matchIdOrMatch),
+        );
   if (match && !canEditPrediction(playerId, match.seasonId)) {
     return "Bu tahmini düzenleme yetkin yok.";
   }
   return "";
 }
-
 
 function renderFocusedUserPredictions(container, matches) {
   if (!container) return;
@@ -10791,7 +11016,9 @@ function renderFocusedUserPredictions(container, matches) {
   const isAdmin = getCurrentRole() === "admin";
 
   if (!currentPlayerId || !currentPlayer) {
-    container.innerHTML = createEmptyState("Bu sayfada tahmin girmek için kullanıcı eşleşmesi bulunamadı.");
+    container.innerHTML = createEmptyState(
+      "Bu sayfada tahmin girmek için kullanıcı eşleşmesi bulunamadı.",
+    );
     return;
   }
 
@@ -10800,7 +11027,9 @@ function renderFocusedUserPredictions(container, matches) {
     const pred = getPrediction(match.id, currentPlayerId);
     return !!(pred && pred.homePred !== "" && pred.awayPred !== "");
   }).length;
-  const openCount = editableMatches.filter((match) => !isMatchLocked(match) || isAdmin).length;
+  const openCount = editableMatches.filter(
+    (match) => !isMatchLocked(match) || isAdmin,
+  ).length;
   const pendingCount = Math.max(editableMatches.length - completedCount, 0);
 
   const cards = editableMatches
@@ -10821,9 +11050,12 @@ function renderFocusedUserPredictions(container, matches) {
       const uiState = predictionUiState[uiKey] || "idle";
       const isSaving = uiState === "saving";
       const toastInfo = getPredictionToastInfo(match.id, currentPlayerId);
-      const showDeleteAction = !lockedForUi && (hasPrediction || pred.remoteId || isSaving);
+      const showDeleteAction =
+        !lockedForUi && (hasPrediction || pred.remoteId || isSaving);
       const showSaveAction =
-        !lockedForUi && canEdit && shouldShowPredictionSaveAction(match.id, currentPlayerId);
+        !lockedForUi &&
+        canEdit &&
+        shouldShowPredictionSaveAction(match.id, currentPlayerId);
       const revealOthersOpen =
         typeof isWeekStartedForPredictionReveal === "function" &&
         isWeekStartedForPredictionReveal(match.weekId);
@@ -10915,16 +11147,20 @@ function renderFocusedUserPredictions(container, matches) {
             <div class="prediction-status-chip ${outcomeClass}" id="pred_status_${match.id}_${currentPlayerId}">
               ${statusText}
             </div>
-            ${revealOthersOpen ? `
+            ${
+              revealOthersOpen
+                ? `
               <button
                 type="button"
                 class="focused-reveal-predictions-btn"
                 onclick="event.stopPropagation(); openDashboardMatchModal('${match.id}');"
                 title="Bu maçtaki diğer kullanıcı tahminlerini aç"
               >${revealButtonText}</button>
-            ` : `
+            `
+                : `
               <div class="focused-reveal-locked-note">🔒 Diğer tahminler maç başlayınca açılır</div>
-            `}
+            `
+            }
             <div
               class="prediction-card-toast ${toastInfo ? "is-visible" : ""}"
               id="pred_toast_${match.id}_${currentPlayerId}"
@@ -10982,7 +11218,10 @@ function renderPredictions() {
 
   renderPredictionLockBanner(weekId);
 
-  if (appBootstrapInProgress || ((currentHydrationPromise || firebaseRealtimeHydrationPromise) && !weekId)) {
+  if (
+    appBootstrapInProgress ||
+    ((currentHydrationPromise || firebaseRealtimeHydrationPromise) && !weekId)
+  ) {
     container.innerHTML = `<div class="empty-state prediction-loading-state"><span class="app-loading-spinner"></span><strong>Aktif hafta yükleniyor...</strong><small>Sezon ve hafta bilgileri Firebase üzerinden doğrulanıyor.</small></div>`;
     schedulePredictionViewportRestore(viewportSnapshot);
     return;
@@ -11046,7 +11285,9 @@ function renderPredictions() {
 
       const playerCols = players
         .map((player) => {
-          const pred = getPrediction(match.id, player.id) || createEmptyPredictionRecord(match.id, player.id);
+          const pred =
+            getPrediction(match.id, player.id) ||
+            createEmptyPredictionRecord(match.id, player.id);
           const canEdit = canEditPrediction(player.id);
           const hasPrediction =
             pred &&
@@ -11064,8 +11305,12 @@ function renderPredictions() {
 
           const statusText = getPredictionBaseStatus(match.id, player.id);
           const showDeleteAction = hasPrediction || pred.remoteId || isSaving;
-          const showSaveAction = canEdit && shouldShowPredictionSaveAction(match.id, player.id);
-          const revealPrediction = canRevealPredictionForViewer(match, player.id);
+          const showSaveAction =
+            canEdit && shouldShowPredictionSaveAction(match.id, player.id);
+          const revealPrediction = canRevealPredictionForViewer(
+            match,
+            player.id,
+          );
           const hiddenNotice = getHiddenPredictionNotice(match);
 
           const pointValue = Number(pred.points || 0);
@@ -11086,13 +11331,16 @@ function renderPredictions() {
         <div class="prediction-cell prediction-pro-cell ${hasPrediction ? "filled-prediction" : "empty-prediction"} ${pointLabel(pred.points)} ${outcomeClass} ${locked || !canEdit ? "locked-cell" : ""}${ownClass}${showPointBadge ? " has-point-badge" : ""} ${!revealPrediction ? "prediction-secret-cell" : ""}">
           ${showPointBadge && revealPrediction ? `<div class="points-badge-inline" style="background:${badgeBg};">${badgeText}</div>` : ""}
 
-          ${!revealPrediction ? `
+          ${
+            !revealPrediction
+              ? `
             <div class="prediction-secret-box">
               <span class="prediction-secret-lock">🔒</span>
               <strong>${hasPrediction ? "Tahmin gizli" : "Tahmin bekleniyor"}</strong>
               <small>${hiddenNotice}</small>
             </div>
-          ` : `
+          `
+              : `
           <div class="desktop-prediction-control">
             <div class="score-inputs compact-inputs center-mode pred-score-row">
               <input
@@ -11149,7 +11397,8 @@ function renderPredictions() {
           <div class="pred-status-slot">
             <div class="prediction-status-chip ${outcomeClass}" id="pred_status_${match.id}_${player.id}">${statusText}</div>
           </div>
-          `}
+          `
+          }
         </div>`;
         })
         .join("");
@@ -11232,10 +11481,10 @@ function setPredictionDraft(matchId, playerId, values = {}) {
   predictionInputDrafts[key] = {
     homePred: Object.prototype.hasOwnProperty.call(values, "homePred")
       ? values.homePred
-      : current.homePred ?? "",
+      : (current.homePred ?? ""),
     awayPred: Object.prototype.hasOwnProperty.call(values, "awayPred")
       ? values.awayPred
-      : current.awayPred ?? "",
+      : (current.awayPred ?? ""),
     updatedAt: Date.now(),
   };
 }
@@ -11257,7 +11506,9 @@ function getPredictionRenderValue(matchId, playerId, side, fallback = "") {
 
 function getPredictionBaseStatus(matchId, playerId) {
   const match = state.matches.find((item) => item.id === matchId);
-  const pred = getPrediction(matchId, playerId) || createEmptyPredictionRecord(matchId, playerId);
+  const pred =
+    getPrediction(matchId, playerId) ||
+    createEmptyPredictionRecord(matchId, playerId);
   const canEdit = canEditPrediction(playerId);
 
   const hasPrediction = pred.homePred !== "" && pred.awayPred !== "";
@@ -11364,7 +11615,10 @@ function getPredictionSaveLabel(matchId, playerId) {
   const key = getPredictionUiKey(matchId, playerId);
   const uiState = predictionUiState[key] || "idle";
   const pred = getPrediction(matchId, playerId);
-  const hasSavedValue = !!(pred && (pred.remoteId || (pred.homePred !== "" && pred.awayPred !== "")));
+  const hasSavedValue = !!(
+    pred &&
+    (pred.remoteId || (pred.homePred !== "" && pred.awayPred !== ""))
+  );
 
   if (uiState === "saving") return "Güncelleniyor...";
   if (uiState === "deleting") return "Siliniyor...";
@@ -11374,11 +11628,11 @@ function getPredictionSaveLabel(matchId, playerId) {
   if (uiState === "deleteQueued") return "Silinecek";
   if (uiState === "dirty") return hasSavedValue ? "Güncelle" : "Kaydet";
   if (uiState === "deleteError") return "Tekrar sil";
-  if (uiState === "error") return hasSavedValue ? "Tekrar güncelle" : "Tekrar kaydet";
+  if (uiState === "error")
+    return hasSavedValue ? "Tekrar güncelle" : "Tekrar kaydet";
   if (hasSavedValue) return "Güncelle";
   return "Kaydet";
 }
-
 
 function getPredictionInputElements(matchId, playerId) {
   return {
@@ -11394,10 +11648,8 @@ function getPredictionInputSnapshot(matchId, playerId) {
     matchId,
     playerId,
   );
-  const homeSource =
-    homeInput?.value ?? draft?.homePred ?? pred.homePred ?? "";
-  const awaySource =
-    awayInput?.value ?? draft?.awayPred ?? pred.awayPred ?? "";
+  const homeSource = homeInput?.value ?? draft?.homePred ?? pred.homePred ?? "";
+  const awaySource = awayInput?.value ?? draft?.awayPred ?? pred.awayPred ?? "";
   const homePred = parseNumberOrEmpty(homeSource);
   const awayPred = parseNumberOrEmpty(awaySource);
   return {
@@ -11432,12 +11684,14 @@ function hasPredictionInputChanged(matchId, playerId) {
 function shouldShowPredictionSaveAction(matchId, playerId) {
   const match = state.matches.find((item) => item.id === matchId);
   if (!match) return false;
-  if ((isMatchLocked(match) && getCurrentRole() !== "admin") || !canEditPrediction(playerId)) {
+  if (
+    (isMatchLocked(match) && getCurrentRole() !== "admin") ||
+    !canEditPrediction(playerId)
+  ) {
     return false;
   }
   return true;
 }
-
 
 function shouldAutoSavePrediction(matchId, playerId) {
   const match = state.matches.find((item) => item.id === matchId);
@@ -11456,7 +11710,11 @@ function shouldAutoSavePrediction(matchId, playerId) {
   const { homePred, awayPred } = getPredictionInputSnapshot(matchId, playerId);
   if (homePred === "" || awayPred === "") return false;
 
-  return !hasStoredPredictionRecord(matchId, playerId) || hasPredictionInputChanged(matchId, playerId) || !!getPredictionDraft(matchId, playerId);
+  return (
+    !hasStoredPredictionRecord(matchId, playerId) ||
+    hasPredictionInputChanged(matchId, playerId) ||
+    !!getPredictionDraft(matchId, playerId)
+  );
 }
 
 function focusPredictionHomeInput(matchId, playerId) {
@@ -11475,7 +11733,10 @@ function focusPredictionHomeInput(matchId, playerId) {
 window.handlePredictionSaveButtonClick = function (matchId, playerId) {
   const key = getPredictionUiKey(matchId, playerId);
   const now = Date.now();
-  if (predictionEditButtonTapLock[key] && now - predictionEditButtonTapLock[key] < 450) {
+  if (
+    predictionEditButtonTapLock[key] &&
+    now - predictionEditButtonTapLock[key] < 450
+  ) {
     return;
   }
   predictionEditButtonTapLock[key] = now;
@@ -11485,7 +11746,11 @@ window.handlePredictionSaveButtonClick = function (matchId, playerId) {
 
   if (uiState === "saving" || uiState === "deleting") return;
 
-  if (shouldAutoSavePrediction(matchId, playerId) || uiState === "dirty" || uiState === "error") {
+  if (
+    shouldAutoSavePrediction(matchId, playerId) ||
+    uiState === "dirty" ||
+    uiState === "error"
+  ) {
     window.queuePredictionSave(matchId, playerId, true, snapshot);
     return;
   }
@@ -11494,7 +11759,6 @@ window.handlePredictionSaveButtonClick = function (matchId, playerId) {
   focusPredictionHomeInput(matchId, playerId);
   schedulePredictionViewportRestore(snapshot);
 };
-
 
 function focusPredictionSiblingInput(target) {
   if (!target) return;
@@ -11569,7 +11833,8 @@ function setPredictionUiState(matchId, playerId, uiState, options = {}) {
   const button = document.getElementById(`pred_btn_${matchId}_${playerId}`);
   if (button) {
     button.textContent = getPredictionSaveLabel(matchId, playerId);
-    button.disabled = forceLocked || uiState === "saving" || uiState === "deleting";
+    button.disabled =
+      forceLocked || uiState === "saving" || uiState === "deleting";
     button.setAttribute("aria-disabled", button.disabled ? "true" : "false");
     button.style.pointerEvents = forceLocked ? "none" : "auto";
     button.dataset.saveState = uiState;
@@ -11600,8 +11865,12 @@ function setPredictionUiState(matchId, playerId, uiState, options = {}) {
     `pred_delete_${matchId}_${playerId}`,
   );
   if (deleteButton) {
-    deleteButton.disabled = forceLocked || uiState === "saving" || uiState === "deleting";
-    deleteButton.setAttribute("aria-disabled", deleteButton.disabled ? "true" : "false");
+    deleteButton.disabled =
+      forceLocked || uiState === "saving" || uiState === "deleting";
+    deleteButton.setAttribute(
+      "aria-disabled",
+      deleteButton.disabled ? "true" : "false",
+    );
     deleteButton.style.pointerEvents = forceLocked ? "none" : "auto";
     deleteButton.classList.toggle("is-working", uiState === "deleting");
   }
@@ -11917,10 +12186,27 @@ window.savePrediction = async function (matchId, playerId, options = {}) {
   playerId = normalizeEntityId(playerId);
   const player = getPlayerById(playerId);
   const actorUser = getAuthUser?.() || null;
-  const actorPlayer = typeof findPlayerForSessionUser === "function" ? findPlayerForSessionUser(actorUser) : null;
-  const actorId = String(state.settings?.auth?.playerId || actorPlayer?.id || actorUser?.id || "");
-  const actorName = String(actorPlayer?.name || actorUser?.adSoyad || actorUser?.name || actorUser?.kullaniciAdi || getCurrentUsername?.() || "");
-  const actorRole = String(getCurrentRole?.() || actorPlayer?.role || actorUser?.rol || "user").toLowerCase() === "admin" ? "admin" : "user";
+  const actorPlayer =
+    typeof findPlayerForSessionUser === "function"
+      ? findPlayerForSessionUser(actorUser)
+      : null;
+  const actorId = String(
+    state.settings?.auth?.playerId || actorPlayer?.id || actorUser?.id || "",
+  );
+  const actorName = String(
+    actorPlayer?.name ||
+      actorUser?.adSoyad ||
+      actorUser?.name ||
+      actorUser?.kullaniciAdi ||
+      getCurrentUsername?.() ||
+      "",
+  );
+  const actorRole =
+    String(
+      getCurrentRole?.() || actorPlayer?.role || actorUser?.rol || "user",
+    ).toLowerCase() === "admin"
+      ? "admin"
+      : "user";
   const seasonLabel = getActiveSeasonLabel();
   const weekNumber = getWeekNumberById(match.weekId);
   const recordKey = `${seasonLabel}_${weekNumber}_${playerId}_${match.id}`;
@@ -12016,7 +12302,10 @@ window.savePrediction = async function (matchId, playerId, options = {}) {
     clearTimeout(predictionTimers[key]);
 
     if (onlineSaveCompleted) {
-      console.warn("Firebase kaydı tamamlandı; ekran/yerel güncelleme sırasında hata yakalandı:", error);
+      console.warn(
+        "Firebase kaydı tamamlandı; ekran/yerel güncelleme sırasında hata yakalandı:",
+        error,
+      );
       saveState(true);
       setPredictionUiState(matchId, playerId, "saved", {
         message: wasUpdate ? "Güncellendi" : "Kaydedildi",
@@ -12078,7 +12367,6 @@ window.savePrediction = async function (matchId, playerId, options = {}) {
   }
 };
 
-
 function getStandingTone(index) {
   if (index === 0) return "gold";
   if (index === 1) return "silver";
@@ -12139,7 +12427,6 @@ function renderLeaderboardTopThree(rows, options = {}) {
       .join("")}
     </div>`;
 }
-
 
 function normalizeAvatarKey(value) {
   return String(value || "")
@@ -12249,9 +12536,12 @@ async function loadAvatarDirectoryMap() {
     let mergedMap = {};
 
     try {
-      const manifestResponse = await fetch(`avatars/avatars.json?v=${Date.now()}`, {
-        cache: "no-store",
-      });
+      const manifestResponse = await fetch(
+        `avatars/avatars.json?v=${Date.now()}`,
+        {
+          cache: "no-store",
+        },
+      );
       if (manifestResponse.ok) {
         const manifest = await manifestResponse.json();
         if (manifest && typeof manifest === "object") {
@@ -12270,7 +12560,9 @@ async function loadAvatarDirectoryMap() {
       const directoryResponse = await fetch(`avatars/?v=${Date.now()}`, {
         cache: "no-store",
       });
-      const contentType = String(directoryResponse.headers.get("content-type") || "").toLowerCase();
+      const contentType = String(
+        directoryResponse.headers.get("content-type") || "",
+      ).toLowerCase();
       if (directoryResponse.ok && contentType.includes("text/html")) {
         const html = await directoryResponse.text();
         mergedMap = {
@@ -12296,15 +12588,15 @@ function findAvatarFromDirectory(candidateKeys = []) {
   }
 
   for (const key of candidateKeys) {
-    const startsWithMatch = Object.entries(directoryMap).find(([fileKey]) =>
-      fileKey.startsWith(key) || key.startsWith(fileKey),
+    const startsWithMatch = Object.entries(directoryMap).find(
+      ([fileKey]) => fileKey.startsWith(key) || key.startsWith(fileKey),
     );
     if (startsWithMatch?.[1]) return startsWithMatch[1];
   }
 
   for (const key of candidateKeys) {
-    const includesMatch = Object.entries(directoryMap).find(([fileKey]) =>
-      fileKey.includes(key) || key.includes(fileKey),
+    const includesMatch = Object.entries(directoryMap).find(
+      ([fileKey]) => fileKey.includes(key) || key.includes(fileKey),
     );
     if (includesMatch?.[1]) return includesMatch[1];
   }
@@ -12378,7 +12670,11 @@ function getExplicitAvatarSource(row) {
 }
 
 function getAvatarDisplayLetter(row) {
-  return escapeHtml(String(row?.name || row?.username || row?.displayName || "?").trim().charAt(0) || "?");
+  return escapeHtml(
+    String(row?.name || row?.username || row?.displayName || "?")
+      .trim()
+      .charAt(0) || "?",
+  );
 }
 
 function markAvatarFallback(img) {
@@ -12408,7 +12704,9 @@ function refreshAvatarImages(root = document) {
       .map((value) => normalizeAvatarKey(value))
       .filter(Boolean);
 
-    const resolvedSrc = String(img.dataset.avatarSrc || "").trim() || findAvatarFromDirectory(candidateKeys);
+    const resolvedSrc =
+      String(img.dataset.avatarSrc || "").trim() ||
+      findAvatarFromDirectory(candidateKeys);
 
     if (resolvedSrc) {
       img.dataset.avatarSrc = resolvedSrc;
@@ -12442,7 +12740,9 @@ function createGenericAvatarMarkup(row, extraClass = "") {
   const avatarSrc = getExplicitAvatarSource(row);
   const fallbackLetter = getAvatarDisplayLetter(row);
   const srcAttr = avatarSrc ? ` src="${escapeHtml(avatarSrc)}"` : "";
-  const dataSrcAttr = avatarSrc ? ` data-avatar-src="${escapeHtml(avatarSrc)}"` : "";
+  const dataSrcAttr = avatarSrc
+    ? ` data-avatar-src="${escapeHtml(avatarSrc)}"`
+    : "";
   const initialDisplay = avatarSrc ? "" : ' style="display:none"';
   const fallbackInitialDisplay = avatarSrc ? ' style="display:none"' : "";
 
@@ -12459,7 +12759,6 @@ function createGenericAvatarMarkup(row, extraClass = "") {
     </div>
   `;
 }
-
 
 function createAvatarMarkup(row) {
   return createGenericAvatarMarkup(row, "leaderboard-avatar");
@@ -12493,7 +12792,6 @@ function createLeaderboardSupportedTeamLogo(row) {
 function handleAvatarImageError(img) {
   markAvatarFallback(img);
 }
-
 
 function standingsRows(rows, showPredictionCount = true, options = {}) {
   const currentPlayerId = normalizeEntityId(getCurrentPlayerId?.() || "");
@@ -12548,7 +12846,7 @@ function standingsRows(rows, showPredictionCount = true, options = {}) {
         `
         : "";
 
-        return `
+      return `
         <article class="leaderboard-row tone-${tone} ${i < 3 ? "top-rank-row" : ""} ${isCurrentUser ? "is-current-user" : ""}">
           ${createLeaderboardSupportedTeamLogo(row)}
       
@@ -12602,7 +12900,9 @@ function getStandingsSummaryData(general, weekly) {
   const weekMatches = weekId ? getMatchesByWeekId(weekId) : [];
   const filledWeeklyPredictions = state.predictions.filter((pred) => {
     if (!weekId) return false;
-    const match = weekMatches.find((item) => String(item.id) === String(pred.matchId));
+    const match = weekMatches.find(
+      (item) => String(item.id) === String(pred.matchId),
+    );
     return (
       match &&
       pred.homePred !== "" &&
@@ -12623,7 +12923,6 @@ function getStandingsSummaryData(general, weekly) {
   };
 }
 
-
 function renderStandingsSummary(summary, generalLeader, weeklyLeader) {
   const strip = document.getElementById("standingsSummaryStrip");
   const hero = document.getElementById("standingsHero");
@@ -12636,7 +12935,6 @@ function renderStandingsSummary(summary, generalLeader, weeklyLeader) {
     hero.innerHTML = renderLeaderboardTopThree(general);
   }
 }
-
 
 function renderStandingsInsights(summary, generalLeader, weeklyLeader) {
   const wrap = document.getElementById("standingsInsights");
@@ -12687,9 +12985,10 @@ function getWeeklyStandingsEmptyMessage(weekId) {
   const weekMatches = getMatchesByWeekId(weekId);
   if (!weekMatches.length) return "Seçili haftada maç bulunmuyor.";
 
-  const resolvedMatches = typeof getResolvedWeekMatches === "function"
-    ? getResolvedWeekMatches(weekId)
-    : weekMatches.filter((match) => match?.played);
+  const resolvedMatches =
+    typeof getResolvedWeekMatches === "function"
+      ? getResolvedWeekMatches(weekId)
+      : weekMatches.filter((match) => match?.played);
 
   if (!resolvedMatches.length) {
     return "Haftalık yarış için henüz sonuçlanmış maç yok.";
@@ -12713,8 +13012,12 @@ function renderStandings() {
   const generalLeaderBadge = document.getElementById("generalLeaderBadge");
   const weeklyLeaderBadge = document.getElementById("weeklyLeaderBadge");
 
-  const generalRankMap = Object.fromEntries(general.map((row, index) => [row.id, index + 1]));
-  const weeklyRankMap = Object.fromEntries(weekly.map((row, index) => [row.id, index + 1]));
+  const generalRankMap = Object.fromEntries(
+    general.map((row, index) => [row.id, index + 1]),
+  );
+  const weeklyRankMap = Object.fromEntries(
+    weekly.map((row, index) => [row.id, index + 1]),
+  );
   const generalDeltaMap = {};
   const weeklyDeltaMap = {};
 
@@ -12746,8 +13049,14 @@ function renderStandings() {
 
   document.getElementById("standingsTable").innerHTML = general.length
     ? isMobileView()
-      ? standingsRowsMobile(general, true, { leaderId: generalLeaderId, rankDeltaMap: generalDeltaMap })
-      : standingsRows(general, true, { leaderId: generalLeaderId, rankDeltaMap: generalDeltaMap })
+      ? standingsRowsMobile(general, true, {
+          leaderId: generalLeaderId,
+          rankDeltaMap: generalDeltaMap,
+        })
+      : standingsRows(general, true, {
+          leaderId: generalLeaderId,
+          rankDeltaMap: generalDeltaMap,
+        })
     : createEmptyState("Henüz puan tablosu oluşmadı.");
 
   document.getElementById("weeklyStandings").innerHTML = weekly.length
@@ -12764,8 +13073,6 @@ function renderStandings() {
         })
     : createEmptyState(getWeeklyStandingsEmptyMessage(weekId));
 }
-
-
 
 function getSortedSeasonMatches(seasonId = getActiveSeasonId()) {
   return [...getMatchesBySeasonId(seasonId)].sort((a, b) => {
@@ -12805,7 +13112,9 @@ function getPlayerSeasonStats(seasonId = getActiveSeasonId()) {
       const accuracyValue = playedMatches
         ? ((exact + resultOnly) / playedMatches) * 100
         : 0;
-      const exactRateValue = filledPreds.length ? (exact / filledPreds.length) * 100 : 0;
+      const exactRateValue = filledPreds.length
+        ? (exact / filledPreds.length) * 100
+        : 0;
       const participationRateValue = totalMatches
         ? (filledPreds.length / totalMatches) * 100
         : 0;
@@ -12813,15 +13122,17 @@ function getPlayerSeasonStats(seasonId = getActiveSeasonId()) {
 
       const weeklyPlayedSummaries = seasonWeeks
         .map((week) => {
-          const playedWeekMatches = getMatchesByWeekId(week.id).filter((match) => {
-            if (match?.played) return true;
-            return (
-              match?.homeScore !== "" &&
-              match?.awayScore !== "" &&
-              match?.homeScore != null &&
-              match?.awayScore != null
-            );
-          });
+          const playedWeekMatches = getMatchesByWeekId(week.id).filter(
+            (match) => {
+              if (match?.played) return true;
+              return (
+                match?.homeScore !== "" &&
+                match?.awayScore !== "" &&
+                match?.homeScore != null &&
+                match?.awayScore != null
+              );
+            },
+          );
           const playedWeekMatchIds = new Set(
             playedWeekMatches.map((match) => String(match.id)),
           );
@@ -12855,17 +13166,21 @@ function getPlayerSeasonStats(seasonId = getActiveSeasonId()) {
         .filter((value) => value !== null);
 
       const bestWeekScore = weeklyTotals.length ? Math.max(...weeklyTotals) : 0;
-      const worstWeekScore = weeklyTotals.length ? Math.min(...weeklyTotals) : 0;
+      const worstWeekScore = weeklyTotals.length
+        ? Math.min(...weeklyTotals)
+        : 0;
       const weekWins = seasonWeeks.reduce((count, week) => {
-        const playedWeekMatches = getMatchesByWeekId(week.id).filter((match) => {
-          if (match?.played) return true;
-          return (
-            match?.homeScore !== "" &&
-            match?.awayScore !== "" &&
-            match?.homeScore != null &&
-            match?.awayScore != null
-          );
-        });
+        const playedWeekMatches = getMatchesByWeekId(week.id).filter(
+          (match) => {
+            if (match?.played) return true;
+            return (
+              match?.homeScore !== "" &&
+              match?.awayScore !== "" &&
+              match?.homeScore != null &&
+              match?.awayScore != null
+            );
+          },
+        );
         const playedWeekMatchIds = new Set(
           playedWeekMatches.map((match) => String(match.id)),
         );
@@ -12883,9 +13198,15 @@ function getPlayerSeasonStats(seasonId = getActiveSeasonId()) {
             );
             return {
               playerId: candidate.id,
-              total: weekPreds.reduce((sum, pred) => sum + Number(pred.points || 0), 0),
-              exact: weekPreds.filter((pred) => Number(pred.points || 0) === 3).length,
-              resultOnly: weekPreds.filter((pred) => Number(pred.points || 0) === 1).length,
+              total: weekPreds.reduce(
+                (sum, pred) => sum + Number(pred.points || 0),
+                0,
+              ),
+              exact: weekPreds.filter((pred) => Number(pred.points || 0) === 3)
+                .length,
+              resultOnly: weekPreds.filter(
+                (pred) => Number(pred.points || 0) === 1,
+              ).length,
               predictionCount: weekPreds.length,
             };
           })
@@ -13050,9 +13371,15 @@ function renderAdvancedStats() {
   const playerCardsTarget = document.getElementById("insightsList");
   const deepTarget = document.getElementById("statsDeepGrid");
 
-  if (!heroTarget || !overviewTarget || !leadersTarget || !playerCardsTarget || !deepTarget) {
+  if (
+    !heroTarget ||
+    !overviewTarget ||
+    !leadersTarget ||
+    !playerCardsTarget ||
+    !deepTarget
+  ) {
     return;
-  };
+  }
 
   const championLabel = champion
     ? `${champion.name}, ${season?.name || "sezonu"} ${champion.total} puanla şampiyon tamamladı.`
@@ -13150,25 +13477,37 @@ function renderAdvancedStats() {
       tag: "👑 Puan lideri",
       name: liveLeader?.name || "-",
       value: liveLeader ? `${liveLeader.total} puan` : "Veri yok",
-      note: liveLeader ? `Başarı ${safePercent(liveLeader.accuracyValue)} • Ortalama ${liveLeader.average}` : "Henüz veri yok",
+      note: liveLeader
+        ? `Başarı ${safePercent(liveLeader.accuracyValue)} • Ortalama ${liveLeader.average}`
+        : "Henüz veri yok",
     },
     {
       tag: "🎯 En isabetli",
       name: mostAccurate?.name || "-",
-      value: mostAccurate ? safePercent(mostAccurate.accuracyValue) : "Veri yok",
-      note: mostAccurate ? `${mostAccurate.exact + mostAccurate.resultOnly} doğru tahmin` : "Henüz veri yok",
+      value: mostAccurate
+        ? safePercent(mostAccurate.accuracyValue)
+        : "Veri yok",
+      note: mostAccurate
+        ? `${mostAccurate.exact + mostAccurate.resultOnly} doğru tahmin`
+        : "Henüz veri yok",
     },
     {
       tag: "🔥 Tam skor kralı",
       name: sharpShooter?.name || "-",
       value: sharpShooter ? `${sharpShooter.exact} tam skor` : "Veri yok",
-      note: sharpShooter ? `Tam skor oranı ${safePercent(sharpShooter.exactRateValue)}` : "Henüz veri yok",
+      note: sharpShooter
+        ? `Tam skor oranı ${safePercent(sharpShooter.exactRateValue)}`
+        : "Henüz veri yok",
     },
     {
       tag: "🛡️ En disiplinli",
       name: reliable?.name || "-",
-      value: reliable ? safePercent(reliable.participationRateValue) : "Veri yok",
-      note: reliable ? `${reliable.predictionCount} dolu tahmin` : "Henüz veri yok",
+      value: reliable
+        ? safePercent(reliable.participationRateValue)
+        : "Veri yok",
+      note: reliable
+        ? `${reliable.predictionCount} dolu tahmin`
+        : "Henüz veri yok",
     },
   ]
     .map(
@@ -13188,7 +13527,8 @@ function renderAdvancedStats() {
           const formMarkup = player.recentForm.length
             ? player.recentForm
                 .map(
-                  (item) => `<span class="form-pill ${item.type ? `is-${item.type}` : ""}">${item.label}</span>`,
+                  (item) =>
+                    `<span class="form-pill ${item.type ? `is-${item.type}` : ""}">${item.label}</span>`,
                 )
                 .join("")
             : '<span class="small-meta">Henüz tahmin yok</span>';
@@ -13236,32 +13576,50 @@ function renderAdvancedStats() {
     {
       label: "Yükselen oyuncu",
       value: risingStar ? escapeHtml(risingStar.name) : "-",
-      note: risingStar ? `Son 5 haftada ${risingStar.recentFormPoints} puan topladı.` : "Henüz veri yok.",
+      note: risingStar
+        ? `Son 5 haftada ${risingStar.recentFormPoints} puan topladı.`
+        : "Henüz veri yok.",
     },
     {
       label: "En iyi tek hafta",
       value: bestWeekPlayer ? `${bestWeekPlayer.bestWeekScore} puan` : "-",
-      note: bestWeekPlayer ? escapeHtml(bestWeekPlayer.name) : "Henüz veri yok.",
+      note: bestWeekPlayer
+        ? escapeHtml(bestWeekPlayer.name)
+        : "Henüz veri yok.",
     },
     {
       label: "En düşük hafta",
       value: worstWeekPlayer ? `${worstWeekPlayer.worstWeekScore} puan` : "-",
-      note: worstWeekPlayer ? `${escapeHtml(worstWeekPlayer.name)} için sezonun en düşük dolu haftası.` : "Henüz veri yok.",
+      note: worstWeekPlayer
+        ? `${escapeHtml(worstWeekPlayer.name)} için sezonun en düşük dolu haftası.`
+        : "Henüz veri yok.",
     },
     {
       label: "En güvenli tahmin profili",
       value: reliable ? escapeHtml(reliable.name) : "-",
-      note: reliable ? `${safePercent(reliable.participationRateValue)} katılım ile düzenli ilerliyor.` : "Henüz veri yok.",
+      note: reliable
+        ? `${safePercent(reliable.participationRateValue)} katılım ile düzenli ilerliyor.`
+        : "Henüz veri yok.",
     },
     {
       label: "En verimli oyuncu",
       value: bestAverage ? escapeHtml(bestAverage.name) : "-",
-      note: bestAverage ? `Tahmin başına ${bestAverage.average} puan ortalaması var.` : "Henüz veri yok.",
+      note: bestAverage
+        ? `Tahmin başına ${bestAverage.average} puan ortalaması var.`
+        : "Henüz veri yok.",
     },
     {
       label: "Sezon kapanış notu",
-      value: champion ? escapeHtml(champion.name) : liveLeader ? escapeHtml(liveLeader.name) : "-",
-      note: champion ? `${champion.total} puanla sezon tamamlandı.` : liveLeader ? `Şimdilik zirvede ${liveLeader.total} puan var.` : "Henüz veri yok.",
+      value: champion
+        ? escapeHtml(champion.name)
+        : liveLeader
+          ? escapeHtml(liveLeader.name)
+          : "-",
+      note: champion
+        ? `${champion.total} puanla sezon tamamlandı.`
+        : liveLeader
+          ? `Şimdilik zirvede ${liveLeader.total} puan var.`
+          : "Henüz veri yok.",
     },
   ]
     .map(
@@ -13360,7 +13718,6 @@ function capturePageViewport() {
   };
 }
 
-
 /* Lig puan durumu - apisiz maç sonuçlarından hesaplanır */
 function getLeagueStandingsCacheKey(seasonId) {
   return String(seasonId || getActiveSeasonId() || "default");
@@ -13414,8 +13771,30 @@ function buildLeagueStandingsFromResults(seasonId = getActiveSeasonId()) {
     const awayName = String(match.awayTeam || "").trim();
     if (!homeName || !awayName) return;
 
-    if (!tableMap.has(homeName)) tableMap.set(homeName, { teamName: homeName, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDiff: 0, points: 0 });
-    if (!tableMap.has(awayName)) tableMap.set(awayName, { teamName: awayName, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDiff: 0, points: 0 });
+    if (!tableMap.has(homeName))
+      tableMap.set(homeName, {
+        teamName: homeName,
+        played: 0,
+        won: 0,
+        drawn: 0,
+        lost: 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
+        goalDiff: 0,
+        points: 0,
+      });
+    if (!tableMap.has(awayName))
+      tableMap.set(awayName, {
+        teamName: awayName,
+        played: 0,
+        won: 0,
+        drawn: 0,
+        lost: 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
+        goalDiff: 0,
+        points: 0,
+      });
 
     const home = tableMap.get(homeName);
     const away = tableMap.get(awayName);
@@ -13469,7 +13848,8 @@ function getCachedLeagueStandings(seasonId = getActiveSeasonId()) {
 
 async function persistLeagueStandingsCache(seasonId, rows) {
   const key = getLeagueStandingsCacheKey(seasonId);
-  if (!state.settings.leagueStandingsCache) state.settings.leagueStandingsCache = {};
+  if (!state.settings.leagueStandingsCache)
+    state.settings.leagueStandingsCache = {};
   const payload = {
     seasonId: String(seasonId || ""),
     updatedAt: new Date().toISOString(),
@@ -13478,7 +13858,11 @@ async function persistLeagueStandingsCache(seasonId, rows) {
   state.settings.leagueStandingsCache[key] = payload;
   saveState();
 
-  if (typeof isFirebaseReady === "function" && isFirebaseReady() && typeof firebaseUpdate === "function") {
+  if (
+    typeof isFirebaseReady === "function" &&
+    isFirebaseReady() &&
+    typeof firebaseUpdate === "function"
+  ) {
     await firebaseUpdate("settings", {
       leagueStandingsCache: state.settings.leagueStandingsCache,
       updatedAt: new Date().toISOString(),
@@ -13585,24 +13969,35 @@ async function pullLeagueStandingsFromCurrentResults(buttonOrEvent) {
 
   const seasonId = getActiveSeasonId();
   if (!seasonId) {
-    return showAlert("Önce aktif sezon seçmelisin.", { title: "Eksik seçim", type: "warning" });
+    return showAlert("Önce aktif sezon seçmelisin.", {
+      title: "Eksik seçim",
+      type: "warning",
+    });
   }
 
   setAsyncButtonState(actionButton, "loading", { loading: "" });
   try {
     const rows = buildLeagueStandingsFromResults(seasonId);
-    const playedTeamRows = rows.filter((row) => normalizeLeagueStandingNumber(row.played) > 0);
+    const playedTeamRows = rows.filter(
+      (row) => normalizeLeagueStandingNumber(row.played) > 0,
+    );
     const payload = await persistLeagueStandingsCache(seasonId, rows);
     renderLeagueStandingsModal(payload);
     setAsyncButtonState(actionButton, "success", { success: "" });
     if (!playedTeamRows.length) {
-      showAlert("Puan durumu hazırlandı ama henüz oynanmış maç sonucu bulunamadı.", { title: "Bilgi", type: "info" });
+      showAlert(
+        "Puan durumu hazırlandı ama henüz oynanmış maç sonucu bulunamadı.",
+        { title: "Bilgi", type: "info" },
+      );
     }
   } catch (error) {
     const cached = getCachedLeagueStandings(seasonId);
     if (cached) renderLeagueStandingsModal(cached);
     setAsyncButtonState(actionButton, "error", { error: "Hata" });
-    showAlert(error?.message || "Puan durumu çekilirken hata oluştu.", { title: "Hata", type: "error" });
+    showAlert(error?.message || "Puan durumu çekilirken hata oluştu.", {
+      title: "Hata",
+      type: "error",
+    });
   }
 }
 /* 05-actions-init.js */
@@ -13746,7 +14141,8 @@ async function addSeason(event) {
       type: "warning",
     });
 
-  const button = event?.currentTarget || document.getElementById("addSeasonBtn");
+  const button =
+    event?.currentTarget || document.getElementById("addSeasonBtn");
   if (button?.disabled) return;
 
   const nameInput = document.getElementById("seasonName");
@@ -13811,7 +14207,9 @@ async function addSeason(event) {
 
       const remoteSettings = (await firebaseRead("settings")) || {};
       const remoteSeasons = Array.isArray(remoteSettings.seasonsMeta)
-        ? remoteSettings.seasonsMeta.map(normalizeSeasonRegistryItem).filter(Boolean)
+        ? remoteSettings.seasonsMeta
+            .map(normalizeSeasonRegistryItem)
+            .filter(Boolean)
         : [];
       if (!remoteSeasons.some((season) => season.id === seasonId)) {
         throw new Error("Sezon Firebase'e doğrulanmış şekilde kaydedilemedi.");
@@ -15203,7 +15601,9 @@ function mapSportsDbTeamToLocal(teamRef, apiTeam, seasonId, seasonLabel) {
     leagueId: String(apiTeam?.idLeague || LEAGUE_ID),
     season: seasonLabel,
     badgeUrl: String(apiTeam?.strBadge || "").trim(),
-    shortName: String(apiTeam?.strTeamShort || apiTeam?.strAlternate || "").trim(),
+    shortName: String(
+      apiTeam?.strTeamShort || apiTeam?.strAlternate || "",
+    ).trim(),
     leagueName: String(apiTeam?.strLeague || "").trim(),
     stadium: String(apiTeam?.strStadium || "").trim(),
     country: String(apiTeam?.strCountry || "").trim(),
@@ -15233,7 +15633,10 @@ async function persistSeasonTeamLogoCache(seasonId) {
   cache[String(seasonId)] = seasonMap;
   saveState();
   if (isFirebaseReady()) {
-    await firebaseWrite(`settings/teamLogoCache/${sanitizeFirebaseKey(seasonId)}`, seasonMap);
+    await firebaseWrite(
+      `settings/teamLogoCache/${sanitizeFirebaseKey(seasonId)}`,
+      seasonMap,
+    );
   }
   return seasonMap;
 }
@@ -15266,8 +15669,11 @@ async function importSeasonTeamsFromApi(buttonOrEvent) {
     });
   }
 
-  if (status) status.textContent = `${seasonLabel} sezonunun takımları alınıyor...`;
-  setAsyncButtonState(actionButton, "loading", { loading: "Takımlar getiriliyor..." });
+  if (status)
+    status.textContent = `${seasonLabel} sezonunun takımları alınıyor...`;
+  setAsyncButtonState(actionButton, "loading", {
+    loading: "Takımlar getiriliyor...",
+  });
 
   try {
     const references = await fetchSeasonTeamReferences(seasonLabel);
@@ -15303,7 +15709,10 @@ async function importSeasonTeamsFromApi(buttonOrEvent) {
 
       if (existing) {
         const preservedSlug = existing.slug || mapped.slug;
-        Object.assign(existing, mapped, { id: existing.id, slug: preservedSlug });
+        Object.assign(existing, mapped, {
+          id: existing.id,
+          slug: preservedSlug,
+        });
         updatedCount += 1;
       } else {
         state.teams.push({ id: uid("team"), ...mapped });
@@ -15323,7 +15732,9 @@ async function importSeasonTeamsFromApi(buttonOrEvent) {
     if (document.getElementById("apiStatus")) {
       document.getElementById("apiStatus").textContent = message;
     }
-    setAsyncButtonState(actionButton, "success", { success: "Takımlar getirildi" });
+    setAsyncButtonState(actionButton, "success", {
+      success: "Takımlar getirildi",
+    });
     recordAdminSyncActivity({
       lastAction: `${seasonLabel} sezonunun takım bilgileri API'den alındı.`,
       success: true,
@@ -15354,7 +15765,8 @@ function inferWeekStatusFromMatches(weekId) {
   const currentStatus = String(week?.status || "hazirlaniyor");
   const matches = getMatchesByWeekId(weekId);
   if (currentStatus === "hazirlaniyor") return "hazirlaniyor";
-  if (!matches.length) return currentStatus === "tamamlandi" ? "tamamlandi" : "aktif";
+  if (!matches.length)
+    return currentStatus === "tamamlandi" ? "tamamlandi" : "aktif";
   if (matches.every((match) => match.played)) return "tamamlandi";
   return "aktif";
 }
@@ -16455,7 +16867,10 @@ function clearSessionRuntimeCaches() {
 
   try {
     Object.keys(sessionStorage).forEach((key) => {
-      if (key.startsWith("fikstur_presence_") || key.startsWith("fikstur_session_")) {
+      if (
+        key.startsWith("fikstur_presence_") ||
+        key.startsWith("fikstur_session_")
+      ) {
         sessionStorage.removeItem(key);
       }
     });
@@ -16464,13 +16879,16 @@ function clearSessionRuntimeCaches() {
   }
 
   if (window.caches?.keys) {
-    window.caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => /fikstur|firebase/i.test(key))
-          .map((key) => window.caches.delete(key)),
-      ),
-    ).catch(() => {});
+    window.caches
+      .keys()
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter((key) => /fikstur|firebase/i.test(key))
+            .map((key) => window.caches.delete(key)),
+        ),
+      )
+      .catch(() => {});
   }
 }
 
@@ -16545,7 +16963,10 @@ function bindIdleLogoutHooks() {
 
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") {
-      localStorage.setItem(BACKGROUND_ENTERED_AT_STORAGE_KEY, String(Date.now()));
+      localStorage.setItem(
+        BACKGROUND_ENTERED_AT_STORAGE_KEY,
+        String(Date.now()),
+      );
       clearIdleLogoutTimer();
       return;
     }
@@ -16559,7 +16980,10 @@ function bindIdleLogoutHooks() {
   window.addEventListener("pageshow", checkIdleLogoutAfterResume);
   window.addEventListener("pagehide", () => {
     if (isAuthenticated()) {
-      localStorage.setItem(BACKGROUND_ENTERED_AT_STORAGE_KEY, String(Date.now()));
+      localStorage.setItem(
+        BACKGROUND_ENTERED_AT_STORAGE_KEY,
+        String(Date.now()),
+      );
       clearIdleLogoutTimer();
     }
   });
@@ -16737,7 +17161,8 @@ window.addEventListener("online", () => {
 });
 
 async function bootstrapApplication() {
-  if (window.__fiksturAppBootstrapPromise) return window.__fiksturAppBootstrapPromise;
+  if (window.__fiksturAppBootstrapPromise)
+    return window.__fiksturAppBootstrapPromise;
 
   window.__fiksturAppBootstrapPromise = (async () => {
     try {
@@ -16754,7 +17179,7 @@ async function bootstrapApplication() {
     bindEvents();
     ensureHeaderSyncButtons();
     ensureAvatarDirectoryReady();
-    
+
     if (typeof suspendViewportPersistence === "function") {
       suspendViewportPersistence(900);
     }
@@ -16771,7 +17196,7 @@ async function bootstrapApplication() {
     updateAdminSyncToggleButton();
     bindIdleLogoutHooks();
     bindAppResumeRefreshHooks();
-    
+
     if (isFirebaseReady()) {
       ensureFirebaseDefaults().catch((error) =>
         console.warn("Firebase varsayılanları hazırlanamadı:", error),
@@ -16783,37 +17208,44 @@ async function bootstrapApplication() {
     console.log("[START] Current User   :", getAuthUser?.());
     if (isAuthenticated()) {
       const expiredOnColdStart = checkIdleLogoutAfterResume();
-    
+
       if (!expiredOnColdStart && isAuthenticated()) {
         appBootstrapInProgress = true;
         startPresenceTracking();
         renderAll();
         console.log("[START] Birleşik başlangıç eşitlemesi başladı");
-    
+
         (async () => {
           try {
-            const sessionHydrationOk = await runSessionHydrationWithFastOverlay({
-              loadingMessage:
-                "Aktif sezon ve en güncel yayınlanan hafta Firebase üzerinden doğrulanıyor...",
-              sessionRestore: true,
-              suppressOverlay: false,
-            });
+            const sessionHydrationOk = await runSessionHydrationWithFastOverlay(
+              {
+                loadingMessage:
+                  "Aktif sezon ve en güncel yayınlanan hafta Firebase üzerinden doğrulanıyor...",
+                sessionRestore: true,
+                suppressOverlay: false,
+              },
+            );
             console.log("[START] Session Hydration bitti:", sessionHydrationOk);
-    
-            const fullHydrationOk = await hydrateFromFirebaseRealtime("startup-auto");
+
+            const fullHydrationOk =
+              await hydrateFromFirebaseRealtime("startup-auto");
             validateFreshActiveSelection({ forceNewestPublished: true });
             ensureActiveSelections();
             saveState(true);
-    
-            console.log("[START] Tam Firebase eşitlemesi bitti:", fullHydrationOk, {
-              seasons: state.seasons?.length || 0,
-              weeks: state.weeks?.length || 0,
-              activeSeasonId: state.settings.activeSeasonId || null,
-              activeWeekId: state.settings.activeWeekId || null,
-              matches: state.matches?.length || 0,
-              predictions: state.predictions?.length || 0,
-            });
-    
+
+            console.log(
+              "[START] Tam Firebase eşitlemesi bitti:",
+              fullHydrationOk,
+              {
+                seasons: state.seasons?.length || 0,
+                weeks: state.weeks?.length || 0,
+                activeSeasonId: state.settings.activeSeasonId || null,
+                activeWeekId: state.settings.activeWeekId || null,
+                matches: state.matches?.length || 0,
+                predictions: state.predictions?.length || 0,
+              },
+            );
+
             if ((state.settings.currentTab || "dashboard") === "dashboard") {
               await maybeAutoSyncResults();
               renderDashboardSyncCard();
@@ -16847,7 +17279,9 @@ function startApplicationBootstrap() {
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", startApplicationBootstrap, { once: true });
+  document.addEventListener("DOMContentLoaded", startApplicationBootstrap, {
+    once: true,
+  });
 } else {
   startApplicationBootstrap();
 }
@@ -16875,16 +17309,19 @@ let dashboardClockLastPhaseMap = new Map();
 
 function getPremiumMatchState(match) {
   const now = Date.now();
-  const visual = typeof getMatchVisualState === "function"
-    ? getMatchVisualState(match)
-    : "waiting";
-  const runtime = typeof getMatchRuntimeInfo === "function"
-    ? getMatchRuntimeInfo(match, now)
-    : { diffMs: null, elapsedMs: null, minute: null, phase: visual };
+  const visual =
+    typeof getMatchVisualState === "function"
+      ? getMatchVisualState(match)
+      : "waiting";
+  const runtime =
+    typeof getMatchRuntimeInfo === "function"
+      ? getMatchRuntimeInfo(match, now)
+      : { diffMs: null, elapsedMs: null, minute: null, phase: visual };
   const diff = runtime.diffMs;
-  const countdown = diff !== null && diff > 0
-    ? formatPredictionLockCountdown(diff)
-    : "00sa 00dk 00sn";
+  const countdown =
+    diff !== null && diff > 0
+      ? formatPredictionLockCountdown(diff)
+      : "00sa 00dk 00sn";
 
   if (match?.played || visual === "played" || visual === "played-postponed") {
     return { phase: visual, label: "BİTTİ", kicker: "FULL TIME" };
@@ -16897,7 +17334,9 @@ function getPremiumMatchState(match) {
   if (visual === "live") {
     const liveMinute = runtime.minute
       ? `${runtime.minute}'`
-      : (String(match?.statusText || "Canlı").replace(/live|in play/gi, "").trim() || "Canlı");
+      : String(match?.statusText || "Canlı")
+          .replace(/live|in play/gi, "")
+          .trim() || "Canlı";
     return { phase: visual, label: "CANLI", kicker: liveMinute };
   }
 
@@ -16933,7 +17372,9 @@ function startDashboardClockRefresh() {
           if (!match) return;
 
           const premium = getPremiumMatchState(match);
-          const countdownEl = card.querySelector("[data-countdown-text], .premium-countdown strong");
+          const countdownEl = card.querySelector(
+            "[data-countdown-text], .premium-countdown strong",
+          );
 
           if (countdownEl) {
             countdownEl.textContent = premium.kicker || "";
@@ -16967,10 +17408,13 @@ function startDashboardClockRefresh() {
 startDashboardClockRefresh();
 /* 06-notifications.js */
 
-const PREDICTION_NOTIFICATION_STORAGE_KEY = "fikstur_prediction_notifications_enabled_v1";
-const PREDICTION_NOTIFICATION_SENT_KEY = "fikstur_prediction_notifications_sent_v1";
+const PREDICTION_NOTIFICATION_STORAGE_KEY =
+  "fikstur_prediction_notifications_enabled_v1";
+const PREDICTION_NOTIFICATION_SENT_KEY =
+  "fikstur_prediction_notifications_sent_v1";
 const PREDICTION_NOTIFICATION_FCM_TOKEN_KEY = "fikstur_prediction_fcm_token_v1";
-const PREDICTION_NOTIFICATION_DEVICE_ID_KEY = "fikstur_prediction_fcm_device_id_v1";
+const PREDICTION_NOTIFICATION_DEVICE_ID_KEY =
+  "fikstur_prediction_fcm_device_id_v1";
 const PREDICTION_NOTIFICATION_CHECK_INTERVAL_MS = 60 * 1000;
 
 const PREDICTION_NOTIFICATION_REMINDERS = [
@@ -16980,7 +17424,8 @@ const PREDICTION_NOTIFICATION_REMINDERS = [
 ];
 
 let predictionNotificationTimer = null;
-const FIKSTUR_FOREGROUND_NOTIFICATION_DEDUPE_KEY = "fikstur_foreground_notification_dedupe_v1";
+const FIKSTUR_FOREGROUND_NOTIFICATION_DEDUPE_KEY =
+  "fikstur_foreground_notification_dedupe_v1";
 const FIKSTUR_FOREGROUND_NOTIFICATION_DEDUPE_MS = 15000;
 
 function shouldSkipForegroundFiksturNotification(key) {
@@ -16989,25 +17434,37 @@ function shouldSkipForegroundFiksturNotification(key) {
 
   let cache = {};
   try {
-    cache = JSON.parse(sessionStorage.getItem(FIKSTUR_FOREGROUND_NOTIFICATION_DEDUPE_KEY) || "{}");
+    cache = JSON.parse(
+      sessionStorage.getItem(FIKSTUR_FOREGROUND_NOTIFICATION_DEDUPE_KEY) ||
+        "{}",
+    );
   } catch {
     cache = {};
   }
 
   const now = Date.now();
   Object.keys(cache).forEach((cacheKey) => {
-    if (now - Number(cache[cacheKey] || 0) > FIKSTUR_FOREGROUND_NOTIFICATION_DEDUPE_MS) {
+    if (
+      now - Number(cache[cacheKey] || 0) >
+      FIKSTUR_FOREGROUND_NOTIFICATION_DEDUPE_MS
+    ) {
       delete cache[cacheKey];
     }
   });
 
-  if (now - Number(cache[safeKey] || 0) < FIKSTUR_FOREGROUND_NOTIFICATION_DEDUPE_MS) {
+  if (
+    now - Number(cache[safeKey] || 0) <
+    FIKSTUR_FOREGROUND_NOTIFICATION_DEDUPE_MS
+  ) {
     return true;
   }
 
   cache[safeKey] = now;
   try {
-    sessionStorage.setItem(FIKSTUR_FOREGROUND_NOTIFICATION_DEDUPE_KEY, JSON.stringify(cache));
+    sessionStorage.setItem(
+      FIKSTUR_FOREGROUND_NOTIFICATION_DEDUPE_KEY,
+      JSON.stringify(cache),
+    );
   } catch {}
 
   return false;
@@ -17044,14 +17501,19 @@ function getPredictionNotificationButtonHtml() {
 
 function readPredictionNotificationSentMap() {
   try {
-    return JSON.parse(localStorage.getItem(PREDICTION_NOTIFICATION_SENT_KEY) || "{}");
+    return JSON.parse(
+      localStorage.getItem(PREDICTION_NOTIFICATION_SENT_KEY) || "{}",
+    );
   } catch {
     return {};
   }
 }
 
 function writePredictionNotificationSentMap(map) {
-  localStorage.setItem(PREDICTION_NOTIFICATION_SENT_KEY, JSON.stringify(map || {}));
+  localStorage.setItem(
+    PREDICTION_NOTIFICATION_SENT_KEY,
+    JSON.stringify(map || {}),
+  );
 }
 
 function getNextPredictionLockTarget() {
@@ -17059,22 +17521,25 @@ function getNextPredictionLockTarget() {
   const weeks = Array.isArray(state?.weeks) ? state.weeks : [];
   const now = Date.now();
 
-  return weeks
-    .filter((week) => !seasonId || String(week.seasonId) === String(seasonId))
-    .map((week) => {
-      const lockTs = getWeekPredictionLockTimestamp(week.id);
-      return {
-        week,
-        lockTs,
-        diff: typeof lockTs === "number" ? lockTs - now : null,
-      };
-    })
-    .filter((item) => typeof item.lockTs === "number" && item.diff > 0)
-    .sort((a, b) => a.lockTs - b.lockTs)[0] || null;
+  return (
+    weeks
+      .filter((week) => !seasonId || String(week.seasonId) === String(seasonId))
+      .map((week) => {
+        const lockTs = getWeekPredictionLockTimestamp(week.id);
+        return {
+          week,
+          lockTs,
+          diff: typeof lockTs === "number" ? lockTs - now : null,
+        };
+      })
+      .filter((item) => typeof item.lockTs === "number" && item.diff > 0)
+      .sort((a, b) => a.lockTs - b.lockTs)[0] || null
+  );
 }
 
 function showPredictionReminderNotification(target, reminder) {
-  const weekNumber = target?.week?.number || getWeekNumberById(target?.week?.id) || "?";
+  const weekNumber =
+    target?.week?.number || getWeekNumberById(target?.week?.id) || "?";
   const title = "Tahmin zamanı yaklaşıyor";
   const body = `${weekNumber}. hafta tahminleri yaklaşık ${reminder.label} sonra kapanacak.`;
 
@@ -17087,7 +17552,6 @@ function showPredictionReminderNotification(target, reminder) {
       icon: getFiksturNotificationAssetUrl("/app-icons/pwa-icon-192-v3.png"),
       badge: getFiksturNotificationAssetUrl("/notification-icons/badge-72.png"),
     });
-
   } catch (error) {
     console.warn("[Bildirim] Bildirim gösterilemedi:", error);
   }
@@ -17140,13 +17604,22 @@ function getFiksturNotificationAssetUrl(path) {
   }
 }
 
-async function cleanupDuplicateFiksturFcmTokens(currentDeviceKey, token, owner) {
+async function cleanupDuplicateFiksturFcmTokens(
+  currentDeviceKey,
+  token,
+  owner,
+) {
   if (!token || !currentDeviceKey || !isFirebaseReady?.()) return;
 
   try {
-    const rows = typeof firebaseRead === "function" ? await firebaseRead("fcmTokens") : null;
+    const rows =
+      typeof firebaseRead === "function"
+        ? await firebaseRead("fcmTokens")
+        : null;
     const updates = {};
-    const ownerIds = [owner?.userId, owner?.playerId].filter(Boolean).map(String);
+    const ownerIds = [owner?.userId, owner?.playerId]
+      .filter(Boolean)
+      .map(String);
 
     Object.entries(rows || {}).forEach(([key, value]) => {
       if (!value || key === currentDeviceKey) return;
@@ -17157,7 +17630,10 @@ async function cleanupDuplicateFiksturFcmTokens(currentDeviceKey, token, owner) 
 
       const sameToken = rowToken && rowToken === token;
       const sameDevice = rowDeviceId && rowDeviceId === currentDeviceKey;
-      const sameOwnerSameToken = sameToken && ownerIds.length && rowIds.some((id) => ownerIds.includes(id));
+      const sameOwnerSameToken =
+        sameToken &&
+        ownerIds.length &&
+        rowIds.some((id) => ownerIds.includes(id));
 
       if (sameToken || sameDevice || sameOwnerSameToken) {
         updates[`fcmTokens/${key}`] = null;
@@ -17166,7 +17642,9 @@ async function cleanupDuplicateFiksturFcmTokens(currentDeviceKey, token, owner) 
 
     if (Object.keys(updates).length) {
       await firebaseUpdate("", updates);
-      console.log(`[FCM] Eski/çift token kayıtları temizlendi: ${Object.keys(updates).length}`);
+      console.log(
+        `[FCM] Eski/çift token kayıtları temizlendi: ${Object.keys(updates).length}`,
+      );
     }
   } catch (error) {
     console.warn("[FCM] Çift token temizliği yapılamadı:", error);
@@ -17183,16 +17661,25 @@ function getFcmTokenOwnerInfo() {
     return null;
   }
 
-  const userId = String(player?.id || authPlayerId || authUser?.playerId || authUser?.id || authUser?.kisiId || "").trim();
-  const playerId = String(player?.id || authPlayerId || authUser?.playerId || authUser?.kisiId || "").trim();
+  const userId = String(
+    player?.id ||
+      authPlayerId ||
+      authUser?.playerId ||
+      authUser?.id ||
+      authUser?.kisiId ||
+      "",
+  ).trim();
+  const playerId = String(
+    player?.id || authPlayerId || authUser?.playerId || authUser?.kisiId || "",
+  ).trim();
   const displayName = String(
     player?.adSoyad ||
-    player?.name ||
-    authUser?.adSoyad ||
-    authUser?.name ||
-    authUser?.kullaniciAdi ||
-    authUser?.username ||
-    ""
+      player?.name ||
+      authUser?.adSoyad ||
+      authUser?.name ||
+      authUser?.kullaniciAdi ||
+      authUser?.username ||
+      "",
   ).trim();
 
   if (!userId || !displayName) {
@@ -17213,12 +17700,17 @@ async function registerFiksturMessagingServiceWorker() {
     throw new Error("Bu tarayıcı service worker desteklemiyor.");
   }
 
-  const swUrl = new URL("./firebase-messaging-sw.js", window.location.href).toString();
+  const swUrl = new URL(
+    "./firebase-messaging-sw.js",
+    window.location.href,
+  ).toString();
 
-
-  const registration = await navigator.serviceWorker.register("./firebase-messaging-sw.js", {
-    scope: "./",
-  });
+  const registration = await navigator.serviceWorker.register(
+    "./firebase-messaging-sw.js",
+    {
+      scope: "./",
+    },
+  );
 
   await navigator.serviceWorker.ready;
 
@@ -17230,17 +17722,22 @@ async function saveFiksturFcmTokenToFirebase(token) {
 
   const owner = getFcmTokenOwnerInfo();
   if (!owner) {
-    console.warn("[FCM] Kullanıcı oturumu hazır olmadığı için token kaydı bekletildi.");
+    console.warn(
+      "[FCM] Kullanıcı oturumu hazır olmadığı için token kaydı bekletildi.",
+    );
     return false;
   }
 
   const deviceId = getFiksturNotificationDeviceId();
-  const safeDeviceKey = sanitizeFirebaseKey?.(deviceId) || deviceId.replace(/[.#$\[\]/]/g, "_");
-  const previousToken = localStorage.getItem(PREDICTION_NOTIFICATION_FCM_TOKEN_KEY) || "";
+  const safeDeviceKey =
+    sanitizeFirebaseKey?.(deviceId) || deviceId.replace(/[.#$\[\]/]/g, "_");
+  const previousToken =
+    localStorage.getItem(PREDICTION_NOTIFICATION_FCM_TOKEN_KEY) || "";
 
   const payload = {
     token,
-    previousToken: previousToken && previousToken !== token ? previousToken : null,
+    previousToken:
+      previousToken && previousToken !== token ? previousToken : null,
     deviceId: safeDeviceKey,
     ...owner,
     permission: Notification.permission,
@@ -17253,7 +17750,10 @@ async function saveFiksturFcmTokenToFirebase(token) {
     if (typeof firebaseUpdate === "function") {
       await firebaseUpdate(`fcmTokens/${safeDeviceKey}`, payload);
     } else if (window.firebase?.database) {
-      await window.firebase.database().ref(`fcmTokens/${safeDeviceKey}`).update(payload);
+      await window.firebase
+        .database()
+        .ref(`fcmTokens/${safeDeviceKey}`)
+        .update(payload);
     } else {
       throw new Error("Firebase Database kayıt fonksiyonu bulunamadı.");
     }
@@ -17261,7 +17761,6 @@ async function saveFiksturFcmTokenToFirebase(token) {
     await cleanupDuplicateFiksturFcmTokens(safeDeviceKey, token, owner);
     localStorage.setItem(PREDICTION_NOTIFICATION_FCM_TOKEN_KEY, token);
     return true;
-
   } catch (error) {
     console.warn("[FCM] Token Firebase'e kaydedilemedi:", error);
     throw error;
@@ -17269,8 +17768,6 @@ async function saveFiksturFcmTokenToFirebase(token) {
 }
 
 async function setupFiksturFcmToken() {
-
-
   if (!window.firebase?.messaging) {
     console.warn("[FCM] Firebase Messaging kütüphanesi bulunamadı.");
     return null;
@@ -17285,7 +17782,9 @@ async function setupFiksturFcmToken() {
   }
 
   if (!hasValidFiksturVapidKey()) {
-    console.warn("[FCM] VAPID key henüz girilmedi. index.html içindeki FIKSTUR_FIREBASE_VAPID_KEY alanını doldur.");
+    console.warn(
+      "[FCM] VAPID key henüz girilmedi. index.html içindeki FIKSTUR_FIREBASE_VAPID_KEY alanını doldur.",
+    );
     return null;
   }
 
@@ -17293,21 +17792,40 @@ async function setupFiksturFcmToken() {
   const messaging = window.firebase.messaging();
 
   messaging.onMessage((payload) => {
-    const title = payload?.data?.title || payload?.notification?.title || "Tahmin Paneli";
-    const body = payload?.data?.body || payload?.notification?.body || "Yeni bildirimin var.";
-    const dedupeKey = payload?.data?.dedupeKey || payload?.data?.tag || `${title}|${body}`;
+    const title =
+      payload?.data?.title || payload?.notification?.title || "Tahmin Paneli";
+    const body =
+      payload?.data?.body ||
+      payload?.notification?.body ||
+      "Yeni bildirimin var.";
+    const dedupeKey =
+      payload?.data?.dedupeKey || payload?.data?.tag || `${title}|${body}`;
     if (shouldSkipForegroundFiksturNotification(dedupeKey)) {
-      console.log("[FCM] Aynı ön plan bildirimi kısa süre içinde tekrar geldi, gösterilmedi:", dedupeKey);
+      console.log(
+        "[FCM] Aynı ön plan bildirimi kısa süre içinde tekrar geldi, gösterilmedi:",
+        dedupeKey,
+      );
       return;
     }
 
     try {
       new Notification(title, {
         body,
-        icon: payload?.data?.icon || payload?.notification?.icon || getFiksturNotificationAssetUrl("/app-icons/pwa-icon-192-v3.png"),
-        badge: payload?.data?.badge || getFiksturNotificationAssetUrl("/notification-icons/badge-72.png"),
-        image: payload?.data?.image || getFiksturNotificationAssetUrl("/app-icons/pwa-icon-512-v3.png"),
-        tag: payload?.data?.tag || String(dedupeKey).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 120),
+        icon:
+          payload?.data?.icon ||
+          payload?.notification?.icon ||
+          getFiksturNotificationAssetUrl("/app-icons/pwa-icon-192-v3.png"),
+        badge:
+          payload?.data?.badge ||
+          getFiksturNotificationAssetUrl("/notification-icons/badge-72.png"),
+        image:
+          payload?.data?.image ||
+          getFiksturNotificationAssetUrl("/app-icons/pwa-icon-512-v3.png"),
+        tag:
+          payload?.data?.tag ||
+          String(dedupeKey)
+            .replace(/[^a-zA-Z0-9_-]/g, "_")
+            .slice(0, 120),
         renotify: false,
         data: payload?.data || {},
       });
@@ -17333,10 +17851,11 @@ async function setupFiksturFcmToken() {
   }
 
   if (!token) {
-    console.warn("[FCM] Token alınamadı. İzin verilmemiş veya tarayıcı desteklemiyor olabilir.");
+    console.warn(
+      "[FCM] Token alınamadı. İzin verilmemiş veya tarayıcı desteklemiyor olabilir.",
+    );
     return null;
   }
-
 
   const saved = await saveFiksturFcmTokenToFirebase(token);
   return saved ? token : null;
@@ -17349,7 +17868,9 @@ async function enablePredictionNotifications() {
   }
 
   if (!window.isSecureContext && location.hostname !== "localhost") {
-    alert("Bildirim izni için site HTTPS üzerinden açılmalı. GitHub Pages yayını uygundur.");
+    alert(
+      "Bildirim izni için site HTTPS üzerinden açılmalı. GitHub Pages yayını uygundur.",
+    );
     console.warn("[Bildirim] HTTPS olmadığı için izin istenemedi.");
     return;
   }
@@ -17360,14 +17881,17 @@ async function enablePredictionNotifications() {
     permission = await Notification.requestPermission();
   } catch (error) {
     console.warn("[Bildirim] İzin penceresi açılamadı:", error);
-    alert("Bildirim izin penceresi açılamadı. Sayfayı yenileyip butona tekrar bas.");
+    alert(
+      "Bildirim izin penceresi açılamadı. Sayfayı yenileyip butona tekrar bas.",
+    );
     return;
   }
 
-
   if (permission !== "granted") {
     localStorage.removeItem(PREDICTION_NOTIFICATION_STORAGE_KEY);
-    alert("Bildirim izni verilmedi. Tekrar denemek için Bildirimleri aç butonuna basabilirsin.");
+    alert(
+      "Bildirim izni verilmedi. Tekrar denemek için Bildirimleri aç butonuna basabilirsin.",
+    );
     renderPredictionLockBanner?.(state?.settings?.activeWeekId);
     return;
   }
@@ -17379,7 +17903,9 @@ async function enablePredictionNotifications() {
     if (token) {
       alert("Bildirimler açıldı ve bu cihaz Firebase'e kaydedildi.");
     } else {
-      alert("Bildirim izni açıldı. FCM token için VAPID key girildikten sonra tekrar dene.");
+      alert(
+        "Bildirim izni açıldı. FCM token için VAPID key girildikten sonra tekrar dene.",
+      );
     }
   } catch (error) {
     console.error("[FCM] Token alma sırasında hata oluştu:", {
@@ -17388,27 +17914,32 @@ async function enablePredictionNotifications() {
       name: error?.name,
       error,
     });
-    alert(`Bildirim izni açıldı ama Firebase token alınamadı. Hata: ${error?.code || error?.message || "Bilinmeyen hata"}`);
+    alert(
+      `Bildirim izni açıldı ama Firebase token alınamadı. Hata: ${error?.code || error?.message || "Bilinmeyen hata"}`,
+    );
   }
 
   checkPredictionNotifications();
   renderPredictionLockBanner?.(state?.settings?.activeWeekId);
 }
 
-window.refreshFiksturFcmTokenOwner = async function refreshFiksturFcmTokenOwner() {
-  if (
-    isPredictionNotificationSupported() &&
-    Notification.permission === "granted" &&
-    hasValidFiksturVapidKey()
-  ) {
-    return setupFiksturFcmToken();
-  }
-  return null;
-};
+window.refreshFiksturFcmTokenOwner =
+  async function refreshFiksturFcmTokenOwner() {
+    if (
+      isPredictionNotificationSupported() &&
+      Notification.permission === "granted" &&
+      hasValidFiksturVapidKey()
+    ) {
+      return setupFiksturFcmToken();
+    }
+    return null;
+  };
 
 function bindPredictionNotificationHooks() {
   document.addEventListener("click", (event) => {
-    const enableButton = event.target.closest?.('[data-action="enable-prediction-notifications"]');
+    const enableButton = event.target.closest?.(
+      '[data-action="enable-prediction-notifications"]',
+    );
     if (enableButton) {
       enablePredictionNotifications();
       return;
@@ -17427,7 +17958,11 @@ function bindPredictionNotificationHooks() {
 
   window.addEventListener("focus", checkPredictionNotifications);
 
-  if (isPredictionNotificationSupported() && Notification.permission === "granted" && hasValidFiksturVapidKey()) {
+  if (
+    isPredictionNotificationSupported() &&
+    Notification.permission === "granted" &&
+    hasValidFiksturVapidKey()
+  ) {
     setTimeout(() => {
       setupFiksturFcmToken().catch((error) => {
         console.warn("[FCM] Otomatik token yenileme başarısız:", error);
@@ -17436,7 +17971,6 @@ function bindPredictionNotificationHooks() {
   }
 
   setTimeout(checkPredictionNotifications, 3000);
-
 }
 
 bindPredictionNotificationHooks();
@@ -17455,24 +17989,67 @@ let adminNotificationLastTokenRows = [];
 let adminNotificationLastUserRows = [];
 
 const ADMIN_NOTIFICATION_ICONS = [
-  { id: "default", emoji: "🔔", label: "Genel", iconPath: "/notification-icons/notif-default.png", badgePath: "/notification-icons/badge-default.png" },
-  { id: "match", emoji: "⚽", label: "Maç", iconPath: "/notification-icons/notif-match.png", badgePath: "/notification-icons/badge-match.png" },
-  { id: "cup", emoji: "🏆", label: "Sonuç", iconPath: "/notification-icons/notif-cup.png", badgePath: "/notification-icons/badge-cup.png" },
-  { id: "alert", emoji: "🚨", label: "Acil", iconPath: "/notification-icons/notif-alert.png", badgePath: "/notification-icons/badge-alert.png" },
-  { id: "announce", emoji: "📢", label: "Duyuru", iconPath: "/notification-icons/notif-announce.png", badgePath: "/notification-icons/badge-announce.png" },
-  { id: "star", emoji: "⭐", label: "Öne Çıkan", iconPath: "/notification-icons/notif-star.png", badgePath: "/notification-icons/badge-star.png" },
+  {
+    id: "default",
+    emoji: "🔔",
+    label: "Genel",
+    iconPath: "/notification-icons/notif-default.png",
+    badgePath: "/notification-icons/badge-default.png",
+  },
+  {
+    id: "match",
+    emoji: "⚽",
+    label: "Maç",
+    iconPath: "/notification-icons/notif-match.png",
+    badgePath: "/notification-icons/badge-match.png",
+  },
+  {
+    id: "cup",
+    emoji: "🏆",
+    label: "Sonuç",
+    iconPath: "/notification-icons/notif-cup.png",
+    badgePath: "/notification-icons/badge-cup.png",
+  },
+  {
+    id: "alert",
+    emoji: "🚨",
+    label: "Acil",
+    iconPath: "/notification-icons/notif-alert.png",
+    badgePath: "/notification-icons/badge-alert.png",
+  },
+  {
+    id: "announce",
+    emoji: "📢",
+    label: "Duyuru",
+    iconPath: "/notification-icons/notif-announce.png",
+    badgePath: "/notification-icons/badge-announce.png",
+  },
+  {
+    id: "star",
+    emoji: "⭐",
+    label: "Öne Çıkan",
+    iconPath: "/notification-icons/notif-star.png",
+    badgePath: "/notification-icons/badge-star.png",
+  },
 ];
 
 function getAdminNotificationAssetUrls(iconId) {
   const meta = getAdminNotificationIconMeta(iconId);
   return {
-    iconUrl: getFiksturNotificationAssetUrl(meta.iconPath || "/notification-icons/notif-default.png"),
-    badgeUrl: getFiksturNotificationAssetUrl(meta.badgePath || "/notification-icons/badge-default.png"),
+    iconUrl: getFiksturNotificationAssetUrl(
+      meta.iconPath || "/notification-icons/notif-default.png",
+    ),
+    badgeUrl: getFiksturNotificationAssetUrl(
+      meta.badgePath || "/notification-icons/badge-default.png",
+    ),
   };
 }
 
 function getAdminNotificationIconMeta(iconId) {
-  return ADMIN_NOTIFICATION_ICONS.find((item) => item.id === iconId) || ADMIN_NOTIFICATION_ICONS[0];
+  return (
+    ADMIN_NOTIFICATION_ICONS.find((item) => item.id === iconId) ||
+    ADMIN_NOTIFICATION_ICONS[0]
+  );
 }
 
 function formatNotificationCenterDate(value) {
@@ -17492,7 +18069,9 @@ function getNotificationTargetLabel(target, row) {
   if (target === "active") return "Aktif kullanıcılar";
   if (target === "pending") return "Tahmini eksik olanlar";
   if (target === "custom") {
-    const count = Array.isArray(row?.targetUserIds) ? row.targetUserIds.length : 0;
+    const count = Array.isArray(row?.targetUserIds)
+      ? row.targetUserIds.length
+      : 0;
     return count ? `Seçili ${count} kişi` : "Seçili kişiler";
   }
   return "Tüm kullanıcılar";
@@ -17501,37 +18080,60 @@ function getNotificationTargetLabel(target, row) {
 function getNotificationPlayerDisplayName(player) {
   return String(
     player?.adSoyad ||
-    player?.name ||
-    player?.kullaniciAdi ||
-    player?.username ||
-    player?.id ||
-    "İsimsiz"
+      player?.name ||
+      player?.kullaniciAdi ||
+      player?.username ||
+      player?.id ||
+      "İsimsiz",
   ).trim();
 }
 
 function normalizeNotificationArray(value) {
   if (Array.isArray(value)) return value.filter(Boolean);
-  if (value && typeof value === "object") return Object.values(value).filter(Boolean);
+  if (value && typeof value === "object")
+    return Object.values(value).filter(Boolean);
   return [];
 }
 
 function getPlayerNotificationId(player) {
-  return String(player?.id || player?.kullaniciAdi || player?.username || "").trim();
+  return String(
+    player?.id || player?.kullaniciAdi || player?.username || "",
+  ).trim();
 }
 
 function normalizeFcmTokenRows(tokens) {
-  const rows = Object.entries(tokens || {}).map(([id, item]) => ({
-    id,
-    token: item?.token || id,
-    deviceId: item?.deviceId || id,
-    userId: String(item?.userId || item?.playerId || item?.kisiId || item?.username || item?.kullaniciAdi || "").trim(),
-    playerId: String(item?.playerId || item?.userId || item?.kisiId || item?.username || item?.kullaniciAdi || "").trim(),
-    displayName: item?.displayName || item?.name || item?.userName || "Bilinmeyen kullanıcı",
-    role: item?.role || "",
-    permission: item?.permission || "unknown",
-    updatedAt: item?.updatedAt || item?.createdAt || "",
-    userAgent: item?.userAgent || "",
-  })).sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+  const rows = Object.entries(tokens || {})
+    .map(([id, item]) => ({
+      id,
+      token: item?.token || id,
+      deviceId: item?.deviceId || id,
+      userId: String(
+        item?.userId ||
+          item?.playerId ||
+          item?.kisiId ||
+          item?.username ||
+          item?.kullaniciAdi ||
+          "",
+      ).trim(),
+      playerId: String(
+        item?.playerId ||
+          item?.userId ||
+          item?.kisiId ||
+          item?.username ||
+          item?.kullaniciAdi ||
+          "",
+      ).trim(),
+      displayName:
+        item?.displayName ||
+        item?.name ||
+        item?.userName ||
+        "Bilinmeyen kullanıcı",
+      role: item?.role || "",
+      permission: item?.permission || "unknown",
+      updatedAt: item?.updatedAt || item?.createdAt || "",
+      userAgent: item?.userAgent || "",
+    }))
+    .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
 
   const uniqueRows = [];
   const seenTokens = new Set();
@@ -17540,7 +18142,8 @@ function normalizeFcmTokenRows(tokens) {
   rows.forEach((row) => {
     const tokenKey = row.token || row.deviceId || row.id;
     const ownerKey = row.userId || row.playerId || row.displayName || tokenKey;
-    if (!tokenKey || seenTokens.has(tokenKey) || seenOwners.has(ownerKey)) return;
+    if (!tokenKey || seenTokens.has(tokenKey) || seenOwners.has(ownerKey))
+      return;
     seenTokens.add(tokenKey);
     seenOwners.add(ownerKey);
     uniqueRows.push(row);
@@ -17552,50 +18155,80 @@ function normalizeFcmTokenRows(tokens) {
 function getNotificationUserRows(tokenRows) {
   const tokenByUser = new Map();
   tokenRows.forEach((token) => {
-    const keys = [...new Set([token.userId, token.playerId].filter(Boolean).map(String))];
+    const keys = [
+      ...new Set([token.userId, token.playerId].filter(Boolean).map(String)),
+    ];
     keys.forEach((key) => {
       if (!tokenByUser.has(key)) tokenByUser.set(key, new Map());
-      tokenByUser.get(key).set(token.token || token.deviceId || token.id, token);
+      tokenByUser
+        .get(key)
+        .set(token.token || token.deviceId || token.id, token);
     });
   });
 
-  return getNotificationSelectablePlayers().map((player) => {
-    const id = getPlayerNotificationId(player);
-    const tokens = [...(tokenByUser.get(id)?.values() || [])];
-    const grantedTokens = tokens.filter((token) => token.permission === "granted" || token.permission === "unknown");
-    const lastToken = tokens[0] || null;
-    return {
-      id,
-      name: getNotificationPlayerDisplayName(player),
-      hasToken: tokens.length > 0,
-      isOpen: grantedTokens.length > 0,
-      tokenCount: tokens.length,
-      lastSeen: lastToken?.updatedAt || "",
-      permission: lastToken?.permission || "none",
-    };
-  }).sort((a, b) => a.name.localeCompare(b.name, "tr"));
+  return getNotificationSelectablePlayers()
+    .map((player) => {
+      const id = getPlayerNotificationId(player);
+      const tokens = [...(tokenByUser.get(id)?.values() || [])];
+      const grantedTokens = tokens.filter(
+        (token) =>
+          token.permission === "granted" || token.permission === "unknown",
+      );
+      const lastToken = tokens[0] || null;
+      return {
+        id,
+        name: getNotificationPlayerDisplayName(player),
+        hasToken: tokens.length > 0,
+        isOpen: grantedTokens.length > 0,
+        tokenCount: tokens.length,
+        lastSeen: lastToken?.updatedAt || "",
+        permission: lastToken?.permission || "none",
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, "tr"));
 }
 
 function getNotificationDeliveryList(row) {
-  const rawSuccess = normalizeNotificationArray(row?.successUsers || row?.sentUsers || row?.deliveredUsers || row?.successUserIds);
-  const rawFailed = normalizeNotificationArray(row?.failedUsers || row?.errorUsers || row?.failedUserIds);
+  const rawSuccess = normalizeNotificationArray(
+    row?.successUsers ||
+      row?.sentUsers ||
+      row?.deliveredUsers ||
+      row?.successUserIds,
+  );
+  const rawFailed = normalizeNotificationArray(
+    row?.failedUsers || row?.errorUsers || row?.failedUserIds,
+  );
   const rawTargets = normalizeNotificationArray(row?.targetUserIds);
   return { rawSuccess, rawFailed, rawTargets };
 }
 
 function getNotificationUserNameById(userId) {
-  const user = adminNotificationLastUserRows.find((item) => item.id === String(userId));
+  const user = adminNotificationLastUserRows.find(
+    (item) => item.id === String(userId),
+  );
   return user?.name || String(userId || "Bilinmeyen kişi");
 }
 
 function getNotificationSelectablePlayers() {
   return (Array.isArray(state?.players) ? state.players : [])
-    .filter((player) => String(getPlayerRole?.(player) || player?.role || "user").toLowerCase() !== "admin")
-    .sort((a, b) => getNotificationPlayerDisplayName(a).localeCompare(getNotificationPlayerDisplayName(b), "tr"));
+    .filter(
+      (player) =>
+        String(
+          getPlayerRole?.(player) || player?.role || "user",
+        ).toLowerCase() !== "admin",
+    )
+    .sort((a, b) =>
+      getNotificationPlayerDisplayName(a).localeCompare(
+        getNotificationPlayerDisplayName(b),
+        "tr",
+      ),
+    );
 }
 
 function getSelectedManualNotificationUserIds() {
-  return Array.from(document.querySelectorAll('[data-notification-user-checkbox]:checked'))
+  return Array.from(
+    document.querySelectorAll("[data-notification-user-checkbox]:checked"),
+  )
     .map((input) => input.value)
     .filter(Boolean);
 }
@@ -17610,20 +18243,25 @@ function renderManualNotificationUserPicker() {
     return;
   }
 
-  wrap.innerHTML = players.map((player) => {
-    const id = escapeHtml(String(player.id || player.kullaniciAdi || player.username || ""));
-    const name = escapeHtml(getNotificationPlayerDisplayName(player));
-    return `
+  wrap.innerHTML = players
+    .map((player) => {
+      const id = escapeHtml(
+        String(player.id || player.kullaniciAdi || player.username || ""),
+      );
+      const name = escapeHtml(getNotificationPlayerDisplayName(player));
+      return `
       <label class="notification-user-chip">
         <input type="checkbox" value="${id}" data-notification-user-checkbox>
         <span>${name}</span>
       </label>
     `;
-  }).join("");
+    })
+    .join("");
 }
 
 function updateManualNotificationCustomTargetVisibility() {
-  const target = document.getElementById("manualNotificationTarget")?.value || "all";
+  const target =
+    document.getElementById("manualNotificationTarget")?.value || "all";
   const panel = document.getElementById("manualNotificationCustomTargetPanel");
   if (!panel) return;
   panel.hidden = target !== "custom";
@@ -17636,12 +18274,17 @@ function setNotificationText(id, value) {
 }
 
 function getManualNotificationFormValues() {
-  const target = document.getElementById("manualNotificationTarget")?.value || "all";
-  const icon = document.getElementById("manualNotificationIcon")?.value || "default";
-  const targetUserIds = target === "custom" ? getSelectedManualNotificationUserIds() : [];
+  const target =
+    document.getElementById("manualNotificationTarget")?.value || "all";
+  const icon =
+    document.getElementById("manualNotificationIcon")?.value || "default";
+  const targetUserIds =
+    target === "custom" ? getSelectedManualNotificationUserIds() : [];
   return {
-    title: document.getElementById("manualNotificationTitle")?.value.trim() || "",
-    message: document.getElementById("manualNotificationMessage")?.value.trim() || "",
+    title:
+      document.getElementById("manualNotificationTitle")?.value.trim() || "",
+    message:
+      document.getElementById("manualNotificationMessage")?.value.trim() || "",
     target,
     icon,
     targetUserIds,
@@ -17650,26 +18293,41 @@ function getManualNotificationFormValues() {
 
 function updateManualNotificationPreview() {
   const preview = document.getElementById("manualNotificationPreview");
-  const previewTitle = document.getElementById("manualNotificationPreviewTitle");
-  const previewTarget = document.getElementById("manualNotificationPreviewTarget");
+  const previewTitle = document.getElementById(
+    "manualNotificationPreviewTitle",
+  );
+  const previewTarget = document.getElementById(
+    "manualNotificationPreviewTarget",
+  );
   const previewIcon = document.getElementById("manualNotificationPreviewIcon");
   const charCounter = document.getElementById("manualNotificationCharCounter");
-  const { title, message, target, icon, targetUserIds } = getManualNotificationFormValues();
+  const { title, message, target, icon, targetUserIds } =
+    getManualNotificationFormValues();
   const maxLength = 300;
 
   if (charCounter) {
     charCounter.textContent = `${message.length} / ${maxLength}`;
-    charCounter.classList.toggle("is-warning", message.length >= 240 && message.length < maxLength);
+    charCounter.classList.toggle(
+      "is-warning",
+      message.length >= 240 && message.length < maxLength,
+    );
     charCounter.classList.toggle("is-danger", message.length >= maxLength);
   }
 
-  if (previewTarget) previewTarget.textContent = target === "custom" ? getNotificationTargetLabel(target, { targetUserIds }) : getNotificationTargetLabel(target);
-  if (previewIcon) previewIcon.textContent = getAdminNotificationIconMeta(icon).emoji;
-  if (previewTitle) previewTitle.textContent = title || "Başlık burada görünecek";
+  if (previewTarget)
+    previewTarget.textContent =
+      target === "custom"
+        ? getNotificationTargetLabel(target, { targetUserIds })
+        : getNotificationTargetLabel(target);
+  if (previewIcon)
+    previewIcon.textContent = getAdminNotificationIconMeta(icon).emoji;
+  if (previewTitle)
+    previewTitle.textContent = title || "Başlık burada görünecek";
   if (!preview) return;
 
   if (!title && !message) {
-    preview.textContent = "Mesaj yazıldığında telefonda nasıl görüneceğini buradan kontrol edebilirsin.";
+    preview.textContent =
+      "Mesaj yazıldığında telefonda nasıl görüneceğini buradan kontrol edebilirsin.";
     return;
   }
 
@@ -17703,7 +18361,12 @@ async function readAdminNotificationCenterData() {
     firebaseRead(ADMIN_NOTIFICATION_SENT_PATH).catch(() => null),
     firebaseRead(ADMIN_NOTIFICATION_FCM_TOKEN_PATH).catch(() => null),
   ]);
-  return { queue: queue || {}, logs: logs || {}, sent: sent || {}, tokens: tokens || {} };
+  return {
+    queue: queue || {},
+    logs: logs || {},
+    sent: sent || {},
+    tokens: tokens || {},
+  };
 }
 
 function normalizeNotificationRows(data) {
@@ -17727,8 +18390,15 @@ function normalizeNotificationRows(data) {
       successCount: item.successCount || 0,
       errorCount: item.errorCount || 0,
       errorMessage: item.errorMessage || "",
-      successUsers: normalizeNotificationArray(item.successUsers || item.sentUsers || item.deliveredUsers || item.successUserIds),
-      failedUsers: normalizeNotificationArray(item.failedUsers || item.errorUsers || item.failedUserIds),
+      successUsers: normalizeNotificationArray(
+        item.successUsers ||
+          item.sentUsers ||
+          item.deliveredUsers ||
+          item.successUserIds,
+      ),
+      failedUsers: normalizeNotificationArray(
+        item.failedUsers || item.errorUsers || item.failedUserIds,
+      ),
       raw: item,
     });
   });
@@ -17751,8 +18421,15 @@ function normalizeNotificationRows(data) {
       successCount: item.successCount || 0,
       errorCount: item.errorCount || 0,
       errorMessage: item.errorMessage || "",
-      successUsers: normalizeNotificationArray(item.successUsers || item.sentUsers || item.deliveredUsers || item.successUserIds),
-      failedUsers: normalizeNotificationArray(item.failedUsers || item.errorUsers || item.failedUserIds),
+      successUsers: normalizeNotificationArray(
+        item.successUsers ||
+          item.sentUsers ||
+          item.deliveredUsers ||
+          item.successUserIds,
+      ),
+      failedUsers: normalizeNotificationArray(
+        item.failedUsers || item.errorUsers || item.failedUserIds,
+      ),
       raw: item,
     });
   });
@@ -17763,20 +18440,41 @@ function normalizeNotificationRows(data) {
       sourcePath: `${ADMIN_NOTIFICATION_SENT_PATH}/${id}`,
       canDelete: true,
       date: item.sentAt,
-      type: item.weekNo ? "Otomatik hafta" : item.type ? `Otomatik ${item.type}` : "Otomatik",
-      title: item.title || (item.weekNo ? `${item.weekNo}. hafta bildirimi` : "Maç hatırlatma bildirimi"),
-      body: item.message || (item.weekNo ? `${item.weekNo}. hafta bildirimi gönderildi` : "Maç hatırlatma bildirimi gönderildi"),
+      type: item.weekNo
+        ? "Otomatik hafta"
+        : item.type
+          ? `Otomatik ${item.type}`
+          : "Otomatik",
+      title:
+        item.title ||
+        (item.weekNo
+          ? `${item.weekNo}. hafta bildirimi`
+          : "Maç hatırlatma bildirimi"),
+      body:
+        item.message ||
+        (item.weekNo
+          ? `${item.weekNo}. hafta bildirimi gönderildi`
+          : "Maç hatırlatma bildirimi gönderildi"),
       rawTarget: item.target || "all",
       icon: item.icon || "match",
       targetUserIds: normalizeNotificationArray(item.targetUserIds),
-      message: item.weekNo ? `${item.weekNo}. hafta bildirimi gönderildi` : "Maç hatırlatma bildirimi gönderildi",
+      message: item.weekNo
+        ? `${item.weekNo}. hafta bildirimi gönderildi`
+        : "Maç hatırlatma bildirimi gönderildi",
       target: getNotificationTargetLabel(item.target || "all", item),
       status: item.sent ? "sent" : "done",
       successCount: item.successCount || 0,
       errorCount: item.errorCount || 0,
       errorMessage: item.errorMessage || "",
-      successUsers: normalizeNotificationArray(item.successUsers || item.sentUsers || item.deliveredUsers || item.successUserIds),
-      failedUsers: normalizeNotificationArray(item.failedUsers || item.errorUsers || item.failedUserIds),
+      successUsers: normalizeNotificationArray(
+        item.successUsers ||
+          item.sentUsers ||
+          item.deliveredUsers ||
+          item.successUserIds,
+      ),
+      failedUsers: normalizeNotificationArray(
+        item.failedUsers || item.errorUsers || item.failedUserIds,
+      ),
       raw: item,
     });
   });
@@ -17805,13 +18503,28 @@ function renderNotificationPagination(totalRows) {
   const info = document.getElementById("notificationHistoryPageInfo");
   if (!wrap) return;
 
-  const totalPages = Math.max(1, Math.ceil(totalRows / ADMIN_NOTIFICATION_HISTORY_PAGE_SIZE));
-  adminNotificationHistoryPage = Math.min(Math.max(1, adminNotificationHistoryPage), totalPages);
+  const totalPages = Math.max(
+    1,
+    Math.ceil(totalRows / ADMIN_NOTIFICATION_HISTORY_PAGE_SIZE),
+  );
+  adminNotificationHistoryPage = Math.min(
+    Math.max(1, adminNotificationHistoryPage),
+    totalPages,
+  );
 
   if (info) {
-    const start = totalRows ? (adminNotificationHistoryPage - 1) * ADMIN_NOTIFICATION_HISTORY_PAGE_SIZE + 1 : 0;
-    const end = Math.min(adminNotificationHistoryPage * ADMIN_NOTIFICATION_HISTORY_PAGE_SIZE, totalRows);
-    info.textContent = totalRows ? `${start}-${end} / ${totalRows} kayıt` : "0 kayıt";
+    const start = totalRows
+      ? (adminNotificationHistoryPage - 1) *
+          ADMIN_NOTIFICATION_HISTORY_PAGE_SIZE +
+        1
+      : 0;
+    const end = Math.min(
+      adminNotificationHistoryPage * ADMIN_NOTIFICATION_HISTORY_PAGE_SIZE,
+      totalRows,
+    );
+    info.textContent = totalRows
+      ? `${start}-${end} / ${totalRows} kayıt`
+      : "0 kayıt";
   }
 
   if (totalPages <= 1) {
@@ -17819,11 +18532,17 @@ function renderNotificationPagination(totalRows) {
     return;
   }
 
-  const pageButtons = getCompactNotificationPageNumbers(adminNotificationHistoryPage, totalPages).map((page) => {
-    if (page === "...") return `<span class="notification-page-dots">…</span>`;
-    const isActive = page === adminNotificationHistoryPage;
-    return `<button class="notification-page-btn ${isActive ? "is-active" : ""}" type="button" data-notification-page="${page}" aria-label="${page}. sayfaya git">${page}</button>`;
-  }).join("");
+  const pageButtons = getCompactNotificationPageNumbers(
+    adminNotificationHistoryPage,
+    totalPages,
+  )
+    .map((page) => {
+      if (page === "...")
+        return `<span class="notification-page-dots">…</span>`;
+      const isActive = page === adminNotificationHistoryPage;
+      return `<button class="notification-page-btn ${isActive ? "is-active" : ""}" type="button" data-notification-page="${page}" aria-label="${page}. sayfaya git">${page}</button>`;
+    })
+    .join("");
 
   wrap.innerHTML = `
     <button class="notification-page-btn" type="button" data-notification-page="prev" ${adminNotificationHistoryPage === 1 ? "disabled" : ""}>‹</button>
@@ -17832,27 +18551,51 @@ function renderNotificationPagination(totalRows) {
   `;
 }
 
-
 function getFilteredNotificationRows(rows) {
   const filter = adminNotificationHistoryFilter;
   if (filter === "sent") {
-    return rows.filter((row) => ["sent", "done", "processed", "success"].includes(String(row.status || "").toLowerCase()));
+    return rows.filter((row) =>
+      ["sent", "done", "processed", "success"].includes(
+        String(row.status || "").toLowerCase(),
+      ),
+    );
   }
   if (filter === "pending") {
-    return rows.filter((row) => ["pending", "queued", "draft", "processing", "scheduled", "planned"].includes(String(row.status || "").toLowerCase()));
+    return rows.filter((row) =>
+      [
+        "pending",
+        "queued",
+        "draft",
+        "processing",
+        "scheduled",
+        "planned",
+      ].includes(String(row.status || "").toLowerCase()),
+    );
   }
   if (filter === "failed") {
-    return rows.filter((row) => ["error", "failed", "fail"].includes(String(row.status || "").toLowerCase()) || row.errorMessage);
+    return rows.filter(
+      (row) =>
+        ["error", "failed", "fail"].includes(
+          String(row.status || "").toLowerCase(),
+        ) || row.errorMessage,
+    );
   }
   if (filter === "manual") {
-    return rows.filter((row) => String(row.type || "").toLowerCase().includes("manuel"));
+    return rows.filter((row) =>
+      String(row.type || "")
+        .toLowerCase()
+        .includes("manuel"),
+    );
   }
   return rows;
 }
 
 function updateNotificationHistoryFilterButtons() {
   document.querySelectorAll("[data-notification-filter]").forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.notificationFilter === adminNotificationHistoryFilter);
+    button.classList.toggle(
+      "is-active",
+      button.dataset.notificationFilter === adminNotificationHistoryFilter,
+    );
   });
 }
 
@@ -17863,8 +18606,14 @@ function renderNotificationHistoryRows(rows) {
   adminNotificationHistoryRows = Array.isArray(rows) ? rows : [];
   updateNotificationHistoryFilterButtons();
   const visibleRows = getFilteredNotificationRows(adminNotificationHistoryRows);
-  const totalPages = Math.max(1, Math.ceil(visibleRows.length / ADMIN_NOTIFICATION_HISTORY_PAGE_SIZE));
-  adminNotificationHistoryPage = Math.min(Math.max(1, adminNotificationHistoryPage), totalPages);
+  const totalPages = Math.max(
+    1,
+    Math.ceil(visibleRows.length / ADMIN_NOTIFICATION_HISTORY_PAGE_SIZE),
+  );
+  adminNotificationHistoryPage = Math.min(
+    Math.max(1, adminNotificationHistoryPage),
+    totalPages,
+  );
 
   if (!visibleRows.length) {
     tbody.innerHTML = `<tr><td colspan="6">Bu filtrede bildirim kaydı yok.</td></tr>`;
@@ -17872,17 +18621,28 @@ function renderNotificationHistoryRows(rows) {
     return;
   }
 
-  const startIndex = (adminNotificationHistoryPage - 1) * ADMIN_NOTIFICATION_HISTORY_PAGE_SIZE;
-  const pageRows = visibleRows.slice(startIndex, startIndex + ADMIN_NOTIFICATION_HISTORY_PAGE_SIZE);
+  const startIndex =
+    (adminNotificationHistoryPage - 1) * ADMIN_NOTIFICATION_HISTORY_PAGE_SIZE;
+  const pageRows = visibleRows.slice(
+    startIndex,
+    startIndex + ADMIN_NOTIFICATION_HISTORY_PAGE_SIZE,
+  );
 
-  tbody.innerHTML = pageRows.map((row) => {
-    const status = String(row.status || "pending");
-    const isPending = ["pending", "queued", "processing"].includes(status);
-    const statusMeta = getNotificationStatusMeta(status);
-    const iconMeta = getAdminNotificationIconMeta(row.icon);
-    const extra = row.successCount ? ` (${row.successCount} başarılı)` : row.errorMessage ? ` - ${row.errorMessage}` : "";
-    const titleAttr = isPending ? "Gönderilmeden önce bu kaydı kuyruktan sil" : "Bu geçmiş kaydını sil";
-    return `
+  tbody.innerHTML = pageRows
+    .map((row) => {
+      const status = String(row.status || "pending");
+      const isPending = ["pending", "queued", "processing"].includes(status);
+      const statusMeta = getNotificationStatusMeta(status);
+      const iconMeta = getAdminNotificationIconMeta(row.icon);
+      const extra = row.successCount
+        ? ` (${row.successCount} başarılı)`
+        : row.errorMessage
+          ? ` - ${row.errorMessage}`
+          : "";
+      const titleAttr = isPending
+        ? "Gönderilmeden önce bu kaydı kuyruktan sil"
+        : "Bu geçmiş kaydını sil";
+      return `
       <tr>
         <td>${escapeHtml(formatNotificationCenterDate(row.date))}</td>
         <td>${escapeHtml(row.type)}</td>
@@ -17896,13 +18656,16 @@ function renderNotificationHistoryRows(rows) {
         </td>
       </tr>
     `;
-  }).join("");
+    })
+    .join("");
 
   renderNotificationPagination(visibleRows.length);
 }
 
 function refillNotificationFormFromHistory(sourcePath) {
-  const row = adminNotificationHistoryRows.find((item) => item.sourcePath === sourcePath);
+  const row = adminNotificationHistoryRows.find(
+    (item) => item.sourcePath === sourcePath,
+  );
   if (!row) {
     alert("Bildirim kaydı bulunamadı.");
     return;
@@ -17919,12 +18682,16 @@ function refillNotificationFormFromHistory(sourcePath) {
   if (iconEl) iconEl.value = row.icon || "default";
   updateManualNotificationCustomTargetVisibility();
   if (Array.isArray(row.targetUserIds) && row.targetUserIds.length) {
-    document.querySelectorAll('[data-notification-user-checkbox]').forEach((input) => {
-      input.checked = row.targetUserIds.includes(input.value);
-    });
+    document
+      .querySelectorAll("[data-notification-user-checkbox]")
+      .forEach((input) => {
+        input.checked = row.targetUserIds.includes(input.value);
+      });
   }
   updateManualNotificationPreview();
-  document.querySelector(".notification-compose-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  document
+    .querySelector(".notification-compose-card")
+    ?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 async function deleteNotificationHistoryItem(sourcePath) {
@@ -17938,7 +18705,9 @@ async function deleteNotificationHistoryItem(sourcePath) {
     return;
   }
 
-  const row = adminNotificationHistoryRows.find((item) => item.sourcePath === sourcePath);
+  const row = adminNotificationHistoryRows.find(
+    (item) => item.sourcePath === sourcePath,
+  );
   const status = String(row?.status || "");
   const isPending = ["pending", "queued", "processing"].includes(status);
   const message = isPending
@@ -17949,11 +18718,16 @@ async function deleteNotificationHistoryItem(sourcePath) {
 
   await firebaseRemove(sourcePath);
   const totalAfterDelete = Math.max(0, adminNotificationHistoryRows.length - 1);
-  const lastPageAfterDelete = Math.max(1, Math.ceil(totalAfterDelete / ADMIN_NOTIFICATION_HISTORY_PAGE_SIZE));
-  adminNotificationHistoryPage = Math.min(adminNotificationHistoryPage, lastPageAfterDelete);
+  const lastPageAfterDelete = Math.max(
+    1,
+    Math.ceil(totalAfterDelete / ADMIN_NOTIFICATION_HISTORY_PAGE_SIZE),
+  );
+  adminNotificationHistoryPage = Math.min(
+    adminNotificationHistoryPage,
+    lastPageAfterDelete,
+  );
   await renderNotificationCenter();
 }
-
 
 function renderNotificationAudiencePanel(tokenRows, userRows) {
   const list = document.getElementById("notificationAudienceList");
@@ -17971,7 +18745,9 @@ function renderNotificationAudiencePanel(tokenRows, userRows) {
     return;
   }
 
-  list.innerHTML = userRows.map((user) => `
+  list.innerHTML = userRows
+    .map(
+      (user) => `
     <div class="notification-audience-row ${user.isOpen ? "is-open" : "is-closed"}">
       <div>
         <strong>${escapeHtml(user.name)}</strong>
@@ -17979,7 +18755,9 @@ function renderNotificationAudiencePanel(tokenRows, userRows) {
       </div>
       <span class="badge ${user.isOpen ? "success" : "gray"}">${user.isOpen ? "🔔 Açık" : "🔕 Kapalı"}</span>
     </div>
-  `).join("");
+  `,
+    )
+    .join("");
 }
 
 function renderNotificationDetailModal(sourcePath) {
@@ -17987,7 +18765,9 @@ function renderNotificationDetailModal(sourcePath) {
   const body = document.getElementById("notificationDetailBody");
   if (!modal || !body) return;
 
-  const row = adminNotificationHistoryRows.find((item) => item.sourcePath === sourcePath);
+  const row = adminNotificationHistoryRows.find(
+    (item) => item.sourcePath === sourcePath,
+  );
   if (!row) {
     alert("Bildirim detayı bulunamadı.");
     return;
@@ -17995,14 +18775,28 @@ function renderNotificationDetailModal(sourcePath) {
 
   const statusMeta = getNotificationStatusMeta(row.status);
   const iconMeta = getAdminNotificationIconMeta(row.icon);
-  const { rawSuccess, rawFailed, rawTargets } = getNotificationDeliveryList(row);
+  const { rawSuccess, rawFailed, rawTargets } =
+    getNotificationDeliveryList(row);
   const targetUsers = rawTargets.map((id) => getNotificationUserNameById(id));
-  const successUsers = rawSuccess.map((item) => typeof item === "string" ? getNotificationUserNameById(item) : (item?.displayName || item?.name || getNotificationUserNameById(item?.userId || item?.playerId || item?.id)));
-  const failedUsers = rawFailed.map((item) => typeof item === "string" ? getNotificationUserNameById(item) : (item?.displayName || item?.name || getNotificationUserNameById(item?.userId || item?.playerId || item?.id)));
+  const successUsers = rawSuccess.map((item) =>
+    typeof item === "string"
+      ? getNotificationUserNameById(item)
+      : item?.displayName ||
+        item?.name ||
+        getNotificationUserNameById(item?.userId || item?.playerId || item?.id),
+  );
+  const failedUsers = rawFailed.map((item) =>
+    typeof item === "string"
+      ? getNotificationUserNameById(item)
+      : item?.displayName ||
+        item?.name ||
+        getNotificationUserNameById(item?.userId || item?.playerId || item?.id),
+  );
 
-  const makeList = (items, emptyText) => items.length
-    ? `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
-    : `<small class="notification-detail-empty">${escapeHtml(emptyText)}</small>`;
+  const makeList = (items, emptyText) =>
+    items.length
+      ? `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+      : `<small class="notification-detail-empty">${escapeHtml(emptyText)}</small>`;
 
   body.innerHTML = `
     <div class="notification-detail-summary">
@@ -18044,30 +18838,65 @@ function closeNotificationDetailModal() {
 }
 
 function updateNotificationSummary(rows) {
-  const pendingCount = rows.filter((r) => ["pending", "queued", "draft", "processing"].includes(String(r.status || "").toLowerCase())).length;
-  const successTotal = rows.reduce((sum, r) => sum + (Number(r.successCount) || 0), 0);
-  const errorTotal = rows.reduce((sum, r) => sum + (Number(r.errorCount) || 0), 0);
+  const pendingCount = rows.filter((r) =>
+    ["pending", "queued", "draft", "processing"].includes(
+      String(r.status || "").toLowerCase(),
+    ),
+  ).length;
+  const successTotal = rows.reduce(
+    (sum, r) => sum + (Number(r.successCount) || 0),
+    0,
+  );
+  const errorTotal = rows.reduce(
+    (sum, r) => sum + (Number(r.errorCount) || 0),
+    0,
+  );
   const lastRow = rows[0];
-  const lastError = rows.find((r) => r.status === "error" || r.status === "failed" || r.errorMessage);
+  const lastError = rows.find(
+    (r) => r.status === "error" || r.status === "failed" || r.errorMessage,
+  );
 
   setNotificationText("notificationPendingCountText", String(pendingCount));
   setNotificationText("notificationSuccessCountText", String(successTotal));
   setNotificationText("notificationErrorCountText", String(errorTotal));
-  setNotificationText("notificationLastTitleText", lastRow ? (lastRow.title || lastRow.message || "Başlıksız") : "Henüz yok");
-  setNotificationText("notificationLastCronText", lastRow ? formatNotificationCenterDate(lastRow.date) : "Henüz kayıt yok");
-  setNotificationText("notificationLastCronMeta", lastRow ? `${lastRow.type} · ${lastRow.status}` : "GitHub Action çalışınca buraya yazılacak.");
-  setNotificationText("notificationLastErrorText", lastError ? `Son hata: ${lastError.errorMessage || "Hata var"}` : "Son hata: Yok");
-  setNotificationText("notificationFirebaseStatus", isFirebaseReady() ? "Bağlı" : "Kapalı");
+  setNotificationText(
+    "notificationLastTitleText",
+    lastRow ? lastRow.title || lastRow.message || "Başlıksız" : "Henüz yok",
+  );
+  setNotificationText(
+    "notificationLastCronText",
+    lastRow ? formatNotificationCenterDate(lastRow.date) : "Henüz kayıt yok",
+  );
+  setNotificationText(
+    "notificationLastCronMeta",
+    lastRow
+      ? `${lastRow.type} · ${lastRow.status}`
+      : "GitHub Action çalışınca buraya yazılacak.",
+  );
+  setNotificationText(
+    "notificationLastErrorText",
+    lastError
+      ? `Son hata: ${lastError.errorMessage || "Hata var"}`
+      : "Son hata: Yok",
+  );
+  setNotificationText(
+    "notificationFirebaseStatus",
+    isFirebaseReady() ? "Bağlı" : "Kapalı",
+  );
 
   const fbBadge = document.getElementById("notificationFirebaseStatusBadge");
   if (fbBadge) {
-    fbBadge.textContent = isFirebaseReady() ? "Firebase bağlı" : "Firebase kapalı";
+    fbBadge.textContent = isFirebaseReady()
+      ? "Firebase bağlı"
+      : "Firebase kapalı";
     fbBadge.className = `badge ${isFirebaseReady() ? "success" : "warn"}`;
   }
 
   const queueBadge = document.getElementById("notificationQueueStatusBadge");
   if (queueBadge) {
-    queueBadge.textContent = pendingCount ? `${pendingCount} bekleyen` : "Kuyruk boş";
+    queueBadge.textContent = pendingCount
+      ? `${pendingCount} bekleyen`
+      : "Kuyruk boş";
     queueBadge.className = `badge ${pendingCount ? "warn" : "gray"}`;
   }
 }
@@ -18079,9 +18908,19 @@ async function renderNotificationCenter() {
   updateManualNotificationPreview();
 
   const draft = (() => {
-    try { return JSON.parse(localStorage.getItem(ADMIN_NOTIFICATION_DRAFT_KEY) || "null"); } catch { return null; }
+    try {
+      return JSON.parse(
+        localStorage.getItem(ADMIN_NOTIFICATION_DRAFT_KEY) || "null",
+      );
+    } catch {
+      return null;
+    }
   })();
-  if (draft && !document.getElementById("manualNotificationTitle")?.value && !document.getElementById("manualNotificationMessage")?.value) {
+  if (
+    draft &&
+    !document.getElementById("manualNotificationTitle")?.value &&
+    !document.getElementById("manualNotificationMessage")?.value
+  ) {
     const titleEl = document.getElementById("manualNotificationTitle");
     const msgEl = document.getElementById("manualNotificationMessage");
     const targetEl = document.getElementById("manualNotificationTarget");
@@ -18092,9 +18931,11 @@ async function renderNotificationCenter() {
     if (iconEl) iconEl.value = draft.icon || "default";
     updateManualNotificationCustomTargetVisibility();
     if (Array.isArray(draft.targetUserIds)) {
-      document.querySelectorAll('[data-notification-user-checkbox]').forEach((input) => {
-        input.checked = draft.targetUserIds.includes(input.value);
-      });
+      document
+        .querySelectorAll("[data-notification-user-checkbox]")
+        .forEach((input) => {
+          input.checked = draft.targetUserIds.includes(input.value);
+        });
     }
     updateManualNotificationPreview();
   }
@@ -18120,7 +18961,10 @@ async function renderNotificationCenter() {
     updateNotificationSummary(rows);
   } catch (error) {
     console.error("Bildirim merkezi yüklenemedi:", error);
-    setNotificationText("notificationLastErrorText", error.message || "Yüklenemedi");
+    setNotificationText(
+      "notificationLastErrorText",
+      error.message || "Yüklenemedi",
+    );
   }
 }
 
@@ -18135,7 +18979,8 @@ async function queueManualNotification() {
     return;
   }
 
-  const { title, message, target, icon, targetUserIds } = getManualNotificationFormValues();
+  const { title, message, target, icon, targetUserIds } =
+    getManualNotificationFormValues();
   if (!title || !message) {
     alert("Başlık ve mesaj metni zorunlu kanka.");
     return;
@@ -18173,12 +19018,15 @@ async function queueManualNotification() {
   const msgEl = document.getElementById("manualNotificationMessage");
   if (titleEl) titleEl.value = "";
   if (msgEl) msgEl.value = "";
-  document.querySelectorAll('[data-notification-user-checkbox]').forEach((input) => { input.checked = false; });
+  document
+    .querySelectorAll("[data-notification-user-checkbox]")
+    .forEach((input) => {
+      input.checked = false;
+    });
   updateManualNotificationPreview();
   await renderNotificationCenter();
   alert("Bildirim Firebase kuyruğuna alındı. Cron-job çalışınca gönderilecek.");
 }
-
 
 async function cleanupOldNotificationHistory() {
   if (getCurrentRole() !== "admin") {
@@ -18190,9 +19038,14 @@ async function cleanupOldNotificationHistory() {
     return;
   }
 
-  const cutoff = Date.now() - (30 * 24 * 60 * 60 * 1000);
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
   const oldRows = adminNotificationHistoryRows.filter((row) => {
-    if (["pending", "queued", "processing"].includes(String(row.status || "").toLowerCase())) return false;
+    if (
+      ["pending", "queued", "processing"].includes(
+        String(row.status || "").toLowerCase(),
+      )
+    )
+      return false;
     const time = new Date(row.date || 0).getTime();
     return time && time < cutoff && row.sourcePath;
   });
@@ -18202,7 +19055,12 @@ async function cleanupOldNotificationHistory() {
     return;
   }
 
-  if (!confirm(`${oldRows.length} adet eski geçmiş kaydı silinecek. Bekleyen bildirimlere dokunulmayacak. Devam edilsin mi?`)) return;
+  if (
+    !confirm(
+      `${oldRows.length} adet eski geçmiş kaydı silinecek. Bekleyen bildirimlere dokunulmayacak. Devam edilsin mi?`,
+    )
+  )
+    return;
 
   await Promise.all(oldRows.map((row) => firebaseRemove(row.sourcePath)));
   adminNotificationHistoryPage = 1;
@@ -18221,7 +19079,12 @@ function bindAdminNotificationCenterEvents() {
   window.__adminNotificationCenterBound = true;
 
   document.addEventListener("input", (event) => {
-    if (["manualNotificationTitle", "manualNotificationMessage"].includes(event.target?.id) || event.target?.matches?.('[data-notification-user-checkbox]')) {
+    if (
+      ["manualNotificationTitle", "manualNotificationMessage"].includes(
+        event.target?.id,
+      ) ||
+      event.target?.matches?.("[data-notification-user-checkbox]")
+    ) {
       updateManualNotificationPreview();
     }
   });
@@ -18231,23 +19094,43 @@ function bindAdminNotificationCenterEvents() {
       updateManualNotificationCustomTargetVisibility();
       updateManualNotificationPreview();
     }
-    if (event.target?.id === "manualNotificationIcon") updateManualNotificationPreview();
-    if (event.target?.matches?.('[data-notification-user-checkbox]')) updateManualNotificationPreview();
+    if (event.target?.id === "manualNotificationIcon")
+      updateManualNotificationPreview();
+    if (event.target?.matches?.("[data-notification-user-checkbox]"))
+      updateManualNotificationPreview();
   });
 
   document.addEventListener("click", async (event) => {
-    const draftButton = event.target.closest?.("#saveManualNotificationDraftBtn");
+    const draftButton = event.target.closest?.(
+      "#saveManualNotificationDraftBtn",
+    );
     const queueButton = event.target.closest?.("#queueManualNotificationBtn");
-    const deleteButton = event.target.closest?.("[data-notification-delete-path]");
-    const detailButton = event.target.closest?.("[data-notification-detail-path]");
-    const detailCloseButton = event.target.closest?.("[data-notification-detail-close]");
-    const detailBackdrop = event.target.classList?.contains("notification-detail-modal") ? event.target : null;
-    const repeatButton = event.target.closest?.("[data-notification-repeat-path]");
+    const deleteButton = event.target.closest?.(
+      "[data-notification-delete-path]",
+    );
+    const detailButton = event.target.closest?.(
+      "[data-notification-detail-path]",
+    );
+    const detailCloseButton = event.target.closest?.(
+      "[data-notification-detail-close]",
+    );
+    const detailBackdrop = event.target.classList?.contains(
+      "notification-detail-modal",
+    )
+      ? event.target
+      : null;
+    const repeatButton = event.target.closest?.(
+      "[data-notification-repeat-path]",
+    );
     const pageButton = event.target.closest?.("[data-notification-page]");
     const filterButton = event.target.closest?.("[data-notification-filter]");
     const cleanupButton = event.target.closest?.("#cleanupOldNotificationsBtn");
-    const selectAllButton = event.target.closest?.("#selectAllNotificationUsersBtn");
-    const clearSelectedButton = event.target.closest?.("#clearNotificationUsersBtn");
+    const selectAllButton = event.target.closest?.(
+      "#selectAllNotificationUsersBtn",
+    );
+    const clearSelectedButton = event.target.closest?.(
+      "#clearNotificationUsersBtn",
+    );
 
     if (detailCloseButton || detailBackdrop) {
       event.preventDefault();
@@ -18257,7 +19140,9 @@ function bindAdminNotificationCenterEvents() {
 
     if (detailButton) {
       event.preventDefault();
-      renderNotificationDetailModal(detailButton.dataset.notificationDetailPath);
+      renderNotificationDetailModal(
+        detailButton.dataset.notificationDetailPath,
+      );
       return;
     }
 
@@ -18269,21 +19154,30 @@ function bindAdminNotificationCenterEvents() {
 
     if (selectAllButton) {
       event.preventDefault();
-      document.querySelectorAll('[data-notification-user-checkbox]').forEach((input) => { input.checked = true; });
+      document
+        .querySelectorAll("[data-notification-user-checkbox]")
+        .forEach((input) => {
+          input.checked = true;
+        });
       updateManualNotificationPreview();
       return;
     }
 
     if (clearSelectedButton) {
       event.preventDefault();
-      document.querySelectorAll('[data-notification-user-checkbox]').forEach((input) => { input.checked = false; });
+      document
+        .querySelectorAll("[data-notification-user-checkbox]")
+        .forEach((input) => {
+          input.checked = false;
+        });
       updateManualNotificationPreview();
       return;
     }
 
     if (filterButton) {
       event.preventDefault();
-      adminNotificationHistoryFilter = filterButton.dataset.notificationFilter || "all";
+      adminNotificationHistoryFilter =
+        filterButton.dataset.notificationFilter || "all";
       adminNotificationHistoryPage = 1;
       renderNotificationHistoryRows(adminNotificationHistoryRows);
       return;
@@ -18305,7 +19199,9 @@ function bindAdminNotificationCenterEvents() {
 
     if (repeatButton) {
       event.preventDefault();
-      refillNotificationFormFromHistory(repeatButton.dataset.notificationRepeatPath);
+      refillNotificationFormFromHistory(
+        repeatButton.dataset.notificationRepeatPath,
+      );
       return;
     }
 
@@ -18313,7 +19209,9 @@ function bindAdminNotificationCenterEvents() {
       event.preventDefault();
       deleteButton.disabled = true;
       try {
-        await deleteNotificationHistoryItem(deleteButton.dataset.notificationDeletePath);
+        await deleteNotificationHistoryItem(
+          deleteButton.dataset.notificationDeletePath,
+        );
       } catch (error) {
         console.error("Bildirim kaydı silinemedi:", error);
         alert(`Bildirim kaydı silinemedi: ${error.message || error}`);
@@ -18325,11 +19223,29 @@ function bindAdminNotificationCenterEvents() {
 
     if (pageButton) {
       event.preventDefault();
-      const totalPages = Math.max(1, Math.ceil(getFilteredNotificationRows(adminNotificationHistoryRows).length / ADMIN_NOTIFICATION_HISTORY_PAGE_SIZE));
+      const totalPages = Math.max(
+        1,
+        Math.ceil(
+          getFilteredNotificationRows(adminNotificationHistoryRows).length /
+            ADMIN_NOTIFICATION_HISTORY_PAGE_SIZE,
+        ),
+      );
       const target = pageButton.dataset.notificationPage;
-      if (target === "prev") adminNotificationHistoryPage = Math.max(1, adminNotificationHistoryPage - 1);
-      else if (target === "next") adminNotificationHistoryPage = Math.min(totalPages, adminNotificationHistoryPage + 1);
-      else adminNotificationHistoryPage = Math.min(totalPages, Math.max(1, Number(target) || 1));
+      if (target === "prev")
+        adminNotificationHistoryPage = Math.max(
+          1,
+          adminNotificationHistoryPage - 1,
+        );
+      else if (target === "next")
+        adminNotificationHistoryPage = Math.min(
+          totalPages,
+          adminNotificationHistoryPage + 1,
+        );
+      else
+        adminNotificationHistoryPage = Math.min(
+          totalPages,
+          Math.max(1, Number(target) || 1),
+        );
       renderNotificationHistoryRows(adminNotificationHistoryRows);
       return;
     }
@@ -18363,10 +19279,14 @@ bindAdminNotificationCenterEvents();
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", () => {
     bindAdminNotificationCenterEvents();
-    renderNotificationCenter().catch((error) => console.warn("Bildirim merkezi ilk yükleme hatası:", error));
+    renderNotificationCenter().catch((error) =>
+      console.warn("Bildirim merkezi ilk yükleme hatası:", error),
+    );
   });
 } else {
-  renderNotificationCenter().catch((error) => console.warn("Bildirim merkezi ilk yükleme hatası:", error));
+  renderNotificationCenter().catch((error) =>
+    console.warn("Bildirim merkezi ilk yükleme hatası:", error),
+  );
 }
 /* 07-prediction-logs.js */
 
@@ -18380,7 +19300,9 @@ const predictionLogState = {
 };
 
 function predictionLogEscape(value) {
-  return typeof escapeHtml === "function" ? escapeHtml(value) : String(value ?? "");
+  return typeof escapeHtml === "function"
+    ? escapeHtml(value)
+    : String(value ?? "");
 }
 
 function predictionLogDateText(value) {
@@ -18405,14 +19327,27 @@ function predictionLogDateInputValue(value) {
 
 function predictionLogScore(value) {
   if (!value) return "-";
-  const home = value.homePred === "" || value.homePred === undefined || value.homePred === null ? "-" : value.homePred;
-  const away = value.awayPred === "" || value.awayPred === undefined || value.awayPred === null ? "-" : value.awayPred;
+  const home =
+    value.homePred === "" ||
+    value.homePred === undefined ||
+    value.homePred === null
+      ? "-"
+      : value.homePred;
+  const away =
+    value.awayPred === "" ||
+    value.awayPred === undefined ||
+    value.awayPred === null
+      ? "-"
+      : value.awayPred;
   return `${home} - ${away}`;
 }
 
 function getPredictionLogCurrentPlayerId() {
   return String(
-    state.settings?.auth?.playerId || getAuthUser?.()?.playerId || getAuthUser?.()?.id || "",
+    state.settings?.auth?.playerId ||
+      getAuthUser?.()?.playerId ||
+      getAuthUser?.()?.id ||
+      "",
   );
 }
 
@@ -18436,7 +19371,10 @@ async function fetchPredictionLogs(force = false) {
     try {
       raw = (await firebaseRead("predictionLogs")) || {};
     } catch (primaryError) {
-      console.warn("predictionLogs yolu okunamadı, settings/auditLogs deneniyor:", primaryError);
+      console.warn(
+        "predictionLogs yolu okunamadı, settings/auditLogs deneniyor:",
+        primaryError,
+      );
     }
 
     let fallbackRaw = {};
@@ -18480,31 +19418,49 @@ function fillPredictionLogFilters() {
   ).filter(([id]) => id);
 
   const weeks = Array.from(
-    new Set(predictionLogState.logs.map((item) => String(item.weekNo || "")).filter(Boolean)),
+    new Set(
+      predictionLogState.logs
+        .map((item) => String(item.weekNo || ""))
+        .filter(Boolean),
+    ),
   ).sort((a, b) => Number(a) - Number(b));
 
   const matches = Array.from(
     new Map(
       predictionLogState.logs.map((item) => [
         String(item.matchId || item.matchLabel || ""),
-        item.matchLabel || `${item.homeTeam || "Ev sahibi"} - ${item.awayTeam || "Deplasman"}`,
+        item.matchLabel ||
+          `${item.homeTeam || "Ev sahibi"} - ${item.awayTeam || "Deplasman"}`,
       ]),
     ).entries(),
   ).filter(([id]) => id);
 
   userFilter.innerHTML = `<option value="all">Tüm kullanıcılar</option>${users
-    .map(([id, name]) => `<option value="${predictionLogEscape(id)}">${predictionLogEscape(name)}</option>`)
+    .map(
+      ([id, name]) =>
+        `<option value="${predictionLogEscape(id)}">${predictionLogEscape(name)}</option>`,
+    )
     .join("")}`;
   weekFilter.innerHTML = `<option value="all">Tüm haftalar</option>${weeks
-    .map((week) => `<option value="${predictionLogEscape(week)}">${predictionLogEscape(week)}. Hafta</option>`)
+    .map(
+      (week) =>
+        `<option value="${predictionLogEscape(week)}">${predictionLogEscape(week)}. Hafta</option>`,
+    )
     .join("")}`;
   matchFilter.innerHTML = `<option value="all">Tüm maçlar</option>${matches
-    .map(([id, label]) => `<option value="${predictionLogEscape(id)}">${predictionLogEscape(label)}</option>`)
+    .map(
+      ([id, label]) =>
+        `<option value="${predictionLogEscape(id)}">${predictionLogEscape(label)}</option>`,
+    )
     .join("")}`;
 
-  userFilter.value = users.some(([id]) => id === previousUser) ? previousUser : "all";
+  userFilter.value = users.some(([id]) => id === previousUser)
+    ? previousUser
+    : "all";
   weekFilter.value = weeks.includes(previousWeek) ? previousWeek : "all";
-  matchFilter.value = matches.some(([id]) => id === previousMatch) ? previousMatch : "all";
+  matchFilter.value = matches.some(([id]) => id === previousMatch)
+    ? previousMatch
+    : "all";
 }
 
 function getPredictionLogFilters() {
@@ -18512,7 +19468,8 @@ function getPredictionLogFilters() {
     user: document.getElementById("predictionLogUserFilter")?.value || "all",
     week: document.getElementById("predictionLogWeekFilter")?.value || "all",
     match: document.getElementById("predictionLogMatchFilter")?.value || "all",
-    action: document.getElementById("predictionLogActionFilter")?.value || "all",
+    action:
+      document.getElementById("predictionLogActionFilter")?.value || "all",
     start: document.getElementById("predictionLogStartDate")?.value || "",
     end: document.getElementById("predictionLogEndDate")?.value || "",
   };
@@ -18521,11 +19478,25 @@ function getPredictionLogFilters() {
 function applyPredictionLogFilters() {
   const filters = getPredictionLogFilters();
   predictionLogState.filtered = predictionLogState.logs.filter((item) => {
-    if (filters.user !== "all" && String(item.targetPlayerId || item.targetPlayerName || "") !== filters.user) return false;
-    if (filters.week !== "all" && String(item.weekNo || "") !== filters.week) return false;
-    if (filters.match !== "all" && String(item.matchId || item.matchLabel || "") !== filters.match) return false;
+    if (
+      filters.user !== "all" &&
+      String(item.targetPlayerId || item.targetPlayerName || "") !==
+        filters.user
+    )
+      return false;
+    if (filters.week !== "all" && String(item.weekNo || "") !== filters.week)
+      return false;
+    if (
+      filters.match !== "all" &&
+      String(item.matchId || item.matchLabel || "") !== filters.match
+    )
+      return false;
     if (filters.action === "admin" && item.isAdminAction !== true) return false;
-    if (!["all", "admin"].includes(filters.action) && String(item.actionType || "") !== filters.action) return false;
+    if (
+      !["all", "admin"].includes(filters.action) &&
+      String(item.actionType || "") !== filters.action
+    )
+      return false;
 
     const itemDate = predictionLogDateInputValue(item.createdAt);
     if (filters.start && itemDate && itemDate < filters.start) return false;
@@ -18533,7 +19504,10 @@ function applyPredictionLogFilters() {
     return true;
   });
 
-  const maxPage = Math.max(1, Math.ceil(predictionLogState.filtered.length / predictionLogState.pageSize));
+  const maxPage = Math.max(
+    1,
+    Math.ceil(predictionLogState.filtered.length / predictionLogState.pageSize),
+  );
   if (predictionLogState.page > maxPage) predictionLogState.page = maxPage;
 }
 
@@ -18571,7 +19545,8 @@ async function clearPredictionLogsOnly() {
       await writeAppAuditLogEntry({
         actionType: "logs_clear",
         actionLabel: "Loglar temizlendi",
-        detail: "Admin sadece log kayıtlarını temizledi. Ana veriler silinmedi.",
+        detail:
+          "Admin sadece log kayıtlarını temizledi. Ana veriler silinmedi.",
         entityType: "logs",
         entityId: "predictionLogs",
       });
@@ -18588,10 +19563,13 @@ async function clearPredictionLogsOnly() {
     });
   } catch (error) {
     console.error("Log temizleme hatası:", error);
-    showAlert?.("Loglar temizlenemedi. Console ekranından hataya bakabilirsin.", {
-      title: "Hata",
-      type: "danger",
-    });
+    showAlert?.(
+      "Loglar temizlenemedi. Console ekranından hataya bakabilirsin.",
+      {
+        title: "Hata",
+        type: "danger",
+      },
+    );
   }
 }
 
@@ -18606,18 +19584,29 @@ function renderPredictionLogStats() {
   const last = filtered[0] || null;
 
   if (totalEl) totalEl.textContent = String(filtered.length);
-  if (adminEl) adminEl.textContent = String(filtered.filter((item) => item.isAdminAction === true).length);
+  if (adminEl)
+    adminEl.textContent = String(
+      filtered.filter((item) => item.isAdminAction === true).length,
+    );
   if (lastActionEl) lastActionEl.textContent = last?.actionLabel || "Yok";
-  if (lastDateEl) lastDateEl.textContent = last ? predictionLogDateText(last.createdAt) : "Henüz log kaydı görünmüyor.";
+  if (lastDateEl)
+    lastDateEl.textContent = last
+      ? predictionLogDateText(last.createdAt)
+      : "Henüz log kaydı görünmüyor.";
   if (badge) {
-    badge.textContent = getCurrentRole() === "admin" ? "Admin görünümü: tüm loglar" : "Kullanıcı görünümü: sadece kendi logların";
+    badge.textContent =
+      getCurrentRole() === "admin"
+        ? "Admin görünümü: tüm loglar"
+        : "Kullanıcı görünümü: sadece kendi logların";
     badge.className = `badge ${getCurrentRole() === "admin" ? "warn" : "gray"}`;
   }
 }
 
 function predictionLogActionBadge(item) {
   const type = String(item.actionType || "");
-  const label = item.actionLabel || (type === "create" ? "Eklendi" : type === "update" ? "Değişti" : "Silindi");
+  const label =
+    item.actionLabel ||
+    (type === "create" ? "Eklendi" : type === "update" ? "Değişti" : "Silindi");
   return `<span class="prediction-log-action prediction-log-action--${predictionLogEscape(type)}">${predictionLogEscape(label)}</span>`;
 }
 
@@ -18629,15 +19618,22 @@ function renderPredictionLogRows() {
   if (!body || !mobileList || !pageInfo || !pagination) return;
 
   const start = (predictionLogState.page - 1) * predictionLogState.pageSize;
-  const rows = predictionLogState.filtered.slice(start, start + predictionLogState.pageSize);
-  const totalPages = Math.max(1, Math.ceil(predictionLogState.filtered.length / predictionLogState.pageSize));
+  const rows = predictionLogState.filtered.slice(
+    start,
+    start + predictionLogState.pageSize,
+  );
+  const totalPages = Math.max(
+    1,
+    Math.ceil(predictionLogState.filtered.length / predictionLogState.pageSize),
+  );
 
   if (!rows.length) {
     body.innerHTML = `<tr><td colspan="7">Bu filtrelere uygun log kaydı bulunamadı.</td></tr>`;
     mobileList.innerHTML = `<div class="prediction-log-empty">Bu filtrelere uygun log kaydı bulunamadı.</div>`;
   } else {
     body.innerHTML = rows
-      .map((item) => `
+      .map(
+        (item) => `
         <tr class="${item.isAdminAction ? "is-admin-log" : ""}">
           <td>${predictionLogEscape(predictionLogDateText(item.createdAt))}</td>
           <td><strong>${predictionLogEscape(item.targetPlayerName || "Bilinmeyen kişi")}</strong></td>
@@ -18650,13 +19646,15 @@ function renderPredictionLogRows() {
           <td><span class="prediction-log-score new">${predictionLogEscape(predictionLogScore(item.newValue))}</span></td>
           <td>
             <strong>${predictionLogEscape(item.actorName || "Bilinmeyen")}</strong>
-            ${item.isAdminAction ? '<span class="prediction-log-admin-pill">Admin</span>' : ''}
+            ${item.isAdminAction ? '<span class="prediction-log-admin-pill">Admin</span>' : ""}
           </td>
-        </tr>`)
+        </tr>`,
+      )
       .join("");
 
     mobileList.innerHTML = rows
-      .map((item) => `
+      .map(
+        (item) => `
         <article class="prediction-log-mobile-card ${item.isAdminAction ? "is-admin-log" : ""}">
           <div class="prediction-log-mobile-top">
             ${predictionLogActionBadge(item)}
@@ -18670,9 +19668,10 @@ function renderPredictionLogRows() {
           </div>
           <div class="prediction-log-mobile-actor">
             Yapan: <strong>${predictionLogEscape(item.actorName || "Bilinmeyen")}</strong>
-            ${item.isAdminAction ? '<span class="prediction-log-admin-pill">Admin</span>' : ''}
+            ${item.isAdminAction ? '<span class="prediction-log-admin-pill">Admin</span>' : ""}
           </div>
-        </article>`)
+        </article>`,
+      )
       .join("");
   }
 
@@ -18696,29 +19695,40 @@ async function renderPredictionLogs(options = {}) {
 }
 
 function bindPredictionLogEvents() {
-  document.getElementById("refreshPredictionLogsBtn")?.addEventListener("click", () => {
-    predictionLogState.page = 1;
-    renderPredictionLogs({ force: true });
-  });
-
-  document.getElementById("clearPredictionLogsBtn")?.addEventListener("click", () => {
-    clearPredictionLogsOnly();
-  });
-
-  document.getElementById("clearPredictionLogFiltersBtn")?.addEventListener("click", () => {
-    ["predictionLogUserFilter", "predictionLogWeekFilter", "predictionLogMatchFilter", "predictionLogActionFilter"].forEach((id) => {
-      const el = document.getElementById(id);
-      if (el) el.value = "all";
+  document
+    .getElementById("refreshPredictionLogsBtn")
+    ?.addEventListener("click", () => {
+      predictionLogState.page = 1;
+      renderPredictionLogs({ force: true });
     });
-    const start = document.getElementById("predictionLogStartDate");
-    const end = document.getElementById("predictionLogEndDate");
-    if (start) start.value = "";
-    if (end) end.value = "";
-    predictionLogState.page = 1;
-    applyPredictionLogFilters();
-    renderPredictionLogStats();
-    renderPredictionLogRows();
-  });
+
+  document
+    .getElementById("clearPredictionLogsBtn")
+    ?.addEventListener("click", () => {
+      clearPredictionLogsOnly();
+    });
+
+  document
+    .getElementById("clearPredictionLogFiltersBtn")
+    ?.addEventListener("click", () => {
+      [
+        "predictionLogUserFilter",
+        "predictionLogWeekFilter",
+        "predictionLogMatchFilter",
+        "predictionLogActionFilter",
+      ].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.value = "all";
+      });
+      const start = document.getElementById("predictionLogStartDate");
+      const end = document.getElementById("predictionLogEndDate");
+      if (start) start.value = "";
+      if (end) end.value = "";
+      predictionLogState.page = 1;
+      applyPredictionLogFilters();
+      renderPredictionLogStats();
+      renderPredictionLogRows();
+    });
 
   [
     "predictionLogUserFilter",
@@ -18736,15 +19746,27 @@ function bindPredictionLogEvents() {
     });
   });
 
-  document.getElementById("predictionLogPagination")?.addEventListener("click", (event) => {
-    const btn = event.target.closest("[data-log-page]");
-    if (!btn || btn.disabled) return;
-    const direction = btn.dataset.logPage;
-    const totalPages = Math.max(1, Math.ceil(predictionLogState.filtered.length / predictionLogState.pageSize));
-    if (direction === "prev") predictionLogState.page = Math.max(1, predictionLogState.page - 1);
-    if (direction === "next") predictionLogState.page = Math.min(totalPages, predictionLogState.page + 1);
-    renderPredictionLogRows();
-  });
+  document
+    .getElementById("predictionLogPagination")
+    ?.addEventListener("click", (event) => {
+      const btn = event.target.closest("[data-log-page]");
+      if (!btn || btn.disabled) return;
+      const direction = btn.dataset.logPage;
+      const totalPages = Math.max(
+        1,
+        Math.ceil(
+          predictionLogState.filtered.length / predictionLogState.pageSize,
+        ),
+      );
+      if (direction === "prev")
+        predictionLogState.page = Math.max(1, predictionLogState.page - 1);
+      if (direction === "next")
+        predictionLogState.page = Math.min(
+          totalPages,
+          predictionLogState.page + 1,
+        );
+      renderPredictionLogRows();
+    });
 }
 
 bindPredictionLogEvents();
