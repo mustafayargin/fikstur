@@ -10852,7 +10852,7 @@ async function exportPredictionShareImage() {
     }
 
     const shareView = getPredictionShareView();
-    const playersPerPage = shareView === "post" ? 6 : 7;
+    const playersPerPage = Math.max(1, players.length);
     const totalPages = Math.max(1, Math.ceil(players.length / playersPerPage));
     const weekLabel = `${getWeekNumberById(weekId) || "hafta"}`;
     const downloaded = [];
