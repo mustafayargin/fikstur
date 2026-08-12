@@ -21123,3 +21123,137 @@ body[data-role="user"] .prediction-header-actions .share-mode-btn,
 body[data-role="user"] #predictionShareToolbar {
   display: none !important;
 }
+
+/* === Genel bakış: tüm kullanıcıları görünür ve avatarları belirgin tut === */
+.premium-avatar-row {
+  min-height: 36px !important;
+  margin-bottom: 10px !important;
+  padding-inline: 10px !important;
+}
+
+.premium-avatar-row .dashboard-avatar-row__chips {
+  width: 100% !important;
+  max-width: 100% !important;
+  padding: 3px 4px !important;
+  gap: 0 !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  justify-content: center !important;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.premium-avatar-row .dashboard-avatar-row__chips::-webkit-scrollbar {
+  display: none;
+}
+
+.premium-avatar-row .dashboard-avatar-chip {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  margin-left: -9px !important;
+  border-width: 2px !important;
+}
+
+.premium-avatar-row .dashboard-inline-avatar.app-avatar {
+  font-size: 12px !important;
+}
+
+.premium-avatar-row .dashboard-avatar-chip:first-child {
+  margin-left: 0 !important;
+}
+
+.premium-avatar-row .dashboard-avatar-chip:hover,
+.premium-avatar-row .dashboard-avatar-chip:focus-visible,
+.premium-avatar-row .dashboard-avatar-chip:active,
+.premium-avatar-row .dashboard-avatar-chip.is-selected {
+  transform: translateY(-2px) scale(1.12) !important;
+  margin-left: -9px !important;
+  margin-right: 0 !important;
+  z-index: 30 !important;
+}
+
+.premium-avatar-row .dashboard-avatar-chip:first-child:hover,
+.premium-avatar-row .dashboard-avatar-chip:first-child:focus-visible,
+.premium-avatar-row .dashboard-avatar-chip:first-child:active,
+.premium-avatar-row .dashboard-avatar-chip:first-child.is-selected {
+  margin-left: 0 !important;
+}
+
+@media (max-width: 640px) {
+  .premium-avatar-row {
+    min-height: 31px !important;
+    margin-bottom: 8px !important;
+    padding-inline: 5px !important;
+  }
+
+  .premium-avatar-row .dashboard-avatar-row__chips {
+    justify-content: center !important;
+    padding: 3px 8px !important;
+    gap: 0 !important;
+  }
+
+  .premium-avatar-row .dashboard-avatar-chip {
+    width: 29px !important;
+    height: 29px !important;
+    min-width: 29px !important;
+    margin-left: -8px !important;
+  }
+
+  .premium-avatar-row .dashboard-inline-avatar.app-avatar {
+    font-size: 11px !important;
+  }
+
+  .premium-avatar-row .dashboard-avatar-chip:hover,
+  .premium-avatar-row .dashboard-avatar-chip:focus-visible,
+  .premium-avatar-row .dashboard-avatar-chip:active,
+  .premium-avatar-row .dashboard-avatar-chip.is-selected {
+    transform: translateY(-1px) scale(1.08) !important;
+    margin-left: -8px !important;
+    margin-right: 0 !important;
+  }
+
+  .premium-avatar-row .dashboard-avatar-chip:first-child:hover,
+  .premium-avatar-row .dashboard-avatar-chip:first-child:focus-visible,
+  .premium-avatar-row .dashboard-avatar-chip:first-child:active,
+  .premium-avatar-row .dashboard-avatar-chip:first-child.is-selected {
+    margin-left: 0 !important;
+  }
+}
+
+/* Avatar sırası büyüdüğü için mobil maç kartına alt tarafta nefes alanı ver. */
+@media (max-width: 720px) {
+  .dashboard-match-card.premium-match-card,
+  .dashboard-match-card.premium-match-card.master-match-card {
+    min-height: 230px !important;
+    padding-bottom: 11px !important;
+  }
+
+  .premium-avatar-row {
+    margin-top: 1px !important;
+    margin-bottom: 9px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .dashboard-match-card.premium-match-card,
+  .dashboard-match-card.premium-match-card.master-match-card {
+    min-height: 222px !important;
+  }
+}
+
+/* Genel bakış üst akışı: API bilgisi ile maç merkezi arasındaki fazla boşluğu kaldır. */
+#tab-dashboard .dashboard-inline-status {
+  margin: 4px 0 0 !important;
+}
+
+@media (max-width: 760px) {
+  #tab-dashboard.active {
+    gap: 7px !important;
+  }
+
+  #tab-dashboard .dashboard-inline-status {
+    margin: 3px 0 0 !important;
+    padding-block: 9px !important;
+  }
+}

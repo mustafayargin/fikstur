@@ -5622,7 +5622,6 @@ function renderDashboardMatchCards(container, matches) {
       const premium = getPremiumStateMeta(match, visual, badge, timeText);
 
       const avatars = predictions
-        .slice(0, 6)
         .map(({ player, pred }) => {
           const tone = getDashboardPredictionTone(pred, match);
           return `
@@ -5636,7 +5635,6 @@ function renderDashboardMatchCards(container, matches) {
           `;
         })
         .join("");
-      const hiddenAvatarCount = Math.max(predictions.length - 6, 0);
 
       return `
       <article
@@ -5683,7 +5681,6 @@ function renderDashboardMatchCards(container, matches) {
 
           <div class="dashboard-avatar-row premium-avatar-row">
             <div class="dashboard-avatar-row__chips">${avatars}</div>
-            ${hiddenAvatarCount ? `<span class="dashboard-avatar-row__more">+${hiddenAvatarCount}</span>` : ""}
           </div>
 
           <div class="dashboard-match-card__footer premium-card-footer">
