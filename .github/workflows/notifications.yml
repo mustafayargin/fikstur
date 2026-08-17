@@ -17,6 +17,10 @@ permissions:
   contents: read
   actions: write
 
+concurrency:
+  group: fikstur-notification-sender
+  cancel-in-progress: false
+
 jobs:
   notify:
     runs-on: ubuntu-latest
@@ -71,9 +75,9 @@ jobs:
               return isNaN(d.getTime()) ? null : d;
             };
 
-            const getNotificationType = (diffHours) => {
-              if (diffHours <= 3 && diffHours > 2) return "3h";
-              if (diffHours <= 2 && diffHours > 0) return "2h";
+            const getPredictionLockNotificationType = (diffHours) => {
+              if (diffHours <= 2 && diffHours > 1) return "2h";
+              if (diffHours <= 1 && diffHours > 0) return "1h";
               return null;
             };
 
@@ -193,24 +197,21 @@ jobs:
               let failureCount = 0;
 
               for (const tokenChunk of chunkArray(safeTokens, 500)) {
+                const dedupeKey = `fikstur_${Buffer.from(`${safeTitle}|${safeBody}`).toString("base64url").slice(0, 80)}`;
                 const message = {
-                  notification: {
-                    title: safeTitle,
-                    body: safeBody
-                  },
                   data: {
                     title: safeTitle,
                     body: safeBody,
-                    url: SITE_URL
+                    url: SITE_URL,
+                    icon: `${SITE_URL.replace(/\/$/, "")}/app-icons/pwa-icon-192-v3.png`,
+                    badge: `${SITE_URL.replace(/\/$/, "")}/notification-icons/badge-72.png`,
+                    image: `${SITE_URL.replace(/\/$/, "")}/app-icons/pwa-icon-512-v3.png`,
+                    tag: dedupeKey,
+                    dedupeKey
                   },
                   webpush: {
-                    notification: {
-                      title: safeTitle,
-                      body: safeBody,
-                      icon: "/icons/icon-192.png",
-                      badge: "/icons/icon-192.png",
-                      image: "/icons/icon-512.png",
-                      requireInteraction: false
+                    headers: {
+                      Urgency: "high"
                     },
                     fcmOptions: {
                       link: SITE_URL
@@ -239,6 +240,7 @@ jobs:
               tokensSnap,
               usersSnap,
               matchesSnap,
+              settingsSnap,
               sentSnap,
               queueSnap,
               logsSnap
@@ -246,6 +248,7 @@ jobs:
               db.ref("fcmTokens").once("value"),
               db.ref("users").once("value"),
               db.ref("matches").once("value"),
+              db.ref("settings").once("value"),
               db.ref("sentNotifications").once("value"),
               db.ref("adminNotificationQueue").once("value"),
               db.ref("notificationLogs").once("value")
@@ -256,6 +259,24 @@ jobs:
               .filter(Boolean);
 
             const usersData = usersSnap.val() || {};
+            const settingsData = settingsSnap.val() || {};
+            const weeksMeta = Array.isArray(settingsData.weeksMeta)
+              ? settingsData.weeksMeta
+              : Object.values(settingsData.weeksMeta || {});
+
+            const manuallyLockedWeekIds = new Set(
+              weeksMeta
+                .filter(week => week && week.predictionManualLocked === true)
+                .map(week => String(week.id || "").trim())
+                .filter(Boolean)
+            );
+            const manuallyLockedWeekNumbers = new Set(
+              weeksMeta
+                .filter(week => week && week.predictionManualLocked === true)
+                .map(week => String(week.number || week.weekNo || "").trim())
+                .filter(Boolean)
+            );
+
             const activeUserIds = new Set(
               Object.values(usersData)
                 .filter(u => u && u.aktif !== false && u.active !== false)
@@ -315,16 +336,30 @@ jobs:
               .slice(0, 5);
 
             for (const [queueId, item] of pendingManualNotifications) {
-              const targetTokens = selectTokensForTarget(item.target || "all");
               const startedAt = new Date().toISOString();
+              const queueRef = db.ref(`adminNotificationQueue/${queueId}`);
+              const claimResult = await queueRef.transaction((current) => {
+                if (!current || current.status !== "pending" || current.type !== "manual") {
+                  return;
+                }
+
+                return {
+                  ...current,
+                  status: "processing",
+                  startedAt,
+                  updatedAt: startedAt
+                };
+              });
+
+              if (!claimResult.committed) {
+                console.log(`Manuel bildirim başka bir çalıştırma tarafından alındı: ${queueId}`);
+                continue;
+              }
+
+              const claimedItem = claimResult.snapshot.val() || item;
+              const targetTokens = selectTokensForTarget(claimedItem.target || "all");
 
               console.log(`Manuel bildirim gönderiliyor: ${queueId} | hedef token: ${targetTokens.length}`);
-
-              await db.ref(`adminNotificationQueue/${queueId}`).update({
-                status: "processing",
-                startedAt,
-                updatedAt: startedAt
-              });
 
               try {
                 if (targetTokens.length === 0) {
@@ -336,8 +371,8 @@ jobs:
                 if (process.env.TEST_MODE === "normal") {
                   res = await sendToTokens(
                     targetTokens,
-                    item.title || "Skor Avcıları",
-                    item.message || "Yeni bildirimin var.",
+                    claimedItem.title || "Skor Avcıları",
+                    claimedItem.message || "Yeni bildirimin var.",
                     tokenRecords
                   );
                 }
@@ -355,9 +390,9 @@ jobs:
                 await db.ref(`notificationLogs/${queueId}`).set({
                   type: "Manuel",
                   status: "sent",
-                  title: item.title || "Skor Avcıları",
-                  message: item.message || "Yeni bildirimin var.",
-                  target: item.target || "all",
+                  title: claimedItem.title || "Skor Avcıları",
+                  message: claimedItem.message || "Yeni bildirimin var.",
+                  target: claimedItem.target || "all",
                   successCount: res.successCount || 0,
                   errorCount: res.failureCount || 0,
                   createdAt: finishedAt
@@ -377,9 +412,9 @@ jobs:
                 await db.ref(`notificationLogs/${queueId}`).set({
                   type: "Manuel",
                   status: "error",
-                  title: item.title || "Skor Avcıları",
-                  message: item.message || "Yeni bildirimin var.",
-                  target: item.target || "all",
+                  title: claimedItem.title || "Skor Avcıları",
+                  message: claimedItem.message || "Yeni bildirimin var.",
+                  target: claimedItem.target || "all",
                   errorMessage: error.message || String(error),
                   createdAt: failedAt
                 });
@@ -396,18 +431,24 @@ jobs:
               if (!weeksMap[w]) {
                 weeksMap[w] = {
                   futureMatchCount: 0,
-                  firstMatchDate: null
+                  firstMatchDate: null,
+                  weekIds: new Set()
                 };
               }
 
+              if (m.weekId) weeksMap[w].weekIds.add(String(m.weekId));
+
               const mDate = parseMatchDate(m.date);
+              if (!mDate) return;
 
-              if (mDate && mDate > now) {
+              // Tahmin kilidi haftanın gerçek ilk maçına göre hesaplanır.
+              // İlk maç: Cuma 20:00 ise kilit Cuma 14:00 olur.
+              if (!weeksMap[w].firstMatchDate || mDate < weeksMap[w].firstMatchDate) {
+                weeksMap[w].firstMatchDate = mDate;
+              }
+
+              if (mDate > now) {
                 weeksMap[w].futureMatchCount++;
-
-                if (!weeksMap[w].firstMatchDate || mDate < weeksMap[w].firstMatchDate) {
-                  weeksMap[w].firstMatchDate = mDate;
-                }
               }
             });
 
@@ -418,63 +459,126 @@ jobs:
                 console.log(`${weekNo}. hafta bildirimi gönderiliyor...`);
 
                 if (process.env.TEST_MODE === "normal") {
-                  const res = await sendToTokens(
-                    tokens,
-                    `📅 ${weekNo}. hafta açıldı!`,
-                    "😅 Tahminlerini girmeyi unutma! ⚽",
-                    tokenRecords
-                  );
+                  const sentRef = db.ref(`sentNotifications/${key}`);
+                  const claimedAt = new Date().toISOString();
+                  const claimResult = await sentRef.transaction((current) => {
+                    if (current) return;
+                    return { status: "processing", claimedAt, weekNo };
+                  });
 
-                  console.log("Yeni hafta bildirim sonucu:", res.successCount, "başarılı.");
-
-                  if (res.successCount > 0) {
-                    await db.ref(`sentNotifications/${key}`).set({
-                      sent: true,
-                      sentAt: new Date().toISOString(),
-                      weekNo
-                    });
-
+                  if (!claimResult.committed) {
                     sentKeys.add(key);
+                    console.log(`Hafta bildirimi başka bir çalıştırma tarafından alındı: ${key}`);
+                    continue;
+                  }
+
+                  try {
+                    const res = await sendToTokens(
+                      tokens,
+                      `📅 ${weekNo}. hafta açıldı!`,
+                      "😅 Tahminlerini girmeyi unutma! ⚽",
+                      tokenRecords
+                    );
+
+                    console.log("Yeni hafta bildirim sonucu:", res.successCount, "başarılı.");
+
+                    if (res.successCount > 0) {
+                      await sentRef.set({
+                        sent: true,
+                        status: "sent",
+                        sentAt: new Date().toISOString(),
+                        weekNo
+                      });
+                      sentKeys.add(key);
+                    } else {
+                      await sentRef.remove();
+                    }
+                  } catch (error) {
+                    await sentRef.remove();
+                    throw error;
                   }
                 }
               }
             }
 
-            for (const [id, m] of matches) {
-              const mDate = parseMatchDate(m.date);
-              if (!mDate) continue;
+            // Tahminler, haftanın ilk maçından 6 saat önce kilitlenir.
+            // Bildirimler maç başlangıcına göre değil, bu kilit saatine göre gönderilir.
+            for (const [weekNo, info] of Object.entries(weeksMap)) {
+              if (weekNo === "unknown" || !info.firstMatchDate) continue;
 
-              const diffHours = (mDate - now) / 3600000;
-              const type = getNotificationType(diffHours);
+              const knownWeekIds = [...(info.weekIds || [])];
+              const manuallyLocked =
+                knownWeekIds.length > 0
+                  ? knownWeekIds.some(id => manuallyLockedWeekIds.has(String(id)))
+                  : manuallyLockedWeekNumbers.has(String(weekNo));
 
-              if (type) {
-                const key = `week_${m.weekNo || "x"}_${type}`;
+              if (manuallyLocked) {
+                console.log(`${weekNo}. hafta admin tarafından manuel kilitli. 2 saat / 1 saat tahmin hatırlatmaları gönderilmeyecek.`);
+                continue;
+              }
 
-                if (!sentKeys.has(key)) {
-                  console.log(`Maç hatırlatıcı (${type}) gönderiliyor: ${m.homeTeam || ""}`);
+              const predictionLockDate = new Date(info.firstMatchDate.getTime() - 6 * 60 * 60 * 1000);
+              const diffToLockHours = (predictionLockDate - now) / 3600000;
+              const type = getPredictionLockNotificationType(diffToLockHours);
 
-                  if (process.env.TEST_MODE === "normal") {
-                    const res = await sendToTokens(
-                      tokens,
-                      "⚽ Maçlar başlamak üzere!",
-                      `Tahminlerini unutma! Maçlar ${type === "3h" ? "3 saat" : "2 saat"} içinde başlıyor.`,
-                      tokenRecords
-                    );
+              if (!type) continue;
 
-                    console.log("Maç hatırlatıcı sonucu:", res.successCount, "başarılı.");
+              // Eski maç-başlangıcı bildirim anahtarlarıyla çakışmaması için yeni anahtar kullanıyoruz.
+              const key = `week_${weekNo}_prediction_lock_${type}`;
 
-                    if (res.successCount > 0) {
-                      await db.ref(`sentNotifications/${key}`).set({
-                        sent: true,
-                        sentAt: new Date().toISOString(),
-                        type,
-                        successCount: res.successCount || 0,
-                        errorCount: res.failureCount || 0
-                      });
+              if (sentKeys.has(key)) continue;
 
-                      sentKeys.add(key);
-                    }
+              console.log(`${weekNo}. hafta tahmin kilidi hatırlatıcısı (${type}) gönderiliyor...`);
+
+              if (process.env.TEST_MODE === "normal") {
+                const sentRef = db.ref(`sentNotifications/${key}`);
+                const claimedAt = new Date().toISOString();
+                const claimResult = await sentRef.transaction((current) => {
+                  if (current) return;
+                  return {
+                    status: "processing",
+                    claimedAt,
+                    type,
+                    weekNo,
+                    predictionLockAt: predictionLockDate.toISOString()
+                  };
+                });
+
+                if (!claimResult.committed) {
+                  sentKeys.add(key);
+                  console.log(`Tahmin kilidi hatırlatıcısı başka bir çalıştırma tarafından alındı: ${key}`);
+                  continue;
+                }
+
+                try {
+                  const remainingText = type === "2h" ? "2 saat" : "1 saat";
+                  const res = await sendToTokens(
+                    tokens,
+                    "🔒 Tahminler yakında kilitleniyor!",
+                    `${weekNo}. hafta tahminlerinin kilitlenmesine ${remainingText} kaldı. Tahminini son kez kontrol etmeyi unutma!`,
+                    tokenRecords
+                  );
+
+                  console.log("Tahmin kilidi hatırlatıcı sonucu:", res.successCount, "başarılı.");
+
+                  if (res.successCount > 0) {
+                    await sentRef.set({
+                      sent: true,
+                      status: "sent",
+                      sentAt: new Date().toISOString(),
+                      type,
+                      weekNo,
+                      predictionLockAt: predictionLockDate.toISOString(),
+                      successCount: res.successCount || 0,
+                      errorCount: res.failureCount || 0
+                    });
+                    sentKeys.add(key);
+                  } else {
+                    await sentRef.remove();
                   }
+                } catch (error) {
+                  await sentRef.remove();
+                  throw error;
                 }
               }
             }
