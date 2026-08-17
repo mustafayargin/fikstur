@@ -2894,6 +2894,9 @@ async function syncOnlineMatchesFromSheet(options = {}) {
         row.awayScore ?? row.depGol ?? row.away_score,
       );
       const played = playedFlag || (homeScore !== "" && awayScore !== "");
+      const manualScoreLocked = parseBooleanish(
+        row.manualScoreLocked ?? row.manualScoreLock ?? row.manuelSkorKilitli ?? false,
+      );
       const normalizedDate = normalizeStoredDate(row.date || row.tarih || "");
 
       if (!existing) {
@@ -2907,6 +2910,7 @@ async function syncOnlineMatchesFromSheet(options = {}) {
           played: played,
           homeScore: homeScore === "" ? null : homeScore,
           awayScore: awayScore === "" ? null : awayScore,
+          manualScoreLocked,
           apiId: row.apiId || "",
           postponed: false,
           wasPostponed: false,
@@ -2930,6 +2934,7 @@ async function syncOnlineMatchesFromSheet(options = {}) {
         existing.played = played;
         existing.homeScore = homeScore === "" ? null : homeScore;
         existing.awayScore = awayScore === "" ? null : awayScore;
+        existing.manualScoreLocked = manualScoreLocked;
       }
 
       if (
@@ -3061,6 +3066,10 @@ function normalizeWeekRegistryItem(item) {
     publishedAt: item.publishedAt || "",
     publishedBy: item.publishedBy || "",
     completedAt: item.completedAt || "",
+    predictionManualLocked: item.predictionManualLocked === true,
+    predictionManualOpen: item.predictionManualOpen === true,
+    predictionManualUpdatedAt: item.predictionManualUpdatedAt || "",
+    predictionManualUpdatedBy: item.predictionManualUpdatedBy || "",
   };
 }
 
@@ -3147,6 +3156,10 @@ async function persistWeekRegistryToFirebase() {
       publishedAt: week.publishedAt || "",
       publishedBy: week.publishedBy || "",
       completedAt: week.completedAt || "",
+      predictionManualLocked: week.predictionManualLocked === true,
+      predictionManualOpen: week.predictionManualOpen === true,
+      predictionManualUpdatedAt: week.predictionManualUpdatedAt || "",
+      predictionManualUpdatedBy: week.predictionManualUpdatedBy || "",
     }))
     .filter((week) => week.id && week.seasonId && week.number);
 
@@ -3258,6 +3271,9 @@ async function sendMatchesToSheet(matches, options = {}) {
       awayScore: match.awayScore ?? "",
       evGol: match.homeScore ?? "",
       depGol: match.awayScore ?? "",
+      manualScoreLocked: !!match.manualScoreLocked,
+      manualScoreLock: !!match.manualScoreLocked,
+      manuelSkorKilitli: match.manualScoreLocked ? 1 : 0,
     }))
     .filter(
       (item) => item.sezon && item.haftaNo && item.evSahibi && item.deplasman,
@@ -5522,7 +5538,9 @@ function renderDashboardMatchCards(container, matches) {
                 Math.min(
                   96,
                   Math.floor(
-                    ((runtime.elapsedMs || 0) / (120 * 60 * 1000)) * 100,
+                    ((runtime.elapsedMs || 0) /
+                      (MATCH_TOTAL_RUNTIME_MINUTES * 60 * 1000)) *
+                      100,
                   ),
                 ),
               )
@@ -5551,11 +5569,13 @@ function renderDashboardMatchCards(container, matches) {
     }
 
     if (visual === "live") {
-      const liveMinute = runtime.minute
-        ? `${runtime.minute}'`
-        : String(match.statusText || "Canlı")
-            .replace(/live|in play/gi, "")
-            .trim() || "Canlı";
+      const liveMinute = runtime.halftime
+        ? "DEVRE ARASI"
+        : runtime.minute
+          ? `${runtime.minute}'`
+          : String(match.statusText || "Canlı")
+              .replace(/live|in play/gi, "")
+              .trim() || "Canlı";
       return {
         icon: "●",
         label: "CANLI",
@@ -5987,7 +6007,7 @@ function renderMobilePredictions(container, matches) {
             ${match.played ? `<span class="result-chip premium-result-chip">Skor ${match.homeScore}-${match.awayScore}</span>` : locked ? `<span class="result-chip warning-chip premium-result-chip">Kapandı</span>` : `<span class="result-chip premium-result-chip soft-chip">Açık</span>`}
           </div>
         </div>
-        ${!isAdmin && !predictionRevealOpen ? `<div class="mobile-fairplay-notice">🔒 Diğer kullanıcıların tahminleri maç başlayınca açılır.</div>` : ""}
+        ${!isAdmin && !predictionRevealOpen ? `<div class="mobile-fairplay-notice">🔒 Diğer kullanıcıların tahminleri tahmin süresi kilitlenince açılır.</div>` : ""}
         <div class="mobile-user-predictions compact-mobile-user-predictions">${players
           .map((player) => {
             const pred =
@@ -6759,8 +6779,95 @@ function getWeekPredictionLockTimestamp(weekId) {
     .sort((a, b) => a - b);
 
   if (!datedMatches.length) return null;
-  return datedMatches[0] - 10 * 60 * 1000;
+  return datedMatches[0] - 6 * 60 * 60 * 1000;
 }
+
+function getWeekPredictionManualState(weekId) {
+  const week = getWeekById(weekId);
+  if (!week) return "auto";
+  if (week.predictionManualLocked === true) return "locked";
+  if (week.predictionManualOpen === true) return "open";
+  return "auto";
+}
+
+function isWeekPredictionLockedForUsers(weekId, nowMs = Date.now()) {
+  const manualState = getWeekPredictionManualState(weekId);
+  if (manualState === "locked") return true;
+  if (manualState === "open") return false;
+
+  const lockTs = getWeekPredictionLockTimestamp(weekId);
+  if (lockTs === null) return false;
+  return nowMs >= lockTs;
+}
+
+function getWeekPredictionAdminControlHtml(weekId) {
+  if (getCurrentRole() !== "admin" || !weekId) return "";
+  const manualState = getWeekPredictionManualState(weekId);
+  const isLocked = manualState === "locked";
+  const label = isLocked ? "🔓 Haftayı Aç" : "🔒 Haftayı Kilitle";
+  const cls = isLocked ? "secondary" : "danger";
+  return `<button type="button" class="${cls} small prediction-week-lock-btn" onclick="toggleWeekPredictionLock('${weekId}', this)">${label}</button>`;
+}
+
+window.toggleWeekPredictionLock = async function (weekId, actionButton = null) {
+  if (getCurrentRole() !== "admin" || !weekId) return;
+  const week = getWeekById(weekId);
+  if (!week) return;
+
+  const manualState = getWeekPredictionManualState(weekId);
+  const willLock = manualState !== "locked";
+  const autoLockTs = getWeekPredictionLockTimestamp(weekId);
+  const now = Date.now();
+
+  const confirmed = await showConfirm(
+    willLock
+      ? `${week.number}. haftayı şimdi kilitlemek istiyor musun?\n\nKullanıcılar tahmin giremeyecek ve tahminler görünür olacak. Bu işlem için kimseye 2 saat / 1 saat hatırlatma bildirimi gönderilmeyecek.`
+      : `${week.number}. haftayı yeniden tahminlere açmak istiyor musun?\n\nNormal 6 saatlik kilit zamanı henüz gelmediyse otomatik sistem tekrar devralır. Kilit zamanı geçtiyse admin açma kararı geçerli olur.`,
+    {
+      title: willLock ? "Haftayı Kilitle" : "Haftayı Aç",
+      type: "confirm",
+      confirmText: willLock ? "Kilitle" : "Aç",
+    },
+  );
+  if (!confirmed) return;
+
+  try {
+    if (actionButton) {
+      setAsyncButtonState(actionButton, "loading", {
+        loading: willLock ? "Kilitleniyor..." : "Açılıyor...",
+      });
+    }
+
+    week.predictionManualLocked = willLock;
+    week.predictionManualOpen =
+      !willLock && typeof autoLockTs === "number" && now >= autoLockTs;
+    week.predictionManualUpdatedAt = new Date().toISOString();
+    week.predictionManualUpdatedBy =
+      (typeof getCurrentUsername === "function" && getCurrentUsername()) ||
+      "admin";
+
+    await persistWeekRegistryToFirebase();
+    saveState(true);
+
+    if (typeof renderPredictions === "function") renderPredictions();
+    if (typeof renderDashboard === "function") renderDashboard();
+
+    showToast(
+      willLock
+        ? `${week.number}. hafta manuel olarak kilitlendi. Hatırlatma bildirimleri susturuldu.`
+        : `${week.number}. hafta yeniden tahminlere açıldı.`,
+      "success",
+    );
+  } catch (error) {
+    console.error("Hafta tahmin kilidi güncellenemedi:", error);
+    showAlert(`Hafta kilidi güncellenemedi: ${error.message || error}`, {
+      title: "İşlem başarısız",
+      type: "error",
+    });
+  } finally {
+    if (actionButton) setAsyncButtonState(actionButton, "idle");
+  }
+};
 
 let predictionLockTimerInterval = null;
 let predictionRevealRefreshTimer = null;
@@ -6861,22 +6968,48 @@ function renderPredictionLockBanner(weekId) {
   predictionRevealSignatureCache[weekId] = getPredictionRevealSignature(weekId);
 
   const lockTs = getWeekPredictionLockTimestamp(weekId);
-  if (lockTs === null) {
-    banner.className = "prediction-lock-banner is-hidden";
-    banner.innerHTML = "";
-    return;
-  }
-
   const isAdmin = getCurrentRole() === "admin";
 
   const updateBanner = () => {
+    const manualState = getWeekPredictionManualState(weekId);
+    const adminControl = isAdmin ? getWeekPredictionAdminControlHtml(weekId) : "";
+    const notificationButton =
+      typeof getPredictionNotificationButtonHtml === "function" &&
+      manualState !== "locked"
+        ? getPredictionNotificationButtonHtml()
+        : "";
+
+    if (manualState === "locked") {
+      banner.className = `prediction-lock-banner ${isAdmin ? "admin" : "closed"}`;
+      banner.innerHTML = isAdmin
+        ? `<strong>🔒 Hafta admin tarafından kilitlendi</strong><span>Kullanıcılar tahmin giremez. 2 saat / 1 saat otomatik hatırlatma bildirimleri bu hafta için gönderilmez.</span>${adminControl}`
+        : `<strong>🔒 Tahminler kilitlendi</strong><span>Admin bu haftayı manuel olarak kilitledi. Tahminler artık görünür.</span>`;
+      refreshPredictionViewsAfterRevealChange(weekId);
+      return;
+    }
+
+    if (manualState === "open") {
+      banner.className = `prediction-lock-banner ${isAdmin ? "admin" : "open"}`;
+      banner.innerHTML = isAdmin
+        ? `<strong>🔓 Hafta admin tarafından açık tutuluyor</strong><span>Normal 6 saatlik kilit zamanı geçmiş olsa bile kullanıcılar tahmin girmeye devam edebilir.</span>${adminControl}${notificationButton}`
+        : `<strong>🔓 Tahminler admin tarafından yeniden açıldı</strong><span>Bu hafta için tahmin girişi şu anda açık.</span>${notificationButton}`;
+      refreshPredictionViewsAfterRevealChange(weekId);
+      return;
+    }
+
+    if (lockTs === null) {
+      banner.className = "prediction-lock-banner is-hidden";
+      banner.innerHTML = "";
+      return;
+    }
+
     const diff = lockTs - Date.now();
 
     if (diff <= 0) {
       if (isAdmin) {
         banner.className = "prediction-lock-banner admin";
         banner.innerHTML =
-          "<strong>🔓 Admin modu açık</strong><span>Tahmin süresi kullanıcılar için doldu. Admin olarak düzenlemeye devam edebilirsin.</span>";
+          `<strong>🔓 Admin modu açık</strong><span>Tahmin süresi kullanıcılar için doldu. İstersen haftayı manuel olarak yeniden açabilirsin.</span>${adminControl}`;
       } else {
         banner.className = "prediction-lock-banner closed";
         banner.innerHTML =
@@ -6890,17 +7023,12 @@ function renderPredictionLockBanner(weekId) {
     const toneClass = diff <= 60 * 60 * 1000 ? "warning" : "open";
     banner.className = `prediction-lock-banner ${isAdmin ? "admin" : toneClass}`;
 
-    const notificationButton =
-      typeof getPredictionNotificationButtonHtml === "function"
-        ? getPredictionNotificationButtonHtml()
-        : "";
-
     if (isAdmin) {
-      banner.innerHTML = `<strong>🔓 Admin görünümü · ${countdown}</strong><span>Kullanıcılar için haftalık kilit bu sürenin sonunda devreye girer.</span>${notificationButton}`;
+      banner.innerHTML = `<strong>🔓 Admin görünümü · ${countdown}</strong><span>Kullanıcılar için otomatik kilit bu sürenin sonunda devreye girer. İstersen daha erken manuel kilitleyebilirsin.</span>${adminControl}${notificationButton}`;
       return;
     }
 
-    banner.innerHTML = `<strong>⏳ Tahmin vermek için kalan süre: ${countdown}</strong><span>Haftanın ilk maçına 10 dk kala tüm tahminler otomatik kilitlenir.</span>${notificationButton}`;
+    banner.innerHTML = `<strong>⏳ Tahmin vermek için kalan süre: ${countdown}</strong><span>Haftanın ilk maçından 6 saat önce tüm tahminler otomatik kilitlenir.</span>${notificationButton}`;
     refreshPredictionViewsAfterRevealChange(weekId);
   };
 
@@ -6911,6 +7039,10 @@ function renderPredictionLockBanner(weekId) {
 function isMatchLocked(match) {
   if (getCurrentRole() === "admin") return false;
   if (match.played) return true;
+
+  const manualState = getWeekPredictionManualState(match.weekId);
+  if (manualState === "locked") return true;
+  if (manualState === "open") return false;
 
   const weekLockTs = getWeekPredictionLockTimestamp(match.weekId);
   if (weekLockTs !== null) return Date.now() >= weekLockTs;
@@ -6955,12 +7087,16 @@ function isMatchStartedForPredictionReveal(match) {
 function isWeekStartedForPredictionReveal(weekId) {
   if (!weekId) return false;
 
-  // Fair Play: Hafta tahmin kilidi geldikten sonra kimse tahmin değiştiremez.
-  // Bu yüzden diğer kullanıcıların tahminlerini açmak güvenlidir.
-  // Önceki durumda sadece maç başlangıç saati bekleniyordu; sanal/test maçlarda
-  // hafta kilitlenmiş olsa bile tahminler mobil/PC/modal tarafta gizli kalabiliyordu.
-  const weekLockTs = getWeekPredictionLockTimestamp(weekId);
-  if (weekLockTs !== null && Date.now() >= weekLockTs) return true;
+  const manualState = getWeekPredictionManualState(weekId);
+  if (manualState === "locked") return true;
+
+  // Admin haftayı, normal otomatik kilit saati geçtikten sonra yeniden açmışsa
+  // kullanıcılar tekrar tahmin girebilsin diye otomatik kilit/reveal kuralını
+  // geçici olarak bastırırız. Maç gerçekten başladıysa tahminler yine görünür.
+  if (manualState !== "open") {
+    const weekLockTs = getWeekPredictionLockTimestamp(weekId);
+    if (weekLockTs !== null && Date.now() >= weekLockTs) return true;
+  }
 
   return getMatchesByWeekId(weekId).some((match) =>
     isMatchStartedForPredictionReveal(match),
@@ -6977,8 +7113,8 @@ function canRevealPredictionForViewer(match, playerId) {
 
 function getHiddenPredictionNotice(match) {
   return isMatchLocked(match)
-    ? "Kilitli · Maç başlayınca açılır"
-    : "Adil oyun · Maç başlayınca açılır";
+    ? "Kilitli · Tahmin süresi kapanınca açılır"
+    : "Adil oyun · Tahmin süresi kapanınca açılır";
 }
 
 function ensurePrediction(matchId, playerId) {
@@ -7112,6 +7248,12 @@ function isPostponedStatus(statusText = "") {
   );
 }
 
+const MATCH_FIRST_HALF_MINUTES = 45;
+const MATCH_HALFTIME_MINUTES = 20;
+const MATCH_SECOND_HALF_MINUTES = 45;
+const MATCH_TOTAL_RUNTIME_MINUTES =
+  MATCH_FIRST_HALF_MINUTES + MATCH_HALFTIME_MINUTES + MATCH_SECOND_HALF_MINUTES;
+
 function getMatchRuntimeInfo(match, nowMs = Date.now()) {
   const startTs = parseMatchDateTimestamp(match?.date);
   if (Number.isNaN(startTs)) {
@@ -7121,29 +7263,70 @@ function getMatchRuntimeInfo(match, nowMs = Date.now()) {
       elapsedMs: null,
       minute: null,
       phase: "unknown",
+      halftime: false,
     };
   }
 
   const diffMs = startTs - nowMs;
   const elapsedMs = nowMs - startTs;
-  const liveMinutes = Number(
-    match?.liveMinutes || match?.durationMinutes || 120,
-  );
-  const liveMs = Math.max(90, liveMinutes) * 60 * 1000;
+  const elapsedMinutes = Math.floor(Math.max(0, elapsedMs) / 60000);
 
   if (diffMs > 0) {
-    return { startTs, diffMs, elapsedMs, minute: null, phase: "waiting" };
+    return {
+      startTs,
+      diffMs,
+      elapsedMs,
+      minute: null,
+      phase: "waiting",
+      halftime: false,
+    };
   }
 
-  if (elapsedMs <= liveMs) {
-    const minute = Math.max(
-      1,
-      Math.min(120, Math.floor(elapsedMs / 60000) + 1),
-    );
-    return { startTs, diffMs, elapsedMs, minute, phase: "live" };
+  if (elapsedMinutes < MATCH_FIRST_HALF_MINUTES) {
+    const minute = Math.max(1, Math.min(45, elapsedMinutes + 1));
+    return {
+      startTs,
+      diffMs,
+      elapsedMs,
+      minute,
+      phase: "live",
+      halftime: false,
+    };
   }
 
-  return { startTs, diffMs, elapsedMs, minute: null, phase: "finished-time" };
+  const halftimeEndsAt = MATCH_FIRST_HALF_MINUTES + MATCH_HALFTIME_MINUTES;
+  if (elapsedMinutes < halftimeEndsAt) {
+    return {
+      startTs,
+      diffMs,
+      elapsedMs,
+      minute: 45,
+      phase: "halftime",
+      halftime: true,
+    };
+  }
+
+  if (elapsedMinutes < MATCH_TOTAL_RUNTIME_MINUTES) {
+    const secondHalfElapsed = elapsedMinutes - halftimeEndsAt;
+    const minute = Math.max(46, Math.min(90, 46 + secondHalfElapsed));
+    return {
+      startTs,
+      diffMs,
+      elapsedMs,
+      minute,
+      phase: "live",
+      halftime: false,
+    };
+  }
+
+  return {
+    startTs,
+    diffMs,
+    elapsedMs,
+    minute: null,
+    phase: "finished-time",
+    halftime: false,
+  };
 }
 
 function getMatchVisualState(match) {
@@ -7168,7 +7351,7 @@ function getMatchVisualState(match) {
   }
 
   const runtime = getMatchRuntimeInfo(match);
-  if (runtime.phase === "live") return "live";
+  if (runtime.phase === "live" || runtime.phase === "halftime") return "live";
   if (runtime.phase === "finished-time") return "finished-time";
   if (isMatchLocked(match)) return "locked";
   return "waiting";
@@ -9511,7 +9694,7 @@ function renderMatches(
               <input type="number" min="0" id="homeScore_${match.id}" value="${match.played ? match.homeScore : ""}" oninput="queueResultSave('${match.id}')" aria-label="${escapeHtml(match.homeTeam)} skoru" />
               <span>-</span>
               <input type="number" min="0" id="awayScore_${match.id}" value="${match.played ? match.awayScore : ""}" oninput="queueResultSave('${match.id}')" aria-label="${escapeHtml(match.awayTeam)} skoru" />
-              <span class="auto-save-note">Otomatik</span>
+              <span class="auto-save-note">${match.manualScoreLocked ? "🔒 Manuel" : "Otomatik"}</span>
             </div>
           </div>
           ${
@@ -9550,6 +9733,8 @@ window.saveResult = async function (matchId) {
   match.homeScore = Number(homeScore);
   match.awayScore = Number(awayScore);
   match.played = true;
+  // Admin tarafından girilen skor API sonucundan daha yüksek önceliklidir.
+  match.manualScoreLocked = true;
   recalculateAllPoints();
   saveState();
   renderAll();
@@ -9850,6 +10035,7 @@ window.editMatch = async function (matchId) {
     match.homeScore = null;
     match.awayScore = null;
     match.played = false;
+    match.manualScoreLocked = false;
   }
 
   await saveSingleMatchChange(match, "Maç bilgileri güncellendi.");
@@ -9880,8 +10066,36 @@ window.clearMatchScore = async function (matchId) {
   match.homeScore = null;
   match.awayScore = null;
   match.played = false;
+  // Skor temizlenince manuel kilit de kalkar; kontrol tekrar TheSportsDB'ye geçer.
+  match.manualScoreLocked = false;
 
-  await saveSingleMatchChange(match, "Maç skoru temizlendi.");
+  let apiScoreRestored = false;
+  try {
+    const season = getSeasonById(match.seasonId);
+    const seasonLabel = String(season?.name || getApiSeasonLabel() || "").trim();
+    if (seasonLabel) {
+      const events = await fetchSeasonEvents(seasonLabel);
+      const apiEvent = events.find(
+        (event) =>
+          (match.apiId && String(event.apiId) === String(match.apiId)) ||
+          (normalizeText(event.homeTeam) === normalizeText(match.homeTeam) &&
+            normalizeText(event.awayTeam) === normalizeText(match.awayTeam)),
+      );
+      if (apiEvent) {
+        applyApiEventToMatch(match, apiEvent);
+        apiScoreRestored = !!match.played;
+      }
+    }
+  } catch (error) {
+    console.warn("Skor temizlendikten sonra API skoru yeniden alınamadı:", error);
+  }
+
+  await saveSingleMatchChange(
+    match,
+    apiScoreRestored
+      ? "Manuel skor temizlendi; güncel API skoru yeniden alındı."
+      : "Manuel skor temizlendi. Maç yeniden API güncellemesine açıldı.",
+  );
 };
 window.removeMatch = async function (matchId) {
   if (isReadOnlyMode())
@@ -11173,7 +11387,7 @@ function renderFocusedUserPredictions(container, matches) {
               >${revealButtonText}</button>
             `
                 : `
-              <div class="focused-reveal-locked-note">🔒 Diğer tahminler maç başlayınca açılır</div>
+              <div class="focused-reveal-locked-note">🔒 Diğer tahminler tahmin süresi kilitlenince açılır</div>
             `
             }
             <div
@@ -15833,19 +16047,20 @@ function applyApiEventToMatch(match, event, allowCreateIfMissing = false) {
   target.statusText = event.statusText || "";
   if (event.date) target.date = event.date;
   const hasScore = event.homeScore !== null && event.awayScore !== null;
+  const manualScoreLocked = !!target.manualScoreLocked;
   if (event.postponed) {
     target.postponed = true;
     target.wasPostponed = true;
   } else if (target.postponed) {
     target.postponed = false;
   }
-  if (hasScore) {
+  if (hasScore && !manualScoreLocked) {
     target.homeScore = event.homeScore;
     target.awayScore = event.awayScore;
     target.played = true;
     if (target.wasPostponed || event.postponed) target.wasPostponed = true;
     target.postponed = false;
-  } else if (!target.played) {
+  } else if (!hasScore && !target.played && !manualScoreLocked) {
     target.homeScore = null;
     target.awayScore = null;
   }
@@ -17433,8 +17648,7 @@ const PREDICTION_NOTIFICATION_DEVICE_ID_KEY =
 const PREDICTION_NOTIFICATION_CHECK_INTERVAL_MS = 60 * 1000;
 
 const PREDICTION_NOTIFICATION_REMINDERS = [
-  { id: "24h", label: "24 saat", ms: 24 * 60 * 60 * 1000 },
-  { id: "3h", label: "3 saat", ms: 3 * 60 * 60 * 1000 },
+  { id: "2h", label: "2 saat", ms: 2 * 60 * 60 * 1000 },
   { id: "1h", label: "1 saat", ms: 60 * 60 * 1000 },
 ];
 
@@ -17539,6 +17753,11 @@ function getNextPredictionLockTarget() {
   return (
     weeks
       .filter((week) => !seasonId || String(week.seasonId) === String(seasonId))
+      .filter(
+        (week) =>
+          week.predictionManualLocked !== true &&
+          week.predictionManualOpen !== true,
+      )
       .map((week) => {
         const lockTs = getWeekPredictionLockTimestamp(week.id);
         return {
@@ -17555,14 +17774,16 @@ function getNextPredictionLockTarget() {
 function showPredictionReminderNotification(target, reminder) {
   const weekNumber =
     target?.week?.number || getWeekNumberById(target?.week?.id) || "?";
-  const title = "Tahmin zamanı yaklaşıyor";
-  const body = `${weekNumber}. hafta tahminleri yaklaşık ${reminder.label} sonra kapanacak.`;
+  const title = "⏳ Tahminler yakında kilitleniyor";
+  const body = `${weekNumber}. hafta tahminlerinin kilitlenmesine ${reminder.label} kaldı. Tahminini son kez kontrol etmeyi unutma!`;
+
+  const notificationTag = `prediction-reminder-${target.week.id}-${reminder.id}`;
 
   try {
-    console.log("[PAGE] new Notification çalıştı", title, dedupeKey);
+    console.log("[PAGE] new Notification çalıştı", title, notificationTag);
     new Notification(title, {
       body,
-      tag: `prediction-reminder-${target.week.id}-${reminder.id}`,
+      tag: notificationTag,
       renotify: true,
       icon: getFiksturNotificationAssetUrl("/app-icons/pwa-icon-192-v3.png"),
       badge: getFiksturNotificationAssetUrl("/notification-icons/badge-72.png"),
