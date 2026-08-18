@@ -10593,23 +10593,9 @@ function getShareCellPalette(pred, match, shareView) {
     };
   }
 
-  const homeDifference = Math.abs(
-    Number(pred.homePred) - Number(match.homeScore),
-  );
-  const awayDifference = Math.abs(
-    Number(pred.awayPred) - Number(match.awayScore),
-  );
-  if (homeDifference <= 1 && awayDifference <= 1) {
-    return {
-      bg: "rgba(30,64,175,0.78)",
-      border: "rgba(96,165,250,0.48)",
-      accent: "#dbeafe",
-      icon: "✔",
-      label: "Yakın tahmin",
-      pointsText: "0 Puan",
-    };
-  }
-
+  // Maç sonu görselinde puan kazandırmayan tahminleri "yakın" diye
+  // işaretlemek yanıltıcı oluyor. Sonuç türü yanlışsa skor farkına
+  // bakılmaksızın kırmızı/yanlış gösterilir.
   return {
     bg: "rgba(127,29,29,0.82)",
     border: "rgba(248,113,113,0.44)",
@@ -10618,6 +10604,223 @@ function getShareCellPalette(pred, match, shareView) {
     label: "Yanlış",
     pointsText: "0 Puan",
   };
+}
+
+function drawPredictionShareStandingsPanel(
+  ctx,
+  x,
+  y,
+  width,
+  weeklyStandings,
+  generalStandings,
+  players,
+) {
+  const weeklyMap = new Map(
+    weeklyStandings.map((row, index) => [
+      String(row.id),
+      { ...row, rank: index + 1 },
+    ]),
+  );
+  const generalMap = new Map(
+    generalStandings.map((row, index) => [
+      String(row.id),
+      { ...row, rank: index + 1 },
+    ]),
+  );
+
+  const rows = players
+    .map((player) => {
+      const weekly = weeklyMap.get(String(player.id));
+      const general = generalMap.get(String(player.id));
+      return {
+        id: player.id,
+        name: player.name,
+        weekly: Number(weekly?.total || 0),
+        general: Number(general?.total || 0),
+        weeklyRank: weekly?.rank || 9999,
+        generalRank: general?.rank || 9999,
+        exact: Number(weekly?.exact || 0),
+        resultOnly: Number(weekly?.resultOnly || 0),
+      };
+    })
+    .sort(
+      (a, b) =>
+        a.weeklyRank - b.weeklyRank ||
+        b.weekly - a.weekly ||
+        a.generalRank - b.generalRank ||
+        b.general - a.general ||
+        String(a.name || "").localeCompare(String(b.name || ""), "tr"),
+    );
+
+  const padding = 20;
+  const titleH = 112;
+  const columnsH = 38;
+  const rowH = 64;
+  const rowGap = 7;
+  const bottomH = 102;
+  const panelH =
+    padding * 2 +
+    titleH +
+    columnsH +
+    rows.length * rowH +
+    Math.max(0, rows.length - 1) * rowGap +
+    bottomH;
+
+  const panelGradient = ctx.createLinearGradient(x, y, x, y + panelH);
+  panelGradient.addColorStop(0, "rgba(14,39,72,0.99)");
+  panelGradient.addColorStop(0.48, "rgba(8,25,49,0.99)");
+  panelGradient.addColorStop(1, "rgba(5,17,34,0.99)");
+
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.48)";
+  ctx.shadowBlur = 26;
+  ctx.shadowOffsetY = 10;
+  fillRoundedRect(
+    ctx,
+    x,
+    y,
+    width,
+    panelH,
+    26,
+    panelGradient,
+    "rgba(125,211,252,0.20)",
+  );
+  ctx.restore();
+
+  const titleGradient = ctx.createLinearGradient(x, y, x + width, y + titleH);
+  titleGradient.addColorStop(0, "rgba(14,116,144,0.30)");
+  titleGradient.addColorStop(1, "rgba(30,64,175,0.12)");
+  fillRoundedRect(
+    ctx,
+    x + 12,
+    y + 12,
+    width - 24,
+    titleH - 10,
+    20,
+    titleGradient,
+    "rgba(125,211,252,0.18)",
+  );
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "#7dd3fc";
+  ctx.font = "900 14px Inter, Arial, sans-serif";
+  ctx.fillText("PUAN DURUMU", x + 30, y + 45);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "900 29px Inter, Arial, sans-serif";
+  ctx.fillText("Haftalık Sıralama", x + 30, y + 80);
+  ctx.fillStyle = "#9fb6d2";
+  ctx.font = "700 13px Inter, Arial, sans-serif";
+  ctx.fillText("Hafta ve sezon toplamı birlikte", x + 30, y + 101);
+
+  let cursorY = y + padding + titleH;
+  ctx.fillStyle = "#7892b2";
+  ctx.font = "900 11px Inter, Arial, sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText("SIRA  KULLANICI", x + padding + 6, cursorY + 23);
+  ctx.textAlign = "center";
+  ctx.fillText("HAFTA", x + width - 112, cursorY + 23);
+  ctx.fillText("GENEL", x + width - 45, cursorY + 23);
+  cursorY += columnsH;
+
+  rows.forEach((row, index) => {
+    const rank = index + 1;
+    const isLeader = rank === 1;
+    const rowGradient = ctx.createLinearGradient(
+      x + padding,
+      cursorY,
+      x + width - padding,
+      cursorY + rowH,
+    );
+    if (rank === 1) {
+      rowGradient.addColorStop(0, "rgba(146,91,12,0.96)");
+      rowGradient.addColorStop(1, "rgba(91,54,7,0.90)");
+    } else if (rank === 2) {
+      rowGradient.addColorStop(0, "rgba(71,85,105,0.88)");
+      rowGradient.addColorStop(1, "rgba(42,55,75,0.88)");
+    } else if (rank === 3) {
+      rowGradient.addColorStop(0, "rgba(120,65,34,0.88)");
+      rowGradient.addColorStop(1, "rgba(72,43,30,0.88)");
+    } else {
+      rowGradient.addColorStop(0, "rgba(15,45,77,0.88)");
+      rowGradient.addColorStop(1, "rgba(10,30,57,0.88)");
+    }
+
+    fillRoundedRect(
+      ctx,
+      x + padding,
+      cursorY,
+      width - padding * 2,
+      rowH,
+      14,
+      rowGradient,
+      isLeader
+        ? "rgba(250,204,21,0.50)"
+        : "rgba(125,211,252,0.12)",
+    );
+
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "center";
+    ctx.fillStyle = isLeader ? "#fde68a" : "#b9cbe0";
+    ctx.font = `${isLeader ? "900" : "800"} 18px Inter, Arial, sans-serif`;
+    const rankText = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : String(rank);
+    ctx.fillText(rankText, x + padding + 26, cursorY + rowH / 2);
+
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "900 14px Inter, Arial, sans-serif";
+    ctx.fillText(
+      truncateCanvasText(ctx, String(row.name || "").toUpperCase(), 112),
+      x + padding + 52,
+      cursorY + 24,
+    );
+    ctx.fillStyle = isLeader ? "#fde68a" : "#89a2bf";
+    ctx.font = "700 10px Inter, Arial, sans-serif";
+    ctx.fillText(
+      `Tam ${row.exact}  •  Sonuç ${row.resultOnly}`,
+      x + padding + 52,
+      cursorY + 45,
+    );
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = isLeader ? "#fef3c7" : "#dbeafe";
+    ctx.font = "900 19px Inter, Arial, sans-serif";
+    ctx.fillText(`${row.weekly}P`, x + width - 112, cursorY + rowH / 2);
+    ctx.fillStyle = "#93c5fd";
+    ctx.font = "900 17px Inter, Arial, sans-serif";
+    ctx.fillText(`${row.general}P`, x + width - 45, cursorY + rowH / 2);
+
+    cursorY += rowH + rowGap;
+  });
+
+  cursorY += 16;
+  fillRoundedRect(
+    ctx,
+    x + padding,
+    cursorY,
+    width - padding * 2,
+    72,
+    18,
+    "rgba(2,6,23,0.42)",
+    "rgba(255,255,255,0.10)",
+  );
+  ctx.textBaseline = "alphabetic";
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#8fa8c5";
+  ctx.font = "800 11px Inter, Arial, sans-serif";
+  ctx.fillText("HAFTA LİDERİ", x + padding + 18, cursorY + 26);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "900 17px Inter, Arial, sans-serif";
+  ctx.fillText(
+    truncateCanvasText(ctx, String(rows[0]?.name || "Henüz yok").toUpperCase(), 160),
+    x + padding + 18,
+    cursorY + 51,
+  );
+  ctx.textAlign = "right";
+  ctx.fillStyle = "#fde68a";
+  ctx.font = "900 24px Inter, Arial, sans-serif";
+  ctx.fillText(`${rows[0]?.weekly || 0} PUAN`, x + width - padding - 18, cursorY + 49);
+  ctx.textAlign = "left";
 }
 
 async function createPredictionShareExportCanvas(
@@ -10633,10 +10836,17 @@ async function createPredictionShareExportCanvas(
   const totalPages = Number(options.totalPages || 1);
   const weeklyStandings =
     shareView === "post" ? getWeeklyStandings(state.settings.activeWeekId) : [];
+  const generalStandings =
+    shareView === "post" ? getGeneralStandings(seasonId) : [];
   const weekLeader = weeklyStandings[0] || null;
-  const width = 1600;
   const margin = 42;
-
+  const gridContentW = 1600 - margin * 2;
+  const standingsPanelGap = 24;
+  const standingsPanelW = 400;
+  const width =
+    shareView === "post"
+      ? margin * 2 + gridContentW + standingsPanelGap + standingsPanelW
+      : 1600;
   const contentW = width - margin * 2;
 
   const headerH = 150;
@@ -10647,7 +10857,7 @@ async function createPredictionShareExportCanvas(
   /* Kartlar arası boşluğu artır */
   const cardGap = 28;
 
-  const cardW = (contentW - cardGap * (columns - 1)) / columns;
+  const cardW = (gridContentW - cardGap * (columns - 1)) / columns;
 
   const playerRowH = shareView === "post" ? 48 : 46;
   const playerGap = 5;
@@ -10665,6 +10875,11 @@ async function createPredictionShareExportCanvas(
     Math.max(0, players.length - 1) * playerGap;
 
   const gridRows = Math.max(1, Math.ceil(matches.length / columns));
+  const gridBlockH =
+    gridRows * cardH + Math.max(0, gridRows - 1) * cardGap;
+  const standingsPanelH =
+    shareView === "post" ? 285 + players.length * 71 : 0;
+  const mainContentH = Math.max(gridBlockH, standingsPanelH);
 
   const leaderH = shareView === "post" && weekLeader ? 185 : 0;
   const leaderGap = leaderH ? 22 : 0;
@@ -10675,8 +10890,7 @@ async function createPredictionShareExportCanvas(
     margin +
     headerH +
     topGap +
-    gridRows * cardH +
-    Math.max(0, gridRows - 1) * cardGap +
+    mainContentH +
     leaderGap +
     leaderH +
     footerH +
@@ -10935,7 +11149,19 @@ async function createPredictionShareExportCanvas(
     }
   }
 
-  let cursorY = gridY + gridRows * cardH + Math.max(0, gridRows - 1) * cardGap;
+  if (shareView === "post") {
+    drawPredictionShareStandingsPanel(
+      ctx,
+      margin + gridContentW + standingsPanelGap,
+      gridY,
+      standingsPanelW,
+      weeklyStandings,
+      generalStandings,
+      players,
+    );
+  }
+
+  let cursorY = gridY + mainContentH;
 
   if (leaderH && weekLeader) {
     cursorY += leaderGap;
