@@ -734,6 +734,11 @@ async function firebaseApiPost(action, payload = {}) {
         typeof payload.matches === "string"
           ? JSON.parse(payload.matches || "[]")
           : payload.matches || [];
+      const allowManualScoreUnlock =
+        payload.allowManualScoreUnlock === true &&
+        typeof getCurrentRole === "function" &&
+        getCurrentRole() === "admin";
+
       for (const match of rawMatches) {
         if (!match?.id) continue;
         const id = sanitizeFirebaseKey(match.id);
@@ -747,7 +752,28 @@ async function firebaseApiPost(action, payload = {}) {
           match.haftaNo ||
           getWeekNumberById(match.weekId) ||
           "";
-        await firebaseWrite(`matches/${id}`, {
+
+        // Firebase'deki admin manuel skoru kanonik kaynaktır. Eski/stale bir
+        // kullanıcı oturumu veya normal API senkronu bu kilidi ve skoru ezemez.
+        const current = (await firebaseRead(`matches/${id}`)) || null;
+        const currentManualLocked = parseBooleanish(
+          current?.manualScoreLocked ??
+            current?.manualScoreLock ??
+            current?.manuelSkorKilitli ??
+            false,
+        );
+        const incomingManualLocked = parseBooleanish(
+          match.manualScoreLocked ??
+            match.manualScoreLock ??
+            match.manuelSkorKilitli ??
+            false,
+        );
+
+        const protectedManualScore =
+          currentManualLocked && !incomingManualLocked && !allowManualScoreUnlock;
+
+        const nextMatch = {
+          ...(current || {}),
           ...match,
           id,
           season: seasonLabel,
@@ -755,7 +781,23 @@ async function firebaseApiPost(action, payload = {}) {
           weekNo,
           haftaNo: weekNo,
           updatedAt: new Date().toISOString(),
-        });
+        };
+
+        if (protectedManualScore) {
+          nextMatch.homeScore = current.homeScore ?? current.evGol ?? null;
+          nextMatch.awayScore = current.awayScore ?? current.depGol ?? null;
+          nextMatch.evGol = nextMatch.homeScore ?? "";
+          nextMatch.depGol = nextMatch.awayScore ?? "";
+          nextMatch.played = parseBooleanish(
+            current.played ?? current.oynandiMi ?? true,
+          );
+          nextMatch.oynandiMi = nextMatch.played ? 1 : 0;
+          nextMatch.manualScoreLocked = true;
+          nextMatch.manualScoreLock = true;
+          nextMatch.manuelSkorKilitli = 1;
+        }
+
+        await firebaseWrite(`matches/${id}`, nextMatch);
       }
       return { success: true };
     }
@@ -2931,6 +2973,8 @@ async function syncOnlineMatchesFromSheet(options = {}) {
             existing.sheetMatchId ||
             "",
         );
+        // Firebase kanonik kaynaktır. Admin kilidi Firebase yazma katmanında
+        // korunur; böylece burada gerçek uzak durum güvenle uygulanabilir.
         existing.played = played;
         existing.homeScore = homeScore === "" ? null : homeScore;
         existing.awayScore = awayScore === "" ? null : awayScore;
@@ -3015,9 +3059,12 @@ async function deleteOnlinePrediction(payload) {
   return await apiPost("deletePrediction", payload);
 }
 
-async function addOnlineMatches(matches) {
+async function addOnlineMatches(matches, options = {}) {
   const serializedMatches = JSON.stringify(matches || []);
-  return await apiPost("addMatches", { matches: serializedMatches });
+  return await apiPost("addMatches", {
+    matches: serializedMatches,
+    allowManualScoreUnlock: options.allowManualScoreUnlock === true,
+  });
 }
 
 async function fetchOnlineUsers(includeInactive = false) {
@@ -3280,7 +3327,9 @@ async function sendMatchesToSheet(matches, options = {}) {
     );
 
   if (!payloadMatches.length) return null;
-  return await addOnlineMatches(payloadMatches);
+  return await addOnlineMatches(payloadMatches, {
+    allowManualScoreUnlock: options.allowManualScoreUnlock === true,
+  });
 }
 
 async function syncWeekMatchesToSheet(weekId) {
@@ -9735,6 +9784,8 @@ window.saveResult = async function (matchId) {
   match.played = true;
   // Admin tarafından girilen skor API sonucundan daha yüksek önceliklidir.
   match.manualScoreLocked = true;
+  match.manualScoreUpdatedAt = new Date().toISOString();
+  match.manualScoreUpdatedBy = getCurrentUsername?.() || "admin";
   recalculateAllPoints();
   saveState();
   renderAll();
@@ -9811,7 +9862,7 @@ window.forceLogoutUserSession = async function (playerId) {
     });
   }
 };
-async function saveSingleMatchChange(match, successMessage) {
+async function saveSingleMatchChange(match, successMessage, options = {}) {
   recalculateAllPoints();
   saveState();
   renderAll();
@@ -9827,7 +9878,10 @@ async function saveSingleMatchChange(match, successMessage) {
   try {
     window.__ALLOW_MATCH_WRITE__ = true;
 
-    await sendMatchesToSheet([match], { force: true });
+    await sendMatchesToSheet([match], {
+      force: true,
+      allowManualScoreUnlock: options.allowManualScoreUnlock === true,
+    });
 
     await syncOnlineMatchesFromSheet({
       seasonId: match.seasonId,
@@ -10068,6 +10122,8 @@ window.clearMatchScore = async function (matchId) {
   match.played = false;
   // Skor temizlenince manuel kilit de kalkar; kontrol tekrar TheSportsDB'ye geçer.
   match.manualScoreLocked = false;
+  match.manualScoreUpdatedAt = null;
+  match.manualScoreUpdatedBy = null;
 
   let apiScoreRestored = false;
   try {
@@ -10095,6 +10151,7 @@ window.clearMatchScore = async function (matchId) {
     apiScoreRestored
       ? "Manuel skor temizlendi; güncel API skoru yeniden alındı."
       : "Manuel skor temizlendi. Maç yeniden API güncellemesine açıldı.",
+    { allowManualScoreUnlock: true },
   );
 };
 window.removeMatch = async function (matchId) {
