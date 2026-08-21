@@ -738,6 +738,10 @@ async function firebaseApiPost(action, payload = {}) {
         payload.allowManualScoreUnlock === true &&
         typeof getCurrentRole === "function" &&
         getCurrentRole() === "admin";
+      const allowScoreClear =
+        payload.allowScoreClear === true &&
+        typeof getCurrentRole === "function" &&
+        getCurrentRole() === "admin";
 
       for (const match of rawMatches) {
         if (!match?.id) continue;
@@ -753,51 +757,95 @@ async function firebaseApiPost(action, payload = {}) {
           getWeekNumberById(match.weekId) ||
           "";
 
-        // Firebase'deki admin manuel skoru kanonik kaynaktır. Eski/stale bir
-        // kullanıcı oturumu veya normal API senkronu bu kilidi ve skoru ezemez.
-        const current = (await firebaseRead(`matches/${id}`)) || null;
-        const currentManualLocked = parseBooleanish(
-          current?.manualScoreLocked ??
-            current?.manualScoreLock ??
-            current?.manuelSkorKilitli ??
-            false,
-        );
-        const incomingManualLocked = parseBooleanish(
-          match.manualScoreLocked ??
-            match.manualScoreLock ??
-            match.manuelSkorKilitli ??
-            false,
-        );
+        const db = getFirebaseDb();
+        if (!db) throw new Error("Firebase henüz yapılandırılmadı.");
 
-        const protectedManualScore =
-          currentManualLocked && !incomingManualLocked && !allowManualScoreUnlock;
-
-        const nextMatch = {
-          ...(current || {}),
-          ...match,
-          id,
-          season: seasonLabel,
-          sezon: seasonLabel,
-          weekNo,
-          haftaNo: weekNo,
-          updatedAt: new Date().toISOString(),
-        };
-
-        if (protectedManualScore) {
-          nextMatch.homeScore = current.homeScore ?? current.evGol ?? null;
-          nextMatch.awayScore = current.awayScore ?? current.depGol ?? null;
-          nextMatch.evGol = nextMatch.homeScore ?? "";
-          nextMatch.depGol = nextMatch.awayScore ?? "";
-          nextMatch.played = parseBooleanish(
-            current.played ?? current.oynandiMi ?? true,
+        // Maç kaydını transaction ile birleştiriyoruz. Böylece API skoru
+        // Firebase'e yazıldıktan hemen sonra başka bir cihazdaki eski/boş
+        // state tüm kaydı set() ile ezip tekrar "Skor bekleniyor" yapamaz.
+        await db.ref(`matches/${id}`).transaction((current) => {
+          const currentRecord = current || {};
+          const currentManualLocked = parseBooleanish(
+            currentRecord.manualScoreLocked ??
+              currentRecord.manualScoreLock ??
+              currentRecord.manuelSkorKilitli ??
+              false,
           );
-          nextMatch.oynandiMi = nextMatch.played ? 1 : 0;
-          nextMatch.manualScoreLocked = true;
-          nextMatch.manualScoreLock = true;
-          nextMatch.manuelSkorKilitli = 1;
-        }
+          const incomingManualLocked = parseBooleanish(
+            match.manualScoreLocked ??
+              match.manualScoreLock ??
+              match.manuelSkorKilitli ??
+              false,
+          );
 
-        await firebaseWrite(`matches/${id}`, nextMatch);
+          const incomingHome = parseNumberOrEmpty(
+            match.homeScore ?? match.evGol ?? match.home_score,
+          );
+          const incomingAway = parseNumberOrEmpty(
+            match.awayScore ?? match.depGol ?? match.away_score,
+          );
+          const incomingHasScore = incomingHome !== "" && incomingAway !== "";
+          const incomingPlayed =
+            parseBooleanish(match.played ?? match.oynandiMi ?? false) ||
+            incomingHasScore;
+
+          const currentHome = parseNumberOrEmpty(
+            currentRecord.homeScore ?? currentRecord.evGol ?? currentRecord.home_score,
+          );
+          const currentAway = parseNumberOrEmpty(
+            currentRecord.awayScore ?? currentRecord.depGol ?? currentRecord.away_score,
+          );
+          const currentHasScore = currentHome !== "" && currentAway !== "";
+          const currentPlayed =
+            parseBooleanish(currentRecord.played ?? currentRecord.oynandiMi ?? false) ||
+            currentHasScore;
+
+          const protectedManualScore =
+            currentManualLocked &&
+            !incomingManualLocked &&
+            !allowManualScoreUnlock;
+
+          // Firebase'de geçerli bir skor varken normal kullanıcı/API senkronundan
+          // gelen boş kayıt bu skoru silemez. Skor yalnızca adminin açıkça
+          // "Skoru Temizle" işlemiyle kaldırılabilir.
+          const protectStoredScore =
+            currentPlayed &&
+            currentHasScore &&
+            !incomingHasScore &&
+            !allowScoreClear;
+
+          const nextMatch = {
+            ...currentRecord,
+            ...match,
+            id,
+            season: seasonLabel,
+            sezon: seasonLabel,
+            weekNo,
+            haftaNo: weekNo,
+            updatedAt: new Date().toISOString(),
+          };
+
+          if (protectedManualScore || protectStoredScore) {
+            nextMatch.homeScore = currentHome;
+            nextMatch.awayScore = currentAway;
+            nextMatch.evGol = currentHome;
+            nextMatch.depGol = currentAway;
+            nextMatch.played = true;
+            nextMatch.oynandiMi = 1;
+          }
+
+          if (protectedManualScore) {
+            nextMatch.manualScoreLocked = true;
+            nextMatch.manualScoreLock = true;
+            nextMatch.manuelSkorKilitli = 1;
+            nextMatch.manualScoreUpdatedAt =
+              currentRecord.manualScoreUpdatedAt || nextMatch.manualScoreUpdatedAt || null;
+            nextMatch.manualScoreUpdatedBy =
+              currentRecord.manualScoreUpdatedBy || nextMatch.manualScoreUpdatedBy || null;
+          }
+
+          return nextMatch;
+        });
       }
       return { success: true };
     }
@@ -3064,6 +3112,7 @@ async function addOnlineMatches(matches, options = {}) {
   return await apiPost("addMatches", {
     matches: serializedMatches,
     allowManualScoreUnlock: options.allowManualScoreUnlock === true,
+    allowScoreClear: options.allowScoreClear === true,
   });
 }
 
@@ -3329,6 +3378,7 @@ async function sendMatchesToSheet(matches, options = {}) {
   if (!payloadMatches.length) return null;
   return await addOnlineMatches(payloadMatches, {
     allowManualScoreUnlock: options.allowManualScoreUnlock === true,
+    allowScoreClear: options.allowScoreClear === true,
   });
 }
 
@@ -9881,6 +9931,7 @@ async function saveSingleMatchChange(match, successMessage, options = {}) {
     await sendMatchesToSheet([match], {
       force: true,
       allowManualScoreUnlock: options.allowManualScoreUnlock === true,
+      allowScoreClear: options.allowScoreClear === true,
     });
 
     await syncOnlineMatchesFromSheet({
@@ -10151,7 +10202,7 @@ window.clearMatchScore = async function (matchId) {
     apiScoreRestored
       ? "Manuel skor temizlendi; güncel API skoru yeniden alındı."
       : "Manuel skor temizlendi. Maç yeniden API güncellemesine açıldı.",
-    { allowManualScoreUnlock: true },
+    { allowManualScoreUnlock: true, allowScoreClear: true },
   );
 };
 window.removeMatch = async function (matchId) {
@@ -16667,7 +16718,21 @@ async function syncSelectedWeekFromApi(options = {}) {
 
     let sheetSyncResult = null;
 
-    if (shouldPublishMatchChanges(week.id)) {
+    // API'den alınan sonuç, sayfa yenilenmeden önce mutlaka Firebase'e
+    // kalıcı yazılır. Bu yazma yalnızca admin kilidi yoksa skoru günceller.
+    // Böylece kullanıcı/API skoru görüp yenilediğinde tekrar bekleniyor olmaz.
+    const apiResultMatches = getMatchesByWeekId(week.id).filter(
+      (match) => match.played && match.homeScore != null && match.awayScore != null,
+    );
+    if (apiResultMatches.length) {
+      try {
+        sheetSyncResult = await sendMatchesToSheet(apiResultMatches, { force: true });
+      } catch (scorePersistError) {
+        console.warn("API skorları Firebase'e kalıcı yazılamadı:", scorePersistError);
+      }
+    }
+
+    if (!sheetSyncResult && shouldPublishMatchChanges(week.id)) {
       try {
         sheetSyncResult = await syncWeekMatchesToSheet(week.id);
       } catch (sheetError) {
