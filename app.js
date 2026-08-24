@@ -734,15 +734,6 @@ async function firebaseApiPost(action, payload = {}) {
         typeof payload.matches === "string"
           ? JSON.parse(payload.matches || "[]")
           : payload.matches || [];
-      const allowManualScoreUnlock =
-        payload.allowManualScoreUnlock === true &&
-        typeof getCurrentRole === "function" &&
-        getCurrentRole() === "admin";
-      const allowScoreClear =
-        payload.allowScoreClear === true &&
-        typeof getCurrentRole === "function" &&
-        getCurrentRole() === "admin";
-
       for (const match of rawMatches) {
         if (!match?.id) continue;
         const id = sanitizeFirebaseKey(match.id);
@@ -756,95 +747,14 @@ async function firebaseApiPost(action, payload = {}) {
           match.haftaNo ||
           getWeekNumberById(match.weekId) ||
           "";
-
-        const db = getFirebaseDb();
-        if (!db) throw new Error("Firebase henüz yapılandırılmadı.");
-
-        // Maç kaydını transaction ile birleştiriyoruz. Böylece API skoru
-        // Firebase'e yazıldıktan hemen sonra başka bir cihazdaki eski/boş
-        // state tüm kaydı set() ile ezip tekrar "Skor bekleniyor" yapamaz.
-        await db.ref(`matches/${id}`).transaction((current) => {
-          const currentRecord = current || {};
-          const currentManualLocked = parseBooleanish(
-            currentRecord.manualScoreLocked ??
-              currentRecord.manualScoreLock ??
-              currentRecord.manuelSkorKilitli ??
-              false,
-          );
-          const incomingManualLocked = parseBooleanish(
-            match.manualScoreLocked ??
-              match.manualScoreLock ??
-              match.manuelSkorKilitli ??
-              false,
-          );
-
-          const incomingHome = parseNumberOrEmpty(
-            match.homeScore ?? match.evGol ?? match.home_score,
-          );
-          const incomingAway = parseNumberOrEmpty(
-            match.awayScore ?? match.depGol ?? match.away_score,
-          );
-          const incomingHasScore = incomingHome !== "" && incomingAway !== "";
-          const incomingPlayed =
-            parseBooleanish(match.played ?? match.oynandiMi ?? false) ||
-            incomingHasScore;
-
-          const currentHome = parseNumberOrEmpty(
-            currentRecord.homeScore ?? currentRecord.evGol ?? currentRecord.home_score,
-          );
-          const currentAway = parseNumberOrEmpty(
-            currentRecord.awayScore ?? currentRecord.depGol ?? currentRecord.away_score,
-          );
-          const currentHasScore = currentHome !== "" && currentAway !== "";
-          const currentPlayed =
-            parseBooleanish(currentRecord.played ?? currentRecord.oynandiMi ?? false) ||
-            currentHasScore;
-
-          const protectedManualScore =
-            currentManualLocked &&
-            !incomingManualLocked &&
-            !allowManualScoreUnlock;
-
-          // Firebase'de geçerli bir skor varken normal kullanıcı/API senkronundan
-          // gelen boş kayıt bu skoru silemez. Skor yalnızca adminin açıkça
-          // "Skoru Temizle" işlemiyle kaldırılabilir.
-          const protectStoredScore =
-            currentPlayed &&
-            currentHasScore &&
-            !incomingHasScore &&
-            !allowScoreClear;
-
-          const nextMatch = {
-            ...currentRecord,
-            ...match,
-            id,
-            season: seasonLabel,
-            sezon: seasonLabel,
-            weekNo,
-            haftaNo: weekNo,
-            updatedAt: new Date().toISOString(),
-          };
-
-          if (protectedManualScore || protectStoredScore) {
-            nextMatch.homeScore = currentHome;
-            nextMatch.awayScore = currentAway;
-            nextMatch.evGol = currentHome;
-            nextMatch.depGol = currentAway;
-            nextMatch.played = true;
-            nextMatch.oynandiMi = 1;
-          }
-
-          if (protectedManualScore) {
-            nextMatch.manualScoreLocked = true;
-            nextMatch.manualScoreLock = true;
-            nextMatch.manuelSkorKilitli = 1;
-            nextMatch.manualScoreUpdatedAt =
-              currentRecord.manualScoreUpdatedAt || nextMatch.manualScoreUpdatedAt || null;
-            nextMatch.manualScoreUpdatedBy =
-              currentRecord.manualScoreUpdatedBy || nextMatch.manualScoreUpdatedBy || null;
-          }
-
-          return nextMatch;
+        await firebaseWrite(`matches/${id}`, {
+          ...match,
+          id,
+          season: seasonLabel,
+          sezon: seasonLabel,
+          weekNo,
+          haftaNo: weekNo,
+          updatedAt: new Date().toISOString(),
         });
       }
       return { success: true };
@@ -3021,8 +2931,6 @@ async function syncOnlineMatchesFromSheet(options = {}) {
             existing.sheetMatchId ||
             "",
         );
-        // Firebase kanonik kaynaktır. Admin kilidi Firebase yazma katmanında
-        // korunur; böylece burada gerçek uzak durum güvenle uygulanabilir.
         existing.played = played;
         existing.homeScore = homeScore === "" ? null : homeScore;
         existing.awayScore = awayScore === "" ? null : awayScore;
@@ -3107,13 +3015,9 @@ async function deleteOnlinePrediction(payload) {
   return await apiPost("deletePrediction", payload);
 }
 
-async function addOnlineMatches(matches, options = {}) {
+async function addOnlineMatches(matches) {
   const serializedMatches = JSON.stringify(matches || []);
-  return await apiPost("addMatches", {
-    matches: serializedMatches,
-    allowManualScoreUnlock: options.allowManualScoreUnlock === true,
-    allowScoreClear: options.allowScoreClear === true,
-  });
+  return await apiPost("addMatches", { matches: serializedMatches });
 }
 
 async function fetchOnlineUsers(includeInactive = false) {
@@ -3376,10 +3280,7 @@ async function sendMatchesToSheet(matches, options = {}) {
     );
 
   if (!payloadMatches.length) return null;
-  return await addOnlineMatches(payloadMatches, {
-    allowManualScoreUnlock: options.allowManualScoreUnlock === true,
-    allowScoreClear: options.allowScoreClear === true,
-  });
+  return await addOnlineMatches(payloadMatches);
 }
 
 async function syncWeekMatchesToSheet(weekId) {
@@ -5261,14 +5162,19 @@ function applyRolePermissions() {
         return;
       }
       const insideDashboardModal = !!el.closest("#dashboardMatchModal");
+      const insideStatsInteraction = !!el.closest(
+        "#statsExperience, #statsDetailModal",
+      );
       const allow =
         insideDashboardModal ||
+        insideStatsInteraction ||
         [
           "dashboardSeasonSelect",
           "dashboardWeekSelect",
           "standingsSeasonSelect",
           "standingsWeekSelect",
           "statsSeasonSelect",
+          "statsWeekSelect",
         ].includes(el.id);
 
       el.disabled = !allow;
@@ -7703,6 +7609,7 @@ function renderSelects() {
     "matchesFilterWeek",
     "predictionWeekSelect",
     "standingsWeekSelect",
+    "statsWeekSelect",
   ].forEach((id) =>
     renderWeekOptions(document.getElementById(id), activeSeasonId, false),
   );
@@ -9834,8 +9741,6 @@ window.saveResult = async function (matchId) {
   match.played = true;
   // Admin tarafından girilen skor API sonucundan daha yüksek önceliklidir.
   match.manualScoreLocked = true;
-  match.manualScoreUpdatedAt = new Date().toISOString();
-  match.manualScoreUpdatedBy = getCurrentUsername?.() || "admin";
   recalculateAllPoints();
   saveState();
   renderAll();
@@ -9912,7 +9817,7 @@ window.forceLogoutUserSession = async function (playerId) {
     });
   }
 };
-async function saveSingleMatchChange(match, successMessage, options = {}) {
+async function saveSingleMatchChange(match, successMessage) {
   recalculateAllPoints();
   saveState();
   renderAll();
@@ -9928,11 +9833,7 @@ async function saveSingleMatchChange(match, successMessage, options = {}) {
   try {
     window.__ALLOW_MATCH_WRITE__ = true;
 
-    await sendMatchesToSheet([match], {
-      force: true,
-      allowManualScoreUnlock: options.allowManualScoreUnlock === true,
-      allowScoreClear: options.allowScoreClear === true,
-    });
+    await sendMatchesToSheet([match], { force: true });
 
     await syncOnlineMatchesFromSheet({
       seasonId: match.seasonId,
@@ -10173,8 +10074,6 @@ window.clearMatchScore = async function (matchId) {
   match.played = false;
   // Skor temizlenince manuel kilit de kalkar; kontrol tekrar TheSportsDB'ye geçer.
   match.manualScoreLocked = false;
-  match.manualScoreUpdatedAt = null;
-  match.manualScoreUpdatedBy = null;
 
   let apiScoreRestored = false;
   try {
@@ -10202,7 +10101,6 @@ window.clearMatchScore = async function (matchId) {
     apiScoreRestored
       ? "Manuel skor temizlendi; güncel API skoru yeniden alındı."
       : "Manuel skor temizlendi. Maç yeniden API güncellemesine açıldı.",
-    { allowManualScoreUnlock: true, allowScoreClear: true },
   );
 };
 window.removeMatch = async function (matchId) {
@@ -13869,7 +13767,228 @@ function safePercent(value) {
   return `${Number(value || 0).toFixed(1)}%`;
 }
 
+let statsDetailPlayerId = null;
+let statsDetailMode = "week";
+let statsSelectedWeekId = null;
+
+function getStatsDisplayWeekId() {
+  const seasonId = getActiveSeasonId();
+  const select = document.getElementById("statsWeekSelect");
+  const selectedWeek = statsSelectedWeekId
+    ? getWeekById(statsSelectedWeekId)
+    : null;
+  if (
+    selectedWeek &&
+    String(selectedWeek.seasonId) === String(seasonId)
+  ) {
+    return statsSelectedWeekId;
+  }
+
+  statsSelectedWeekId = null;
+  const requestedWeekId = select?.value || state.settings.activeWeekId;
+  if (requestedWeekId && getResolvedWeekMatches(requestedWeekId).length) {
+    return requestedWeekId;
+  }
+
+  const completedWeeks = getWeeksBySeasonId(seasonId)
+    .filter((week) => getResolvedWeekMatches(week.id).length > 0)
+    .sort((a, b) => Number(b.number || 0) - Number(a.number || 0));
+  return completedWeeks[0]?.id || requestedWeekId || null;
+}
+
+function getStatsPlayerRows(weekId) {
+  const resolvedMatches = getResolvedWeekMatches(weekId);
+  const matchIds = new Set(resolvedMatches.map((match) => String(match.id)));
+  const seasonStats = new Map(
+    getPlayerSeasonStats(getActiveSeasonId()).map((row) => [String(row.id), row]),
+  );
+
+  return getWeeklyStandings(weekId).map((row, index) => {
+    const playerPredictions = state.predictions.filter(
+      (pred) =>
+        String(pred.playerId) === String(row.id) &&
+        matchIds.has(String(pred.matchId)) &&
+        pred.homePred !== "" &&
+        pred.awayPred !== "",
+    );
+    return {
+      ...row,
+      rank: index + 1,
+      wrong: playerPredictions.filter((pred) => Number(pred.points || 0) === 0).length,
+      weekWins: seasonStats.get(String(row.id))?.weekWins || 0,
+      seasonTotal: seasonStats.get(String(row.id))?.total || 0,
+    };
+  });
+}
+
+function renderWeeklyStatsExperience() {
+  const target = document.getElementById("statsExperience");
+  if (!target) return;
+
+  const weekId = getStatsDisplayWeekId();
+  const weekSelect = document.getElementById("statsWeekSelect");
+  if (weekSelect && weekId) weekSelect.value = weekId;
+  const week = getWeekById(weekId);
+  const resolvedMatches = weekId ? getResolvedWeekMatches(weekId) : [];
+  const rows = weekId ? getStatsPlayerRows(weekId) : [];
+  const totalPredictions = rows.reduce((sum, row) => sum + row.predictionCount, 0);
+  const totalExact = rows.reduce((sum, row) => sum + row.exact, 0);
+  const totalCorrect = rows.reduce((sum, row) => sum + row.resultOnly, 0);
+
+  const cards = rows
+    .map((row) => {
+      const medal = row.rank === 1 ? "🥇" : row.rank === 2 ? "🥈" : row.rank === 3 ? "🥉" : row.rank;
+      return `<button class="weekly-player-card rank-${Math.min(row.rank, 4)}" type="button" onclick="openStatsPlayerDetail(decodeURIComponent('${encodeURIComponent(String(row.id))}'))">
+        <span class="weekly-player-rank">${medal}</span>
+        <span class="weekly-player-main">
+          <span class="weekly-player-name">${escapeHtml(row.name)}</span>
+          <span class="weekly-player-sub"><span>🏆 ${row.weekWins} hafta lideri</span><span>Sezon ${row.seasonTotal} puan</span></span>
+        </span>
+        <span class="weekly-player-metrics">
+          <span class="metric-exact"><strong>${row.exact}</strong><small>Tam Skor</small></span>
+          <span class="metric-correct"><strong>${row.resultOnly}</strong><small>Doğru</small></span>
+          <span class="metric-wrong"><strong>${row.wrong}</strong><small>Yanlış</small></span>
+        </span>
+        <span class="weekly-player-score"><strong>${row.total}</strong><small>Puan</small></span>
+        <span class="weekly-player-action">Maçlarını Gör <b>›</b></span>
+      </button>`;
+    })
+    .join("");
+
+  target.innerHTML = `
+    <section class="weekly-stats-summary">
+      <div><span>⚽</span><strong>${resolvedMatches.length}</strong><small>Sonuçlanan Maç</small></div>
+      <div><span>🎯</span><strong>${totalPredictions}</strong><small>Tahmin</small></div>
+      <div><span>🔥</span><strong>${totalExact}</strong><small>Tam Skor</small></div>
+      <div><span>✓</span><strong>${totalCorrect}</strong><small>Doğru Sonuç</small></div>
+    </section>
+    <div class="stats-desktop-workspace">
+      <section class="weekly-performance-panel">
+        <div class="weekly-performance-head">
+          <div><span class="stats-kicker">${week ? `${escapeHtml(String(week.number))}. HAFTA` : "HAFTA"}</span><h3>Haftalık Performans</h3></div>
+          <span class="weekly-performance-hint">Oyuncuya dokun, maçlarını gör</span>
+        </div>
+        <div class="weekly-player-list">${cards || createEmptyState(getWeeklyStandingsEmptyMessage(weekId))}</div>
+      </section>
+      <aside class="stats-desktop-detail" id="statsDesktopDetail">
+        <div id="statsDesktopDetailContent">
+          <div class="stats-desktop-placeholder"><span>📊</span><h3>Oyuncu Detayı</h3><p>Maçlarını incelemek için soldan bir oyuncu seç.</p></div>
+        </div>
+      </aside>
+    </div>`;
+
+  if (statsDetailPlayerId && window.matchMedia("(min-width: 1001px)").matches) {
+    document.getElementById("statsDesktopDetail")?.classList.add("is-visible");
+    renderStatsPlayerDetail();
+  } else if (statsDetailPlayerId && !document.getElementById("statsDetailModal")?.classList.contains("hidden")) {
+    renderStatsPlayerDetail();
+  }
+}
+
+function getStatsDetailMatches(playerId, mode) {
+  const seasonId = getActiveSeasonId();
+  const matches = mode === "season"
+    ? getMatchesBySeasonId(seasonId).filter(isMatchResolvedForScoring)
+    : getResolvedWeekMatches(getStatsDisplayWeekId());
+  return [...matches].sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0)).map((match) => ({
+    match,
+    pred: getPrediction(match.id, playerId),
+  }));
+}
+
+function renderStatsPlayerDetail() {
+  const targets = [
+    document.getElementById("statsDetailContent"),
+    document.getElementById("statsDesktopDetailContent"),
+  ].filter(Boolean);
+  const player = getPlayerById(statsDetailPlayerId);
+  if (!targets.length || !player) return;
+  const detailRows = getStatsDetailMatches(player.id, statsDetailMode);
+  const filled = detailRows.filter(({ pred }) => pred && pred.homePred !== "" && pred.awayPred !== "");
+  const points = filled.reduce((sum, { pred }) => sum + Number(pred.points || 0), 0);
+  const exact = filled.filter(({ pred }) => Number(pred.points || 0) === 3).length;
+  const correct = filled.filter(({ pred }) => Number(pred.points || 0) === 1).length;
+  const wrong = filled.filter(({ pred }) => Number(pred.points || 0) === 0).length;
+  const seasonRow = getPlayerSeasonStats(getActiveSeasonId()).find((row) => String(row.id) === String(player.id));
+
+  const matchesHtml = detailRows.map(({ match, pred }) => {
+    const hasPred = pred && pred.homePred !== "" && pred.awayPred !== "";
+    const predPoints = hasPred ? Number(pred.points || 0) : null;
+    const tone = !hasPred ? "empty" : predPoints === 3 ? "exact" : predPoints === 1 ? "correct" : "wrong";
+    const label = !hasPred ? "TAHMİN YOK" : predPoints === 3 ? "TAM SKOR" : predPoints === 1 ? "DOĞRU SONUÇ" : "YANLIŞ";
+    return `<article class="stats-match-row">
+      <div class="stats-match-teams">
+        <span>${teamLogoHtml(match.homeTeam, match.seasonId)}<b>${escapeHtml(match.homeTeam)}</b></span>
+        <strong>${match.homeScore} – ${match.awayScore}</strong>
+        <span>${teamLogoHtml(match.awayTeam, match.seasonId)}<b>${escapeHtml(match.awayTeam)}</b></span>
+      </div>
+      <div class="stats-match-result">
+        <span>Tahmin <strong>${hasPred ? `${pred.homePred} – ${pred.awayPred}` : "—"}</strong></span>
+        <em class="is-${tone}">${label}</em>
+      </div>
+    </article>`;
+  }).join("");
+
+  const detailMarkup = `<header class="stats-detail-head">
+      <span class="stats-detail-avatar">${escapeHtml(player.name.slice(0, 1).toUpperCase())}</span>
+      <div><h3 id="statsDetailTitle">${escapeHtml(player.name)}’ın Detayı</h3><p>🏆 ${seasonRow?.weekWins || 0} hafta liderliği</p></div>
+    </header>
+    <div class="stats-detail-tabs">
+      <button class="${statsDetailMode === "week" ? "active" : ""}" onclick="setStatsDetailMode('week')">Bu Hafta</button>
+      <button class="${statsDetailMode === "season" ? "active" : ""}" onclick="setStatsDetailMode('season')">Sezon Geneli</button>
+    </div>
+    <div class="stats-detail-totals">
+      <span><strong>${points}</strong>Puan</span><span class="metric-exact"><strong>${exact}</strong>Tam Skor</span>
+      <span class="metric-correct"><strong>${correct}</strong>Doğru</span><span class="metric-wrong"><strong>${wrong}</strong>Yanlış</span>
+    </div>
+    <div class="stats-match-list">${matchesHtml || createEmptyState("Gösterilecek sonuçlanmış maç yok.")}</div>`;
+  targets.forEach((target) => {
+    target.innerHTML = detailMarkup;
+  });
+}
+
+window.openStatsPlayerDetail = function (playerId) {
+  statsDetailPlayerId = playerId;
+  statsDetailMode = "week";
+  renderStatsPlayerDetail();
+  if (window.matchMedia("(min-width: 1001px)").matches) {
+    document.getElementById("statsDesktopDetail")?.classList.add("is-visible");
+    closeStatsPlayerDetail();
+    return;
+  }
+  const modal = document.getElementById("statsDetailModal");
+  modal?.removeAttribute("hidden");
+  if (modal) modal.style.removeProperty("display");
+  modal?.classList.remove("hidden");
+  document.body.classList.add("stats-detail-open");
+};
+
+window.closeStatsPlayerDetail = function () {
+  const modal = document.getElementById("statsDetailModal");
+  modal?.classList.add("hidden");
+  modal?.setAttribute("hidden", "");
+  if (modal) modal.style.setProperty("display", "none", "important");
+  document.body.classList.remove("stats-detail-open");
+};
+
+document.addEventListener("click", (event) => {
+  if (event.target?.id === "statsDetailModal") closeStatsPlayerDetail();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeStatsPlayerDetail();
+});
+
+window.setStatsDetailMode = function (mode) {
+  statsDetailMode = mode === "season" ? "season" : "week";
+  renderStatsPlayerDetail();
+};
+
 function renderAdvancedStats() {
+  if (document.getElementById("statsExperience")) {
+    renderWeeklyStatsExperience();
+    return;
+  }
   const seasonId = getActiveSeasonId();
   const season = getSeasonById(seasonId);
   const info = getSeasonInsights(seasonId);
@@ -16718,21 +16837,7 @@ async function syncSelectedWeekFromApi(options = {}) {
 
     let sheetSyncResult = null;
 
-    // API'den alınan sonuç, sayfa yenilenmeden önce mutlaka Firebase'e
-    // kalıcı yazılır. Bu yazma yalnızca admin kilidi yoksa skoru günceller.
-    // Böylece kullanıcı/API skoru görüp yenilediğinde tekrar bekleniyor olmaz.
-    const apiResultMatches = getMatchesByWeekId(week.id).filter(
-      (match) => match.played && match.homeScore != null && match.awayScore != null,
-    );
-    if (apiResultMatches.length) {
-      try {
-        sheetSyncResult = await sendMatchesToSheet(apiResultMatches, { force: true });
-      } catch (scorePersistError) {
-        console.warn("API skorları Firebase'e kalıcı yazılamadı:", scorePersistError);
-      }
-    }
-
-    if (!sheetSyncResult && shouldPublishMatchChanges(week.id)) {
+    if (shouldPublishMatchChanges(week.id)) {
       try {
         sheetSyncResult = await syncWeekMatchesToSheet(week.id);
       } catch (sheetError) {
@@ -17414,6 +17519,11 @@ function bindEvents() {
     "standingsWeekSelect",
   ].forEach((id) => {
     on(id, "change", (e) => setActiveWeek(e.target.value));
+  });
+  on("statsWeekSelect", "change", (e) => {
+    statsSelectedWeekId = e.target.value || null;
+    closeStatsPlayerDetail();
+    renderWeeklyStatsExperience();
   });
   on("backupSeasonSelect", "change", () => {
     renderBackupPanel();

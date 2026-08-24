@@ -879,66 +879,22 @@
         <section class="tab-panel" id="tab-stats">
           <div class="page-header stats-page-header">
             <div>
-              <h2>İstatistik Merkezi</h2>
-              <p>
-                Sezon özeti, kategori liderleri, oyuncu performansı ve gelişmiş
-                analizler burada.
-              </p>
+              <h2>İstatistikler</h2>
+              <p>Haftanın sonuçlarını tek bakışta gör, oyuncuya dokunup maç detaylarını incele.</p>
             </div>
-            <div class="header-actions">
+            <div class="header-actions stats-filter-actions">
               <select id="statsSeasonSelect"></select>
+              <select id="statsWeekSelect" aria-label="İstatistik haftası"></select>
             </div>
           </div>
-
-          <section class="stats-hero-card card" id="statsHeroCard"></section>
-
-          <section class="stats-section">
-            <div class="stats-section-head">
-              <div>
-                <h3>Sezon Özeti</h3>
-                <p class="small-meta">
-                  Tahmin yoğunluğu, başarı seviyesi ve genel sezon resmi.
-                </p>
-              </div>
-            </div>
-            <div class="stats-overview-grid" id="advancedStatsGrid"></div>
-          </section>
-
-          <section class="stats-section">
-            <div class="stats-section-head">
-              <div>
-                <h3>Kategori Liderleri</h3>
-                <p class="small-meta">
-                  Farklı alanlarda öne çıkan oyuncular burada toplanır.
-                </p>
-              </div>
-            </div>
-            <div class="stats-leaders-grid" id="statsLeadersGrid"></div>
-          </section>
-
-          <section class="stats-section">
-            <div class="stats-section-head">
-              <div>
-                <h3>Oyuncu Performans Kartları</h3>
-                <p class="small-meta">
-                  Puanın yanında başarı oranı, isabet ve katılım da öne çıkar.
-                </p>
-              </div>
-            </div>
-            <div id="insightsList"></div>
-          </section>
-
-          <section class="stats-section">
-            <div class="stats-section-head">
-              <div>
-                <h3>Gelişmiş Analiz</h3>
-                <p class="small-meta">
-                  Sezonu tek bakışta anlatan daha detaylı özetler.
-                </p>
-              </div>
-            </div>
-            <div class="stats-deep-grid" id="statsDeepGrid"></div>
-          </section>
+          <div id="statsExperience"></div>
+          <div class="stats-detail-backdrop hidden" id="statsDetailModal" role="dialog" aria-modal="true" aria-labelledby="statsDetailTitle">
+            <section class="stats-detail-sheet">
+              <div class="stats-sheet-handle" aria-hidden="true"></div>
+              <button class="stats-sheet-close" type="button" onclick="closeStatsPlayerDetail()" aria-label="Kapat">×</button>
+              <div id="statsDetailContent"></div>
+            </section>
+          </div>
         </section>
 
         <section class="tab-panel admin-only" id="tab-notifications">
