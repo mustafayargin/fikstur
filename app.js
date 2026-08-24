@@ -2863,8 +2863,19 @@ async function syncOnlineMatchesFromSheet(options = {}) {
       );
       if (!weekNo) return;
 
-      const week = ensureWeekForSeason(seasonId, weekNo);
-      if (!week) return;
+      // Canlı maç listesi hafta oluşturmaya yetkili değildir. Haftalar yalnızca
+      // adminin "Hafta Oluştur" işlemiyle settings/weeksMeta alanına eklenir.
+      // Eski/yanlış maç kayıtlarındaki hafta numaralarının kendiliğinden yeni
+      // hafta üretmesini bu kontrol engeller.
+      const week = getAllWeeksBySeasonId(seasonId).find(
+        (item) => Number(item.number) === weekNo,
+      );
+      if (!week) {
+        console.warn(
+          `[HAFTA KORUMASI] Kayıtlı olmayan ${weekNo}. hafta maç kaydı atlandı.`,
+        );
+        return;
+      }
 
       touchedWeekIds.add(week.id);
 
@@ -3063,6 +3074,7 @@ function normalizeWeekRegistryItem(item) {
     seasonId,
     number,
     status,
+    createdAt: item.createdAt || "",
     publishedAt: item.publishedAt || "",
     publishedBy: item.publishedBy || "",
     completedAt: item.completedAt || "",
@@ -3104,18 +3116,34 @@ async function syncSeasonRegistryFromFirebase() {
 
   state.seasons = seasonList.map((item) => ({ ...item }));
 
-  const localWeekMap = new Map(
-    state.weeks.map((week) => [
-      `${week.seasonId}__${Number(week.number)}`,
-      week,
-    ]),
-  );
-  weekList.forEach((remoteWeek) => {
-    const key = `${remoteWeek.seasonId}__${Number(remoteWeek.number)}`;
-    const localWeek = localWeekMap.get(key);
-    if (localWeek) Object.assign(localWeek, remoteWeek);
-    else state.weeks.push({ ...remoteWeek });
-  });
+  // Firebase hafta kayıtları tek doğru kaynaktır. Yerel hafta kimliği ile
+  // Firebase hafta kimliği farklıysa önce o haftanın maçlarını kanonik kimliğe
+  // taşı. Böylece hafta listesi temizlenirken maçlar ve onlara bağlı tahminler
+  // kaybolmaz.
+  if (Array.isArray(settings.weeksMeta)) {
+    const previousWeeksById = new Map(
+      state.weeks.map((week) => [String(week.id), week]),
+    );
+    const canonicalWeeksByNumber = new Map(
+      weekList.map((week) => [
+        `${String(week.seasonId)}__${Number(week.number)}`,
+        week,
+      ]),
+    );
+
+    state.matches.forEach((match) => {
+      const previousWeek = previousWeeksById.get(String(match.weekId));
+      if (!previousWeek) return;
+      const canonicalWeek = canonicalWeeksByNumber.get(
+        `${String(previousWeek.seasonId)}__${Number(previousWeek.number)}`,
+      );
+      if (!canonicalWeek) return;
+      match.weekId = canonicalWeek.id;
+      match.seasonId = canonicalWeek.seasonId;
+    });
+
+    state.weeks = weekList.map((week) => ({ ...week }));
+  }
   state.teams = state.teams.filter((team) =>
     remoteIds.has(String(team.seasonId)),
   );
@@ -3128,10 +3156,8 @@ async function syncSeasonRegistryFromFirebase() {
       remoteIds.has(String(match.seasonId)) &&
       validWeekIds.has(String(match.weekId)),
   );
-  const validMatchIds = new Set(state.matches.map((match) => String(match.id)));
-  state.predictions = state.predictions.filter((pred) =>
-    validMatchIds.has(String(pred.matchId)),
-  );
+  // Tahminler burada asla silinmez. Uzak tahmin eşitlemesi, maç kayıtları
+  // yüklendikten sonra mevcut tahminleri doğru maç kimlikleriyle birleştirir.
 
   if (
     state.settings.activeSeasonId &&
@@ -3153,6 +3179,7 @@ async function persistWeekRegistryToFirebase() {
       seasonId: String(week.seasonId || "").trim(),
       number: Number(week.number || 0),
       status: String(week.status || "hazirlaniyor"),
+      createdAt: week.createdAt || "",
       publishedAt: week.publishedAt || "",
       publishedBy: week.publishedBy || "",
       completedAt: week.completedAt || "",
@@ -7158,7 +7185,9 @@ function isWeekCompleted(weekId) {
 }
 
 function getWeekPublishTime(week) {
-  const timestamp = Date.parse(week?.publishedAt || week?.completedAt || "");
+  const timestamp = Date.parse(
+    week?.createdAt || week?.publishedAt || week?.completedAt || "",
+  );
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
@@ -7193,9 +7222,9 @@ function validateFreshActiveSelection({ forceNewestPublished = false } = {}) {
     getWeeksBySeasonId(season.id).map((week) => ({ season, week })),
   );
 
+  // Her yeni oturumda kullanıcının karşısına adminin en son eklediği hafta
+  // gelir. Eski bir "aktif" hafta seçimi yeni eklenen haftayı ezemez.
   const sortCandidates = (a, b) =>
-    (String(b.week.status || "") === "aktif" ? 1 : 0) -
-      (String(a.week.status || "") === "aktif" ? 1 : 0) ||
     getWeekPublishTime(b.week) - getWeekPublishTime(a.week) ||
     Number(b.week.number) - Number(a.week.number);
 
@@ -15229,7 +15258,13 @@ async function addWeek() {
       title: "Tekrarlayan kayıt",
       type: "warning",
     });
-  const week = { id: uid("week"), seasonId, number, status };
+  const week = {
+    id: uid("week"),
+    seasonId,
+    number,
+    status,
+    createdAt: new Date().toISOString(),
+  };
   state.weeks.push(week);
   state.settings.activeWeekId = week.id;
   document.getElementById("weekNumber").value = "";
