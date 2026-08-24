@@ -2863,19 +2863,8 @@ async function syncOnlineMatchesFromSheet(options = {}) {
       );
       if (!weekNo) return;
 
-      // Canlı maç listesi hafta oluşturmaya yetkili değildir. Haftalar yalnızca
-      // adminin "Hafta Oluştur" işlemiyle settings/weeksMeta alanına eklenir.
-      // Eski/yanlış maç kayıtlarındaki hafta numaralarının kendiliğinden yeni
-      // hafta üretmesini bu kontrol engeller.
-      const week = getAllWeeksBySeasonId(seasonId).find(
-        (item) => Number(item.number) === weekNo,
-      );
-      if (!week) {
-        console.warn(
-          `[HAFTA KORUMASI] Kayıtlı olmayan ${weekNo}. hafta maç kaydı atlandı.`,
-        );
-        return;
-      }
+      const week = ensureWeekForSeason(seasonId, weekNo);
+      if (!week) return;
 
       touchedWeekIds.add(week.id);
 
@@ -3074,7 +3063,6 @@ function normalizeWeekRegistryItem(item) {
     seasonId,
     number,
     status,
-    createdAt: item.createdAt || "",
     publishedAt: item.publishedAt || "",
     publishedBy: item.publishedBy || "",
     completedAt: item.completedAt || "",
@@ -3116,34 +3104,18 @@ async function syncSeasonRegistryFromFirebase() {
 
   state.seasons = seasonList.map((item) => ({ ...item }));
 
-  // Firebase hafta kayıtları tek doğru kaynaktır. Yerel hafta kimliği ile
-  // Firebase hafta kimliği farklıysa önce o haftanın maçlarını kanonik kimliğe
-  // taşı. Böylece hafta listesi temizlenirken maçlar ve onlara bağlı tahminler
-  // kaybolmaz.
-  if (Array.isArray(settings.weeksMeta)) {
-    const previousWeeksById = new Map(
-      state.weeks.map((week) => [String(week.id), week]),
-    );
-    const canonicalWeeksByNumber = new Map(
-      weekList.map((week) => [
-        `${String(week.seasonId)}__${Number(week.number)}`,
-        week,
-      ]),
-    );
-
-    state.matches.forEach((match) => {
-      const previousWeek = previousWeeksById.get(String(match.weekId));
-      if (!previousWeek) return;
-      const canonicalWeek = canonicalWeeksByNumber.get(
-        `${String(previousWeek.seasonId)}__${Number(previousWeek.number)}`,
-      );
-      if (!canonicalWeek) return;
-      match.weekId = canonicalWeek.id;
-      match.seasonId = canonicalWeek.seasonId;
-    });
-
-    state.weeks = weekList.map((week) => ({ ...week }));
-  }
+  const localWeekMap = new Map(
+    state.weeks.map((week) => [
+      `${week.seasonId}__${Number(week.number)}`,
+      week,
+    ]),
+  );
+  weekList.forEach((remoteWeek) => {
+    const key = `${remoteWeek.seasonId}__${Number(remoteWeek.number)}`;
+    const localWeek = localWeekMap.get(key);
+    if (localWeek) Object.assign(localWeek, remoteWeek);
+    else state.weeks.push({ ...remoteWeek });
+  });
   state.teams = state.teams.filter((team) =>
     remoteIds.has(String(team.seasonId)),
   );
@@ -3156,8 +3128,10 @@ async function syncSeasonRegistryFromFirebase() {
       remoteIds.has(String(match.seasonId)) &&
       validWeekIds.has(String(match.weekId)),
   );
-  // Tahminler burada asla silinmez. Uzak tahmin eşitlemesi, maç kayıtları
-  // yüklendikten sonra mevcut tahminleri doğru maç kimlikleriyle birleştirir.
+  const validMatchIds = new Set(state.matches.map((match) => String(match.id)));
+  state.predictions = state.predictions.filter((pred) =>
+    validMatchIds.has(String(pred.matchId)),
+  );
 
   if (
     state.settings.activeSeasonId &&
@@ -3179,7 +3153,6 @@ async function persistWeekRegistryToFirebase() {
       seasonId: String(week.seasonId || "").trim(),
       number: Number(week.number || 0),
       status: String(week.status || "hazirlaniyor"),
-      createdAt: week.createdAt || "",
       publishedAt: week.publishedAt || "",
       publishedBy: week.publishedBy || "",
       completedAt: week.completedAt || "",
@@ -7185,9 +7158,7 @@ function isWeekCompleted(weekId) {
 }
 
 function getWeekPublishTime(week) {
-  const timestamp = Date.parse(
-    week?.createdAt || week?.publishedAt || week?.completedAt || "",
-  );
+  const timestamp = Date.parse(week?.publishedAt || week?.completedAt || "");
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
@@ -7222,9 +7193,9 @@ function validateFreshActiveSelection({ forceNewestPublished = false } = {}) {
     getWeeksBySeasonId(season.id).map((week) => ({ season, week })),
   );
 
-  // Her yeni oturumda kullanıcının karşısına adminin en son eklediği hafta
-  // gelir. Eski bir "aktif" hafta seçimi yeni eklenen haftayı ezemez.
   const sortCandidates = (a, b) =>
+    (String(b.week.status || "") === "aktif" ? 1 : 0) -
+      (String(a.week.status || "") === "aktif" ? 1 : 0) ||
     getWeekPublishTime(b.week) - getWeekPublishTime(a.week) ||
     Number(b.week.number) - Number(a.week.number);
 
@@ -13799,6 +13770,7 @@ function safePercent(value) {
 let statsDetailPlayerId = null;
 let statsDetailMode = "week";
 let statsSelectedWeekId = null;
+let statsDetailSelectedWeekId = null;
 
 function getStatsDisplayWeekId() {
   const seasonId = getActiveSeasonId();
@@ -13916,9 +13888,10 @@ function renderWeeklyStatsExperience() {
 
 function getStatsDetailMatches(playerId, mode) {
   const seasonId = getActiveSeasonId();
+  const detailWeekId = statsDetailSelectedWeekId || getStatsDisplayWeekId();
   const matches = mode === "season"
     ? getMatchesBySeasonId(seasonId).filter(isMatchResolvedForScoring)
-    : getResolvedWeekMatches(getStatsDisplayWeekId());
+    : getResolvedWeekMatches(detailWeekId);
   return [...matches].sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0)).map((match) => ({
     match,
     pred: getPrediction(match.id, playerId),
@@ -13939,6 +13912,21 @@ function renderStatsPlayerDetail() {
   const correct = filled.filter(({ pred }) => Number(pred.points || 0) === 1).length;
   const wrong = filled.filter(({ pred }) => Number(pred.points || 0) === 0).length;
   const seasonRow = getPlayerSeasonStats(getActiveSeasonId()).find((row) => String(row.id) === String(player.id));
+  const currentWeekId = getStatsDisplayWeekId();
+  const selectedDetailWeekId = statsDetailSelectedWeekId || currentWeekId;
+  const detailWeekOptions = getWeeksBySeasonId(getActiveSeasonId())
+    .filter((week) => getResolvedWeekMatches(week.id).length > 0)
+    .sort((a, b) => Number(b.number || 0) - Number(a.number || 0))
+    .map((week) => {
+      const weekMatches = getResolvedWeekMatches(week.id);
+      const knownCount = weekMatches.filter((match) => {
+        const prediction = getPrediction(match.id, player.id);
+        return prediction && [1, 3].includes(Number(prediction.points || 0));
+      }).length;
+      const label = `${week.number}. Hafta · ${weekMatches.length} maçta ${knownCount} bildi`;
+      return `<option value="${escapeHtml(String(week.id))}" ${String(week.id) === String(selectedDetailWeekId) ? "selected" : ""}>${escapeHtml(label)}</option>`;
+    })
+    .join("");
 
   const matchesHtml = detailRows.map(({ match, pred }) => {
     const hasPred = pred && pred.homePred !== "" && pred.awayPred !== "";
@@ -13963,8 +13951,19 @@ function renderStatsPlayerDetail() {
       <div><h3 id="statsDetailTitle">${escapeHtml(player.name)}’ın Detayı</h3><p>🏆 ${seasonRow?.weekWins || 0} hafta liderliği</p></div>
     </header>
     <div class="stats-detail-tabs">
-      <button class="${statsDetailMode === "week" ? "active" : ""}" onclick="setStatsDetailMode('week')">Bu Hafta</button>
-      <button class="${statsDetailMode === "season" ? "active" : ""}" onclick="setStatsDetailMode('season')">Sezon Geneli</button>
+      <button class="stats-detail-tab ${statsDetailMode === "week" && String(selectedDetailWeekId) === String(currentWeekId) ? "active" : ""}" onclick="setStatsDetailMode('week')">
+        <span class="stats-detail-tab-icon">⚡</span>
+        <span class="stats-detail-tab-copy"><strong>Bu Hafta</strong><small>Güncel performans</small></span>
+      </button>
+      <label class="stats-detail-week-picker ${statsDetailMode === "week" && String(selectedDetailWeekId) !== String(currentWeekId) ? "active" : ""}">
+        <span class="stats-detail-tab-icon">📅</span>
+        <span class="stats-detail-picker-copy"><strong>Hafta Arşivi</strong><small>Geçmiş haftayı incele</small></span>
+        <select aria-label="Detay haftası" onchange="setStatsDetailWeek(this.value)">${detailWeekOptions}</select>
+      </label>
+      <button class="stats-detail-tab ${statsDetailMode === "season" ? "active" : ""}" onclick="setStatsDetailMode('season')">
+        <span class="stats-detail-tab-icon">🏆</span>
+        <span class="stats-detail-tab-copy"><strong>Sezon Geneli</strong><small>Tüm maçlar</small></span>
+      </button>
     </div>
     <div class="stats-detail-totals">
       <span><strong>${points}</strong>Puan</span><span class="metric-exact"><strong>${exact}</strong>Tam Skor</span>
@@ -13979,6 +13978,7 @@ function renderStatsPlayerDetail() {
 window.openStatsPlayerDetail = function (playerId) {
   statsDetailPlayerId = playerId;
   statsDetailMode = "week";
+  statsDetailSelectedWeekId = getStatsDisplayWeekId();
   renderStatsPlayerDetail();
   if (window.matchMedia("(min-width: 1001px)").matches) {
     document.getElementById("statsDesktopDetail")?.classList.add("is-visible");
@@ -14010,6 +14010,17 @@ document.addEventListener("keydown", (event) => {
 
 window.setStatsDetailMode = function (mode) {
   statsDetailMode = mode === "season" ? "season" : "week";
+  if (statsDetailMode === "week") {
+    statsDetailSelectedWeekId = getStatsDisplayWeekId();
+  }
+  renderStatsPlayerDetail();
+};
+
+window.setStatsDetailWeek = function (weekId) {
+  const week = getWeekById(weekId);
+  if (!week || String(week.seasonId) !== String(getActiveSeasonId())) return;
+  statsDetailSelectedWeekId = week.id;
+  statsDetailMode = "week";
   renderStatsPlayerDetail();
 };
 
@@ -15258,13 +15269,7 @@ async function addWeek() {
       title: "Tekrarlayan kayıt",
       type: "warning",
     });
-  const week = {
-    id: uid("week"),
-    seasonId,
-    number,
-    status,
-    createdAt: new Date().toISOString(),
-  };
+  const week = { id: uid("week"), seasonId, number, status };
   state.weeks.push(week);
   state.settings.activeWeekId = week.id;
   document.getElementById("weekNumber").value = "";
