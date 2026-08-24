@@ -9,6 +9,88 @@ const LEAGUE_ID = 4339; // Turkish Super Lig on TheSportsDB
 const GOOGLE_SCRIPT_URL =
   "https://script.google.com/macros/s/AKfycbzcyAI06Rou8EZNr-_5FV21Km53d6BEizVsrd_auXHTRus4gxQe25QT-9CJyOgH7iU-/exec";
 
+const FIKSTUR_ASSET_FINGERPRINT_KEY = "fikstur:assetFingerprint:v1";
+const FIKSTUR_UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+let fiksturUpdateCheckInProgress = false;
+let fiksturLastUpdateCheckAt = 0;
+
+function hashFiksturAssetText(text = "") {
+  let hash = 5381;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = (hash * 33) ^ text.charCodeAt(index);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+async function getFiksturRemoteAssetFingerprint() {
+  const stamp = Date.now();
+  const [appResponse, styleResponse] = await Promise.all([
+    fetch(`./app.js?update_check=${stamp}`, { cache: "no-store" }),
+    fetch(`./styles.css?update_check=${stamp}`, { cache: "no-store" }),
+  ]);
+  if (!appResponse.ok || !styleResponse.ok) {
+    throw new Error("Güncelleme dosyaları kontrol edilemedi.");
+  }
+  const [appText, styleText] = await Promise.all([
+    appResponse.text(),
+    styleResponse.text(),
+  ]);
+  return `${hashFiksturAssetText(appText)}.${hashFiksturAssetText(styleText)}`;
+}
+
+async function checkForFiksturAppUpdate({ force = false } = {}) {
+  if (fiksturUpdateCheckInProgress) return false;
+  const now = Date.now();
+  if (!force && now - fiksturLastUpdateCheckAt < FIKSTUR_UPDATE_CHECK_INTERVAL_MS)
+    return false;
+
+  fiksturUpdateCheckInProgress = true;
+  fiksturLastUpdateCheckAt = now;
+  try {
+    const remoteFingerprint = await getFiksturRemoteAssetFingerprint();
+    const savedFingerprint = localStorage.getItem(FIKSTUR_ASSET_FINGERPRINT_KEY);
+    localStorage.setItem(FIKSTUR_ASSET_FINGERPRINT_KEY, remoteFingerprint);
+
+    if (savedFingerprint && savedFingerprint !== remoteFingerprint) {
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.set("app_update", String(Date.now()));
+      window.location.replace(nextUrl.toString());
+      return true;
+    }
+  } catch (error) {
+    console.warn("[GÜNCELLEME] Otomatik sürüm kontrolü ertelendi:", error);
+  } finally {
+    fiksturUpdateCheckInProgress = false;
+  }
+  return false;
+}
+
+function startFiksturAutomaticUpdateMonitor() {
+  window.setTimeout(() => checkForFiksturAppUpdate({ force: true }), 2500);
+  window.setInterval(() => checkForFiksturAppUpdate(), FIKSTUR_UPDATE_CHECK_INTERVAL_MS);
+  window.addEventListener("focus", () => checkForFiksturAppUpdate({ force: true }));
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      checkForFiksturAppUpdate({ force: true });
+    }
+  });
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker
+        .register("./firebase-messaging-sw.js", {
+          scope: "./",
+          updateViaCache: "none",
+        })
+        .then((registration) => registration.update())
+        .catch((error) =>
+          console.warn("[SW] Otomatik güncelleme kaydı ertelendi:", error),
+        );
+    });
+  }
+}
+
+startFiksturAutomaticUpdateMonitor();
+
 const FIREBASE_DEFAULT_USERS = [
   {
     id: "admin-root",
@@ -2703,110 +2785,15 @@ function removeMatchesFromLocalState(matchIds = []) {
   state.predictions = state.predictions.filter(
     (pred) => !normalizedIds.has(String(pred.matchId)),
   );
-
-  const remainingWeekIds = new Set(state.matches.map((match) => match.weekId));
-  state.weeks = state.weeks.filter((week) => remainingWeekIds.has(week.id));
-
-  const remainingSeasonIds = new Set(state.weeks.map((week) => week.seasonId));
-  state.seasons = state.seasons.filter((season) =>
-    remainingSeasonIds.has(season.id),
-  );
-
-  const remainingTeamKeys = new Set(
-    state.matches.flatMap((match) => [
-      `${match.seasonId}__${normalizeText(match.homeTeam)}`,
-      `${match.seasonId}__${normalizeText(match.awayTeam)}`,
-    ]),
-  );
-  state.teams = state.teams.filter((team) =>
-    remainingTeamKeys.has(`${team.seasonId}__${normalizeText(team.name)}`),
-  );
-
-  ensureActiveSelections();
+  // Bir maç silmek bağlı haftayı/sezonu otomatik silemez. Hafta ve sezon
+  // yalnızca kendi admin silme işlemleriyle kaldırılır.
 }
 
 function pruneLocalMatchesAgainstRemote(rows = [], requestedSeasonLabel = "") {
-  const remoteRows = Array.isArray(rows) ? rows : [];
-  const affectedSeasonLabels = new Set(
-    remoteRows
-      .map(
-        (row) =>
-          row.season || row.sezon || row.seasonName || row.sezonAdi || "",
-      )
-      .filter(Boolean)
-      .map((value) => normalizeText(value)),
-  );
-
-  if (requestedSeasonLabel) {
-    affectedSeasonLabels.add(normalizeText(requestedSeasonLabel));
-  }
-
-  if (
-    !affectedSeasonLabels.size &&
-    !requestedSeasonLabel &&
-    !remoteRows.length
-  ) {
-    state.matches = [];
-    state.predictions = [];
-    state.weeks = [];
-    state.teams = [];
-    state.seasons = [];
-    ensureActiveSelections();
-    return;
-  }
-
-  const remoteKeysBySeason = new Map();
-
-  remoteRows.forEach((row) => {
-    const seasonLabel = normalizeText(
-      row.season ||
-        row.sezon ||
-        row.seasonName ||
-        row.sezonAdi ||
-        requestedSeasonLabel ||
-        "",
-    );
-    if (!seasonLabel) return;
-    if (!remoteKeysBySeason.has(seasonLabel)) {
-      remoteKeysBySeason.set(seasonLabel, new Set());
-    }
-
-    const keys = remoteKeysBySeason.get(seasonLabel);
-    const weekNo = String(
-      row.weekNo || row.haftaNo || row.week || row.hafta || "",
-    );
-    const homeTeam = normalizeText(row.homeTeam || row.evSahibi || "");
-    const awayTeam = normalizeText(row.awayTeam || row.deplasman || "");
-    const remoteId = String(row.id || row.sheetMatchId || row.macId || "");
-
-    if (remoteId) keys.add(`id:${remoteId}`);
-    keys.add(`fp:${weekNo}__${homeTeam}__${awayTeam}`);
-  });
-
-  const removedMatchIds = state.matches
-    .filter((match) => {
-      // Hazırlanmakta olan haftaların maçları admin taslağıdır.
-      // Kullanıcı Firebase alanında henüz bulunmadıkları için uzak listeye göre silinmez.
-      if (isWeekPreparing(match.weekId)) return false;
-
-      const seasonLabel = normalizeText(
-        getSeasonById(match.seasonId)?.name || "",
-      );
-      if (!affectedSeasonLabels.has(seasonLabel)) return false;
-
-      const seasonKeys = remoteKeysBySeason.get(seasonLabel) || new Set();
-      const remoteId = String(
-        match.sheetMatchId || match.remoteMatchId || match.macId || "",
-      );
-      const fingerprint = `fp:${getWeekNumberById(match.weekId)}__${normalizeText(match.homeTeam)}__${normalizeText(match.awayTeam)}`;
-
-      if (remoteId && seasonKeys.has(`id:${remoteId}`)) return false;
-      if (seasonKeys.has(fingerprint)) return false;
-      return true;
-    })
-    .map((match) => String(match.id));
-
-  removeMatchesFromLocalState(removedMatchIds);
+  // Bilinçli olarak salt-okunur/no-op. Uzak veri eksik geldiğinde yerel maç,
+  // tahmin, hafta veya sezon temizlenemez. Silme yetkisi yalnızca adminin
+  // açık removeMatch/removeWeek/removeSeason işlemlerindedir.
+  return { removed: 0, protected: true, rows: Array.isArray(rows) ? rows.length : 0, requestedSeasonLabel };
 }
 
 async function syncOnlineMatchesFromSheet(options = {}) {
@@ -2828,9 +2815,9 @@ async function syncOnlineMatchesFromSheet(options = {}) {
       rows = normalizeOnlineMatchRows(response);
     }
 
-    if (options.replaceRemoteScope !== false) {
-      pruneLocalMatchesAgainstRemote(rows, requestedSeasonLabel || "");
-    }
+    // Uzak maç listesi eksik/gecikmiş gelebilir. API/Firebase okuması hiçbir
+    // zaman yerel maç, tahmin, hafta veya sezon silmeye yetkili değildir.
+    // Silme işlemleri yalnızca adminin açık silme butonlarından yapılır.
 
     if (!rows.length) {
       recalculateAllPoints();
@@ -2863,8 +2850,15 @@ async function syncOnlineMatchesFromSheet(options = {}) {
       );
       if (!weekNo) return;
 
-      const week = ensureWeekForSeason(seasonId, weekNo);
-      if (!week) return;
+      // Maç senkronu hafta oluşturamaz. Yalnızca admin tarafından daha önce
+      // kaydedilmiş haftalara ait maçlar içeri alınır.
+      const week = getRegisteredWeekForSeason(seasonId, weekNo);
+      if (!week) {
+        console.warn(
+          `[HAFTA KORUMASI] ${weekNo}. hafta admin tarafından oluşturulmadığı için uzak maç kaydı atlandı.`,
+        );
+        return;
+      }
 
       touchedWeekIds.add(week.id);
 
@@ -3104,34 +3098,41 @@ async function syncSeasonRegistryFromFirebase() {
 
   state.seasons = seasonList.map((item) => ({ ...item }));
 
-  const localWeekMap = new Map(
-    state.weeks.map((week) => [
-      `${week.seasonId}__${Number(week.number)}`,
-      week,
-    ]),
-  );
-  weekList.forEach((remoteWeek) => {
-    const key = `${remoteWeek.seasonId}__${Number(remoteWeek.number)}`;
-    const localWeek = localWeekMap.get(key);
-    if (localWeek) Object.assign(localWeek, remoteWeek);
-    else state.weeks.push({ ...remoteWeek });
-  });
+  if (Array.isArray(settings.weeksMeta)) {
+    // Firebase'deki admin hafta kaydı kanonik listedir. Kimlik değişmişse aynı
+    // sezon + hafta numarasındaki maçları yeni kimliğe taşı; maçları ve
+    // tahminleri silme. Böylece eski cihaz kayıtları güvenle uzlaştırılır.
+    const previousWeeksById = new Map(
+      state.weeks.map((week) => [String(week.id), week]),
+    );
+    const canonicalWeeksByNumber = new Map(
+      weekList.map((week) => [
+        `${String(week.seasonId)}__${Number(week.number)}`,
+        week,
+      ]),
+    );
+
+    state.matches.forEach((match) => {
+      const previousWeek = previousWeeksById.get(String(match.weekId));
+      if (!previousWeek) return;
+      const canonicalWeek = canonicalWeeksByNumber.get(
+        `${String(previousWeek.seasonId)}__${Number(previousWeek.number)}`,
+      );
+      if (!canonicalWeek) return;
+      match.weekId = canonicalWeek.id;
+      match.seasonId = canonicalWeek.seasonId;
+    });
+
+    state.weeks = weekList.map((week) => ({ ...week }));
+  }
   state.teams = state.teams.filter((team) =>
     remoteIds.has(String(team.seasonId)),
   );
   state.weeks = state.weeks.filter((week) =>
     remoteIds.has(String(week.seasonId)),
   );
-  const validWeekIds = new Set(state.weeks.map((week) => String(week.id)));
-  state.matches = state.matches.filter(
-    (match) =>
-      remoteIds.has(String(match.seasonId)) &&
-      validWeekIds.has(String(match.weekId)),
-  );
-  const validMatchIds = new Set(state.matches.map((match) => String(match.id)));
-  state.predictions = state.predictions.filter((pred) =>
-    validMatchIds.has(String(pred.matchId)),
-  );
+  // Registry eşitlemesi maç veya tahmin silmez. Eksik/yarım bir uzak yanıtın
+  // kullanıcı verisini temizlemesine kesinlikle izin verilmez.
 
   if (
     state.settings.activeSeasonId &&
@@ -7229,21 +7230,17 @@ function forceDefaultLandingAfterLogin(reason = "login") {
     state.settings.activeWeekId = getPreferredWeekIdForSeason(seasonId);
   }
 }
-function ensureWeekForSeason(seasonId, weekNumber) {
-  if (!weekNumber) return null;
-  let week = getWeeksBySeasonId(seasonId).find(
+function getRegisteredWeekForSeason(seasonId, weekNumber) {
+  if (!seasonId || !weekNumber) return null;
+  return getAllWeeksBySeasonId(seasonId).find(
     (w) => Number(w.number) === Number(weekNumber),
-  );
-  if (!week) {
-    week = {
-      id: uid("week"),
-      seasonId,
-      number: Number(weekNumber),
-      status: "hazirlaniyor",
-    };
-    state.weeks.push(week);
-  }
-  return week;
+  ) || null;
+}
+
+// Geriye dönük çağrılar için tutulur; artık asla hafta oluşturmaz.
+// Yeni hafta yalnızca adminin addWeek() işlemiyle eklenebilir.
+function ensureWeekForSeason(seasonId, weekNumber) {
+  return getRegisteredWeekForSeason(seasonId, weekNumber);
 }
 
 function isPostponedStatus(statusText = "") {
@@ -16565,7 +16562,13 @@ function relocateMatchToApiWeek(match, seasonId, apiWeekNumber) {
   const currentWeekNumber = getWeekNumberById(match.weekId);
   if (Number(currentWeekNumber) === Number(apiWeekNumber))
     return getWeekById(match.weekId);
-  const nextWeek = ensureWeekForSeason(seasonId, apiWeekNumber);
+  const nextWeek = getRegisteredWeekForSeason(seasonId, apiWeekNumber);
+  if (!nextWeek) {
+    console.warn(
+      `[HAFTA KORUMASI] API maçı ${apiWeekNumber}. haftaya taşımak istedi; hafta admin tarafından oluşturulmadığı için taşıma yapılmadı.`,
+    );
+    return getWeekById(match.weekId) || null;
+  }
   if (nextWeek) {
     match.originalWeekNumber =
       match.originalWeekNumber || currentWeekNumber || apiWeekNumber;
@@ -17007,10 +17010,16 @@ async function importFixturesFromApi(updateResultsOnly = false) {
     let movedCount = 0;
 
     events.forEach((event) => {
-      let week = ensureWeekForSeason(
+      const week = getRegisteredWeekForSeason(
         seasonId,
         event.weekNumber || getWeeksBySeasonId(seasonId).length + 1,
       );
+      if (!week) {
+        console.warn(
+          `[HAFTA KORUMASI] ${event.weekNumber || "Bilinmeyen"}. hafta admin tarafından oluşturulmadığı için sezon API kaydı atlandı.`,
+        );
+        return;
+      }
       touchedWeekIds.add(week.id);
 
       let existing = state.matches.find(
@@ -18443,8 +18452,15 @@ async function registerFiksturMessagingServiceWorker() {
     "./firebase-messaging-sw.js",
     {
       scope: "./",
+      updateViaCache: "none",
     },
   );
+
+  // Tarayıcının 24 saatlik varsayılan kontrolünü bekleme; her uygulama
+  // açılışında deploy edilmiş yeni Service Worker sürümünü doğrula.
+  await registration.update().catch((error) => {
+    console.warn("[SW] Güncelleme kontrolü ertelendi:", error);
+  });
 
   await navigator.serviceWorker.ready;
 

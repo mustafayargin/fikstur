@@ -21,6 +21,35 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// Yeni deploy edilen Service Worker beklemeden devreye girer. İlk kez bu
+// güncelleme sistemine geçen açık sekmeler bir kez yenilenir; kullanıcı verisi,
+// bildirim izni ve FCM tokeni korunur.
+self.addEventListener("install", () => {
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    self.clients.claim().then(async () => {
+      const clientList = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+      await Promise.all(
+        clientList.map((client) => {
+          try {
+            const nextUrl = new URL(client.url);
+            nextUrl.searchParams.set("sw_update", String(Date.now()));
+            return client.navigate(nextUrl.toString());
+          } catch {
+            return null;
+          }
+        }),
+      );
+    }),
+  );
+});
+
 const FIKSTUR_SHOWN_NOTIFICATION_CACHE = new Map();
 const FIKSTUR_NOTIFICATION_DEDUPE_MS = 15000;
 
