@@ -846,9 +846,9 @@
             <section class="card standings-board-card">
               <div class="card-header standings-card-head standings-list-head">
                 <div>
-                  <h3>Genel Sıralama</h3>
+                  <h3>Şampiyonluk Sıralaması</h3>
                   <p class="card-subtitle">
-                    Toplam puan, tam skor ve yakın tahmin başarısı.
+                    Sezon genelinde şampiyonluk yarışı ve avantaj sırası.
                   </p>
                 </div>
                 <span class="badge gray" id="generalLeaderBadge"
@@ -856,6 +856,15 @@
                 >
               </div>
               <div id="standingsTable" class="standings-card-body"></div>
+              <div class="standings-tiebreak-note">
+                <span>⚖️</span>
+                <p>
+                  <strong>Puan eşitliği kuralı:</strong> Futboldaki averaj
+                  sistemi gibi; önce tam skor, ardından doğru sonuç ve yapılan
+                  tahmin sayısı üstünlüğüne bakılır. Tüm değerler eşitse
+                  oyuncular aynı sırayı paylaşır.
+                </p>
+              </div>
             </section>
 
             <aside class="standings-side-stack standings-side-stack--luxury">
@@ -2020,6 +2029,6 @@
       window.__fiksturFirebaseReady = true;
     </script>
 
-<script src="app.js?v=20260824-auto-update-v1"></script>
+<script src="app.js?v=20260825-broadcast-ticket-v4"></script>
   </body>
 </html>

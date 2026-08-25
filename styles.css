@@ -12166,6 +12166,33 @@ body.player-modal-open {
   gap: 14px;
 }
 
+#tab-standings .standings-tiebreak-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 16px;
+  padding: 11px 13px;
+  border: 1px solid rgba(242, 184, 75, 0.2);
+  border-radius: 13px;
+  color: #9fb0c6;
+  background: linear-gradient(135deg, rgba(242, 184, 75, 0.09), rgba(15, 32, 54, 0.65));
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+#tab-standings .standings-tiebreak-note > span {
+  flex: 0 0 auto;
+  font-size: 16px;
+}
+
+#tab-standings .standings-tiebreak-note p {
+  margin: 0;
+}
+
+#tab-standings .standings-tiebreak-note strong {
+  color: #f2c45f;
+}
+
 #tab-standings #standingsTable .leaderboard-row,
 #tab-standings #weeklyStandings .leaderboard-row {
   box-sizing: border-box;
