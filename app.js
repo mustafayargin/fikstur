@@ -3096,6 +3096,59 @@ async function syncSeasonRegistryFromFirebase() {
   const weekList = rawWeekList.map(normalizeWeekRegistryItem).filter(Boolean);
   const remoteIds = new Set(seasonList.map((item) => String(item.id)));
 
+  // Acil veri koruması: weeksMeta daha eski/eksik bir cihaz tarafından
+  // yanlışlıkla daraltılmış olsa bile Firebase'de saklanan maçlar haftanın
+  // gerçekten daha önce oluşturulduğunu kanıtlar. Bu, dış API'den yeni hafta
+  // üretmez; yalnızca kendi veritabanımızdaki sahipsiz maçların hafta kaydını
+  // geri kurar.
+  const storedMatches = firebaseSnapshotToArray(
+    (await firebaseRead("matches").catch(() => null)) || {},
+  );
+  const seasonByName = new Map(
+    seasonList.map((season) => [normalizeText(season.name), season]),
+  );
+  const knownWeekKeys = new Set(
+    weekList.map(
+      (week) => `${String(week.seasonId)}__${Number(week.number)}`,
+    ),
+  );
+  let repairedWeekRegistry = false;
+
+  storedMatches.forEach((match) => {
+    const weekNo = Number(
+      match.weekNo || match.haftaNo || match.week || match.hafta || 0,
+    );
+    if (!weekNo) return;
+
+    const directSeasonId = String(match.seasonId || "").trim();
+    const namedSeason = seasonByName.get(
+      normalizeText(match.season || match.sezon || match.seasonName || ""),
+    );
+    const seasonId = remoteIds.has(directSeasonId)
+      ? directSeasonId
+      : namedSeason?.id || "";
+    if (!seasonId) return;
+
+    const key = `${seasonId}__${weekNo}`;
+    if (knownWeekKeys.has(key)) return;
+
+    const played = parseBooleanish(
+      match.played ?? match.oynandiMi ?? match.isPlayed ?? false,
+    );
+    weekList.push({
+      id: `week-recovered-${sanitizeFirebaseKey(seasonId)}-${weekNo}`,
+      seasonId,
+      number: weekNo,
+      status: played ? "tamamlandi" : "aktif",
+      publishedAt: "",
+      publishedBy: "system-recovery",
+      completedAt: "",
+      recoveredFromStoredMatches: true,
+    });
+    knownWeekKeys.add(key);
+    repairedWeekRegistry = true;
+  });
+
   state.seasons = seasonList.map((item) => ({ ...item }));
 
   if (Array.isArray(settings.weeksMeta)) {
@@ -3143,12 +3196,18 @@ async function syncSeasonRegistryFromFirebase() {
   if (!state.settings.activeSeasonId && seasonList.length) {
     state.settings.activeSeasonId = seasonList[0].id;
   }
+  if (repairedWeekRegistry) {
+    // Yalnızca eksik kayıtları ekleyen korumalı yazım; mevcut haftaları silmez.
+    await persistWeekRegistryToFirebase().catch((error) =>
+      console.warn("Eksik hafta kayıtları Firebase'e geri yazılamadı:", error),
+    );
+  }
   return seasonList;
 }
 
-async function persistWeekRegistryToFirebase() {
+async function persistWeekRegistryToFirebase(options = {}) {
   if (!isFirebaseReady()) return false;
-  const weeksMeta = state.weeks
+  const localWeeksMeta = state.weeks
     .map((week) => ({
       id: String(week.id || "").trim(),
       seasonId: String(week.seasonId || "").trim(),
@@ -3164,8 +3223,28 @@ async function persistWeekRegistryToFirebase() {
     }))
     .filter((week) => week.id && week.seasonId && week.number);
 
+  const removedWeekIds = new Set(
+    (options.removedWeekIds || []).map((id) => String(id)),
+  );
+  const db = getFirebaseDb();
+  await db.ref("settings/weeksMeta").transaction((currentValue) => {
+    const remoteWeeks = (Array.isArray(currentValue) ? currentValue : [])
+      .map(normalizeWeekRegistryItem)
+      .filter(Boolean)
+      .filter((week) => !removedWeekIds.has(String(week.id)));
+    const merged = new Map();
+
+    remoteWeeks.forEach((week) => {
+      const key = `${String(week.seasonId)}__${Number(week.number)}`;
+      merged.set(key, week);
+    });
+    localWeeksMeta.forEach((week) => {
+      const key = `${String(week.seasonId)}__${Number(week.number)}`;
+      merged.set(key, week);
+    });
+    return Array.from(merged.values());
+  });
   await firebaseUpdate("settings", {
-    weeksMeta,
     weeksMetaUpdatedAt: new Date().toISOString(),
   });
   return true;
@@ -9638,7 +9717,7 @@ window.removeWeek = async function (id) {
     state.weeks = state.weeks.filter((w) => w.id !== id);
     if (isFirebaseReady()) {
       try {
-        await persistWeekRegistryToFirebase();
+        await persistWeekRegistryToFirebase({ removedWeekIds: [id] });
       } catch (error) {
         console.warn("Hafta listesi Firebase'de güncellenemedi:", error);
       }
