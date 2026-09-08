@@ -76,10 +76,9 @@ jobs:
             };
 
             const getPredictionLockNotificationType = (diffHours) => {
-              if (diffHours <= 2 && diffHours > 1) return "2h";
-              if (diffHours <= 1 && diffHours > 0) return "1h";
-              return null;
-            };
+            if (diffHours <= 1 && diffHours > 0) return "1h";
+            return null;
+          };
 
             const withTimeout = (promise, ms, label) => {
               const timeoutPromise = new Promise((_, reject) => {
@@ -551,7 +550,7 @@ jobs:
                 }
 
                 try {
-                  const remainingText = type === "2h" ? "2 saat" : "1 saat";
+                  const remainingText = "1 saat";
                   const res = await sendToTokens(
                     tokens,
                     "🔒 Tahminler yakında kilitleniyor!",
