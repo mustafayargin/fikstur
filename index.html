@@ -197,7 +197,7 @@
                 <select id="dashboardWeekSelect"></select>
                 <button
                   type="button"
-                  class="secondary dashboard-mobile-sync-btn admin-only"
+                  class="secondary dashboard-mobile-sync-btn"
                   id="dashboardMobileWeekScoreUpdateBtn"
                   aria-label="Skorları Güncelle"
                   title="Skorları Güncelle"
@@ -1818,6 +1818,34 @@
           </button>
         </div>
         <div id="leagueStandingsModalBody"></div>
+      </div>
+    </div>
+
+    <div
+      class="team-analysis-modal hidden"
+      id="teamAnalysisModal"
+      aria-hidden="true"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="teamAnalysisModalTitle"
+    >
+      <div class="team-analysis-modal-card">
+        <div class="team-analysis-modal-head">
+          <div>
+            <span class="team-analysis-kicker">Maç ön izlemesi</span>
+            <h3 id="teamAnalysisModalTitle">Takım Karşılaştırması</h3>
+            <p id="teamAnalysisModalMeta">Sezon performansı hazırlanıyor...</p>
+          </div>
+          <button
+            class="team-analysis-close"
+            id="teamAnalysisModalClose"
+            type="button"
+            aria-label="Takım karşılaştırmasını kapat"
+          >
+            ×
+          </button>
+        </div>
+        <div id="teamAnalysisModalBody"></div>
       </div>
     </div>
     <div class="champion-modal hidden" id="championModal">

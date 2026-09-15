@@ -5249,6 +5249,8 @@ function applyRolePermissions() {
         insideDashboardModal ||
         insideStatsInteraction ||
         [
+          "dashboardWeekScoreUpdateBtn",
+          "dashboardMobileWeekScoreUpdateBtn",
           "dashboardSeasonSelect",
           "dashboardWeekSelect",
           "standingsSeasonSelect",
@@ -6086,7 +6088,7 @@ function renderMobilePredictions(container, matches) {
       return `
       <article class="mobile-prediction-card premium-card compact-premium-card ${match.played ? "played-row" : ""} ${locked ? "locked-match" : "open-match"} ${visual === "postponed" ? "postponed-row" : ""} ${visual === "played-postponed" ? "rescheduled-played-row" : ""}">
         <div class="mobile-prediction-header premium-header compact-premium-header">
-          <div class="mobile-prediction-match">${matchCell(match)}</div>
+          <div class="mobile-prediction-match">${matchCell(match, { interactiveTeams: true })}</div>
           <div class="mobile-prediction-subline premium-subline compact-subline">
             <span class="badge ${badge.cls}">${badge.text}</span>
             ${match.played ? `<span class="result-chip premium-result-chip">Skor ${match.homeScore}-${match.awayScore}</span>` : locked ? `<span class="result-chip warning-chip premium-result-chip">Kapandı</span>` : `<span class="result-chip premium-result-chip soft-chip">Açık</span>`}
@@ -7762,16 +7764,23 @@ function matchCell(match, options = {}) {
     showMeta = false,
     metaClass = "",
     alwaysShowStatus = false,
+    interactiveTeams = false,
   } = options;
+  const homeLogo = interactiveTeams
+    ? `<button type="button" class="team-analysis-trigger" onclick="event.stopPropagation(); openTeamAnalysisModal('${match.id}', 'home');" title="${escapeHtml(match.homeTeam)} takım analizini aç" aria-label="${escapeHtml(match.homeTeam)} takım analizini aç">${teamLogoHtml(match.homeTeam, match.seasonId)}</button>`
+    : teamLogoHtml(match.homeTeam, match.seasonId);
+  const awayLogo = interactiveTeams
+    ? `<button type="button" class="team-analysis-trigger" onclick="event.stopPropagation(); openTeamAnalysisModal('${match.id}', 'away');" title="${escapeHtml(match.awayTeam)} takım analizini aç" aria-label="${escapeHtml(match.awayTeam)} takım analizini aç">${teamLogoHtml(match.awayTeam, match.seasonId)}</button>`
+    : teamLogoHtml(match.awayTeam, match.seasonId);
   return `
     <div class="fixture-cell ${visual === "postponed" ? "fixture-postponed" : visual === "played-postponed" ? "fixture-rescheduled-played" : ""}">
       <div class="team-inline home-team">
-        ${teamLogoHtml(match.homeTeam, match.seasonId)}
+        ${homeLogo}
         <span class="team-name" title="${escapeHtml(match.homeTeam)}">${escapeHtml(match.homeTeam)}</span>
       </div>
       <span class="versus-tag">-</span>
       <div class="team-inline away-team">
-        ${teamLogoHtml(match.awayTeam, match.seasonId)}
+        ${awayLogo}
         <span class="team-name" title="${escapeHtml(match.awayTeam)}">${escapeHtml(match.awayTeam)}</span>
       </div>
     </div>
@@ -7785,6 +7794,76 @@ const dashboardApiProgressState = {
   mode: "idle",
   timer: null,
 };
+
+const MANUAL_SCORE_UPDATE_COOLDOWN_MS = 10 * 60 * 1000;
+let dashboardScoreCooldownTimer = null;
+let dashboardScoreUpdatePromise = null;
+
+function getManualScoreLastSuccessAt() {
+  return Number(
+    state.settings?.manualScoreLastSuccessAt ||
+      state.settings?.resultsLastAutoSyncAt ||
+      0,
+  );
+}
+
+function getManualScoreCooldownRemaining(now = Date.now()) {
+  return Math.max(
+    0,
+    MANUAL_SCORE_UPDATE_COOLDOWN_MS - (now - getManualScoreLastSuccessAt()),
+  );
+}
+
+function formatManualScoreCooldown(remainingMs) {
+  const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = String(totalSeconds % 60).padStart(2, "0");
+  return `${minutes}:${seconds}`;
+}
+
+function renderManualScoreCooldown() {
+  const remaining = getManualScoreCooldownRemaining();
+  const desktopButton = document.getElementById("dashboardWeekScoreUpdateBtn");
+  const mobileButton = document.getElementById(
+    "dashboardMobileWeekScoreUpdateBtn",
+  );
+  const running = !!dashboardScoreUpdatePromise;
+
+  if (desktopButton && !running) {
+    if (!desktopButton.dataset.originalText) {
+      desktopButton.dataset.originalText = "Skorları Güncelle";
+    }
+    desktopButton.disabled = remaining > 0;
+    desktopButton.classList.toggle("is-cooldown", remaining > 0);
+    desktopButton.textContent =
+      remaining > 0
+        ? `Tekrar kontrol: ${formatManualScoreCooldown(remaining)}`
+        : "Skorları Güncelle";
+    desktopButton.title =
+      remaining > 0
+        ? "Son başarılı API kontrolünden sonra 10 dakika beklenir."
+        : "Skorları API'den kontrol et";
+  }
+
+  if (mobileButton && !running) {
+    const icon = mobileButton.querySelector(".dashboard-mobile-sync-btn__icon");
+    mobileButton.disabled = remaining > 0;
+    mobileButton.classList.toggle("is-cooldown", remaining > 0);
+    if (icon) icon.textContent = remaining > 0 ? "⏱" : "⟳";
+    const label =
+      remaining > 0
+        ? `Tekrar kontrol için ${formatManualScoreCooldown(remaining)} kaldı`
+        : "Skorları Güncelle";
+    mobileButton.setAttribute("aria-label", label);
+    mobileButton.title = label;
+  }
+
+  clearInterval(dashboardScoreCooldownTimer);
+  dashboardScoreCooldownTimer = null;
+  if (remaining > 0) {
+    dashboardScoreCooldownTimer = setInterval(renderManualScoreCooldown, 1000);
+  }
+}
 
 function setDashboardApiProgress(
   value = 0,
@@ -7953,6 +8032,7 @@ function renderDashboardSyncCard() {
     dashboardApiProgressState.label,
     dashboardApiProgressState.mode,
   );
+  renderManualScoreCooldown();
 }
 
 function buildFirebaseAdminSummary() {
@@ -8090,6 +8170,7 @@ async function testFirebaseAdminConnection(buttonOrEvent) {
 }
 
 async function runDashboardWeekScoreUpdate(buttonOrEvent) {
+  if (dashboardScoreUpdatePromise) return dashboardScoreUpdatePromise;
   const actionButton = getActionButtonFromArg(buttonOrEvent);
   const season = getSeasonById(getActiveSeasonId());
   const week = getWeekById(state.settings.activeWeekId);
@@ -8100,27 +8181,80 @@ async function runDashboardWeekScoreUpdate(buttonOrEvent) {
     });
   }
 
-  setAsyncButtonState(actionButton, "loading", { loading: "Çekiliyor..." });
-  startDashboardApiProgress();
-  const status = document.getElementById("dashboardSyncStatus");
-  if (status) {
-    status.textContent = `${season.name} / ${week.number}. hafta skorları API'den çekiliyor...`;
-  }
+  dashboardScoreUpdatePromise = (async () => {
+    try {
+      if (isFirebaseReady()) {
+        const remoteSettings = (await firebaseRead("settings")) || {};
+        const remoteLastSuccess = Number(
+          remoteSettings.manualScoreLastSuccessAt ||
+            remoteSettings.resultsLastAutoSyncAt ||
+            0,
+        );
+        if (remoteLastSuccess > getManualScoreLastSuccessAt()) {
+          state.settings.manualScoreLastSuccessAt = remoteLastSuccess;
+          saveState(true);
+        }
+      }
 
-  try {
-    await syncSelectedWeekFromApi();
-    const adminWeekStatus =
-      document.getElementById("weekApiStatus")?.textContent ||
-      `${week.number}. hafta skorları güncellendi.`;
-    finishDashboardApiProgress(true, adminWeekStatus);
-    setAsyncButtonState(actionButton, "success", { success: "Tamamlandı" });
-  } catch (error) {
-    finishDashboardApiProgress(
-      false,
-      error?.message || "API işlemi başarısız oldu.",
-    );
-    setAsyncButtonState(actionButton, "error", { error: "Hata" });
-  }
+      const remaining = getManualScoreCooldownRemaining();
+      if (remaining > 0) {
+        renderManualScoreCooldown();
+        return showAlert(
+          `API kısa süre önce başarıyla kontrol edildi. Tekrar denemek için ${formatManualScoreCooldown(remaining)} beklemelisin.`,
+          { title: "Skorlar güncel", type: "info" },
+        );
+      }
+
+      setAsyncButtonState(actionButton, "loading", {
+        loading: "API'ye bağlanılıyor...",
+      });
+      startDashboardApiProgress();
+      const status = document.getElementById("dashboardSyncStatus");
+      if (status) {
+        status.textContent = `${season.name} / ${week.number}. hafta için skor API'sine bağlanılıyor...`;
+      }
+
+      const result = await syncSelectedWeekFromApi({ manualUserRequest: true });
+      const finishedAt = Number(result?.finishedAt || Date.now());
+      state.settings.manualScoreLastSuccessAt = finishedAt;
+      saveState();
+      if (isFirebaseReady()) {
+        try {
+          await firebaseUpdate("settings", {
+            manualScoreLastSuccessAt: finishedAt,
+            manualScoreLastSuccessBy: getAutoSyncActorLabel(),
+            updatedAt: new Date().toISOString(),
+          });
+        } catch (cooldownError) {
+          console.warn("Ortak skor kontrol süresi kaydedilemedi:", cooldownError);
+        }
+      }
+
+      const changedCount = Number(result?.updatedCount || 0) + Number(result?.createdCount || 0);
+      const message = changedCount
+        ? `✓ API kontrol edildi: ${result.checkedCount} maç incelendi, ${changedCount} maç güncellendi.`
+        : `✓ API kontrol edildi: ${result?.checkedCount || 0} maç incelendi, yeni skor bulunamadı.`;
+      finishDashboardApiProgress(true, message);
+      setAsyncButtonState(actionButton, "success", {
+        success: "API kontrol edildi ✓",
+      });
+      showAlert(message, { title: "Skor kontrolü tamamlandı", type: "success" });
+      setTimeout(renderManualScoreCooldown, 1250);
+      return result;
+    } catch (error) {
+      finishDashboardApiProgress(
+        false,
+        `⚠ ${error?.message || "API işlemi başarısız oldu."} 10 dakikalık bekleme başlatılmadı.`,
+      );
+      setAsyncButtonState(actionButton, "error", { error: "Tekrar dene" });
+      return null;
+    } finally {
+      dashboardScoreUpdatePromise = null;
+      setTimeout(renderManualScoreCooldown, 1700);
+    }
+  })();
+
+  return dashboardScoreUpdatePromise;
 }
 
 async function syncDashboardWeek() {
@@ -11861,7 +11995,9 @@ function desktopPredictionMatchCell(match) {
       <div class="prediction-fixture-glow"></div>
       <div class="desktop-prediction-match-inner prediction-fixture-inner">
         <div class="desktop-prediction-team prediction-fixture-team home-team">
-          ${teamLogoHtml(match.homeTeam, match.seasonId)}
+          <button type="button" class="team-analysis-trigger" onclick="event.stopPropagation(); openTeamAnalysisModal('${match.id}', 'home');" title="${escapeHtml(match.homeTeam)} takım analizini aç" aria-label="${escapeHtml(match.homeTeam)} takım analizini aç">
+            ${teamLogoHtml(match.homeTeam, match.seasonId)}
+          </button>
           <span class="team-name" title="${escapeHtml(match.homeTeam)}">${escapeHtml(match.homeTeam)}</span>
         </div>
         <div class="desktop-prediction-center prediction-fixture-center">
@@ -11870,7 +12006,9 @@ function desktopPredictionMatchCell(match) {
           <div class="prediction-fixture-state"><span class="badge ${badge.cls}">${badge.text}</span><small>${centerLabel}</small></div>
         </div>
         <div class="desktop-prediction-team prediction-fixture-team away-team">
-          ${teamLogoHtml(match.awayTeam, match.seasonId)}
+          <button type="button" class="team-analysis-trigger" onclick="event.stopPropagation(); openTeamAnalysisModal('${match.id}', 'away');" title="${escapeHtml(match.awayTeam)} takım analizini aç" aria-label="${escapeHtml(match.awayTeam)} takım analizini aç">
+            ${teamLogoHtml(match.awayTeam, match.seasonId)}
+          </button>
           <span class="team-name" title="${escapeHtml(match.awayTeam)}">${escapeHtml(match.awayTeam)}</span>
         </div>
       </div>
@@ -11973,9 +12111,9 @@ function renderFocusedUserPredictions(container, matches) {
         <div class="prediction-scene-inner">
           <div class="prediction-scene-team prediction-scene-team--home">
             
-          <div class="prediction-scene-logo">
+          <button type="button" class="prediction-scene-logo team-analysis-trigger" onclick="event.stopPropagation(); openTeamAnalysisModal('${match.id}', 'home');" title="${escapeHtml(match.homeTeam)} takım analizini aç" aria-label="${escapeHtml(match.homeTeam)} takım analizini aç">
               ${teamLogoHtml(match.homeTeam, match.seasonId)}
-            </div>
+            </button>
             <strong title="${escapeHtml(match.homeTeam)}">${escapeHtml(match.homeTeam)}</strong>
           
             </div>
@@ -12065,9 +12203,9 @@ function renderFocusedUserPredictions(container, matches) {
           </div>
 
           <div class="prediction-scene-team prediction-scene-team--away">
-            <div class="prediction-scene-logo">
+            <button type="button" class="prediction-scene-logo team-analysis-trigger" onclick="event.stopPropagation(); openTeamAnalysisModal('${match.id}', 'away');" title="${escapeHtml(match.awayTeam)} takım analizini aç" aria-label="${escapeHtml(match.awayTeam)} takım analizini aç">
               ${teamLogoHtml(match.awayTeam, match.seasonId)}
-            </div>
+            </button>
             <strong title="${escapeHtml(match.awayTeam)}">${escapeHtml(match.awayTeam)}</strong>
           </div>
         </div>
@@ -14925,8 +15063,13 @@ function normalizeLeagueStandingNumber(value) {
   return Number.isFinite(numberValue) ? numberValue : 0;
 }
 
-function buildLeagueStandingsFromResults(seasonId = getActiveSeasonId()) {
+function buildLeagueStandingsFromResults(
+  seasonId = getActiveSeasonId(),
+  options = {},
+) {
   const activeSeasonId = String(seasonId || "");
+  const beforeTime = Number(options.beforeTime);
+  const excludeMatchId = String(options.excludeMatchId || "");
   const teamNames = new Set();
 
   state.teams
@@ -14957,7 +15100,15 @@ function buildLeagueStandingsFromResults(seasonId = getActiveSeasonId()) {
 
   const playedMatches = state.matches.filter((match) => {
     if (String(match.seasonId || "") !== activeSeasonId) return false;
+    if (excludeMatchId && String(match.id) === excludeMatchId) return false;
     if (!match.played) return false;
+    const matchTime = parseMatchDateTimestamp(match.date);
+    if (
+      Number.isFinite(beforeTime) &&
+      Number.isFinite(matchTime) &&
+      matchTime >= beforeTime
+    )
+      return false;
     const homeScore = Number(match.homeScore);
     const awayScore = Number(match.awayScore);
     return Number.isFinite(homeScore) && Number.isFinite(awayScore);
@@ -15041,6 +15192,174 @@ function getCachedLeagueStandings(seasonId = getActiveSeasonId()) {
   const cache = state.settings.leagueStandingsCache || {};
   const saved = cache[getLeagueStandingsCacheKey(seasonId)];
   return saved && Array.isArray(saved.rows) ? saved : null;
+}
+
+function getLeagueStandingForTeam(rows, teamName) {
+  const key = normalizeText(teamName);
+  return (
+    (rows || []).find((row) => normalizeText(row.teamName) === key) || {
+      teamName,
+      rank: "-",
+      played: 0,
+      won: 0,
+      drawn: 0,
+      lost: 0,
+      goalsFor: 0,
+      goalsAgainst: 0,
+      goalDiff: 0,
+      points: 0,
+    }
+  );
+}
+
+function getTeamRecentMatches(teamName, seasonId, targetMatch) {
+  const teamKey = normalizeText(teamName);
+  const targetTime = parseMatchDateTimestamp(targetMatch?.date);
+  return state.matches
+    .filter((match) => {
+      if (String(match.seasonId || "") !== String(seasonId || "")) return false;
+      if (String(match.id) === String(targetMatch?.id)) return false;
+      if (!match.played) return false;
+      const involved =
+        normalizeText(match.homeTeam) === teamKey ||
+        normalizeText(match.awayTeam) === teamKey;
+      if (!involved) return false;
+      const matchTime = parseMatchDateTimestamp(match.date);
+      return !Number.isFinite(targetTime) ||
+        !Number.isFinite(matchTime) ||
+        matchTime < targetTime;
+    })
+    .sort(
+      (a, b) =>
+        (parseMatchDateTimestamp(b.date) || 0) -
+        (parseMatchDateTimestamp(a.date) || 0),
+    )
+    .slice(0, 5)
+    .map((match) => {
+      const isHome = normalizeText(match.homeTeam) === teamKey;
+      const teamScore = Number(isHome ? match.homeScore : match.awayScore);
+      const opponentScore = Number(isHome ? match.awayScore : match.homeScore);
+      const result = teamScore > opponentScore ? "W" : teamScore < opponentScore ? "L" : "D";
+      return {
+        match,
+        result,
+        opponent: isHome ? match.awayTeam : match.homeTeam,
+        venue: isHome ? "İç saha" : "Deplasman",
+        score: `${teamScore}-${opponentScore}`,
+      };
+    });
+}
+
+function buildTeamFormSummary(recentMatches) {
+  return (recentMatches || []).reduce(
+    (summary, item) => {
+      summary.goalsFor += Number(item.score.split("-")[0] || 0);
+      summary.goalsAgainst += Number(item.score.split("-")[1] || 0);
+      if (item.result === "W") summary.won += 1;
+      else if (item.result === "D") summary.drawn += 1;
+      else summary.lost += 1;
+      return summary;
+    },
+    { won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0 },
+  );
+}
+
+function renderTeamRecentForm(teamName, recentMatches) {
+  if (!recentMatches.length) {
+    return `<div class="team-analysis-empty">Bu takım için önceki oynanmış maç bulunamadı.</div>`;
+  }
+  return `
+    <div class="team-analysis-form-dots" aria-label="${escapeHtml(teamName)} son maç formu">
+      ${recentMatches
+        .map(
+          (item) =>
+            `<span class="form-dot is-${item.result.toLowerCase()}" title="${escapeHtml(item.opponent)} ${escapeHtml(item.score)}">${item.result === "W" ? "G" : item.result === "D" ? "B" : "M"}</span>`,
+        )
+        .join("")}
+    </div>
+    <div class="team-analysis-match-list">
+      ${recentMatches
+        .map(
+          (item) => `
+            <div class="team-analysis-match-row is-${item.result.toLowerCase()}">
+              <span class="team-analysis-result-badge">${item.result === "W" ? "G" : item.result === "D" ? "B" : "M"}</span>
+              <span class="team-analysis-opponent"><strong>${escapeHtml(item.opponent)}</strong><small>${escapeHtml(item.venue)} · ${formatDate(item.match.date)}</small></span>
+              <b>${escapeHtml(item.score)}</b>
+            </div>`,
+        )
+        .join("")}
+    </div>`;
+}
+
+function buildTeamAnalysisPanel(teamName, row, recentMatches, seasonId, focused) {
+  const form = buildTeamFormSummary(recentMatches);
+  return `
+    <section class="team-analysis-side ${focused ? "is-focused" : ""}">
+      <div class="team-analysis-team-head">
+        ${teamLogoHtml(teamName, seasonId, "team-analysis-logo")}
+        <div><strong>${escapeHtml(teamName)}</strong><span>${row.rank === "-" ? "Sıralama oluşmadı" : `${row.rank}. sıra · ${row.points} puan`}</span></div>
+      </div>
+      <div class="team-analysis-stats">
+        <span><b>${row.played}</b><small>Maç</small></span>
+        <span><b>${row.won}</b><small>G</small></span>
+        <span><b>${row.drawn}</b><small>B</small></span>
+        <span><b>${row.lost}</b><small>M</small></span>
+        <span><b>${row.goalDiff > 0 ? "+" : ""}${row.goalDiff}</b><small>Averaj</small></span>
+      </div>
+      <div class="team-analysis-section-title"><span>Son ${recentMatches.length || 0} maç</span><small>${form.goalsFor} gol attı · ${form.goalsAgainst} gol yedi</small></div>
+      ${renderTeamRecentForm(teamName, recentMatches)}
+    </section>`;
+}
+
+function openTeamAnalysisModal(matchId, focusedSide = "home") {
+  const modal = document.getElementById("teamAnalysisModal");
+  const title = document.getElementById("teamAnalysisModalTitle");
+  const meta = document.getElementById("teamAnalysisModalMeta");
+  const body = document.getElementById("teamAnalysisModalBody");
+  const match = state.matches.find((item) => String(item.id) === String(matchId));
+  if (!modal || !title || !meta || !body || !match) return;
+
+  const rows = buildLeagueStandingsFromResults(match.seasonId, {
+    beforeTime: parseMatchDateTimestamp(match.date),
+    excludeMatchId: match.id,
+  });
+  const homeRow = getLeagueStandingForTeam(rows, match.homeTeam);
+  const awayRow = getLeagueStandingForTeam(rows, match.awayTeam);
+  const homeRecent = getTeamRecentMatches(match.homeTeam, match.seasonId, match);
+  const awayRecent = getTeamRecentMatches(match.awayTeam, match.seasonId, match);
+  const season = getSeasonById(match.seasonId);
+
+  title.textContent = `${match.homeTeam} - ${match.awayTeam}`;
+  meta.textContent = `${season?.name || "Sezon"} · ${getWeekNumberById(match.weekId) || "-"}. Hafta · ${formatDate(match.date)}`;
+  body.innerHTML = `
+    <div class="team-analysis-rank-strip">
+      <span><b>${homeRow.rank === "-" ? "-" : `${homeRow.rank}.`}</b> ${escapeHtml(match.homeTeam)}</span>
+      <strong>Lig sıralaması</strong>
+      <span>${escapeHtml(match.awayTeam)} <b>${awayRow.rank === "-" ? "-" : `${awayRow.rank}.`}</b></span>
+    </div>
+    <div class="team-analysis-grid">
+      ${buildTeamAnalysisPanel(match.homeTeam, homeRow, homeRecent, match.seasonId, focusedSide === "home")}
+      ${buildTeamAnalysisPanel(match.awayTeam, awayRow, awayRecent, match.seasonId, focusedSide === "away")}
+    </div>
+    <p class="team-analysis-footnote">Puan durumu ve form bilgileri programdaki oynanmış maç sonuçlarından hesaplanır.</p>`;
+  hydrateTeamLogosIn(body);
+  modal.classList.remove("hidden");
+  modal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("team-analysis-open");
+  requestAnimationFrame(() => modal.classList.add("is-open"));
+}
+
+let teamAnalysisCloseTimer = null;
+function closeTeamAnalysisModal() {
+  const modal = document.getElementById("teamAnalysisModal");
+  if (!modal || modal.classList.contains("hidden")) return;
+  modal.classList.remove("is-open");
+  modal.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("team-analysis-open");
+  clearTimeout(teamAnalysisCloseTimer);
+  teamAnalysisCloseTimer = setTimeout(() => {
+    if (!modal.classList.contains("is-open")) modal.classList.add("hidden");
+  }, 260);
 }
 
 async function persistLeagueStandingsCache(seasonId, rows) {
@@ -17414,6 +17733,16 @@ async function syncSelectedWeekFromApi(options = {}) {
       success: true,
       updatedMatchCount: updatedCount + createdCount,
     });
+    return {
+      success: true,
+      finishedAt,
+      checkedCount: weekEvents.length,
+      updatedCount,
+      scoreCount,
+      createdCount,
+      movedCount,
+      sheetSyncSuccess: !!sheetSyncResult?.success,
+    };
   } catch (error) {
     setWeekApiStatus(`Hafta API hatası: ${error.message}`);
 
@@ -17885,6 +18214,10 @@ function bindEvents() {
   on("firebaseAdminTestBtn", "click", testFirebaseAdminConnection);
   on("pullLeagueStandingsBtn", "click", pullLeagueStandingsFromCurrentResults);
   on("leagueStandingsModalClose", "click", closeLeagueStandingsModal);
+  on("teamAnalysisModalClose", "click", closeTeamAnalysisModal);
+  on("teamAnalysisModal", "click", (event) => {
+    if (event.target === event.currentTarget) closeTeamAnalysisModal();
+  });
   on("leagueStandingsModal", "click", (event) => {
     const card = event.currentTarget.querySelector(
       ".league-standings-modal-card",
@@ -17898,7 +18231,10 @@ function bindEvents() {
     }
   });
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") closeLeagueStandingsModal();
+    if (event.key === "Escape") {
+      closeLeagueStandingsModal();
+      closeTeamAnalysisModal();
+    }
   });
   on("toggleShareModeBtn", "click", togglePredictionShareMode);
   document.addEventListener("click", (event) => {
