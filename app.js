@@ -14210,6 +14210,7 @@ let statsDetailPlayerId = null;
 let statsDetailMode = "week";
 let statsSelectedWeekId = null;
 let statsDetailSelectedWeekId = null;
+let statsOverviewMode = "week";
 
 function getStatsDisplayWeekId() {
   const seasonId = getActiveSeasonId();
@@ -14269,8 +14270,28 @@ function renderWeeklyStatsExperience() {
   const weekSelect = document.getElementById("statsWeekSelect");
   if (weekSelect && weekId) weekSelect.value = weekId;
   const week = getWeekById(weekId);
-  const resolvedMatches = weekId ? getResolvedWeekMatches(weekId) : [];
-  const rows = weekId ? getStatsPlayerRows(weekId) : [];
+  const isSeasonMode = statsOverviewMode === "season";
+  const seasonId = getActiveSeasonId();
+  const resolvedMatches = isSeasonMode
+    ? getMatchesBySeasonId(seasonId).filter(isMatchResolvedForScoring)
+    : weekId
+      ? getResolvedWeekMatches(weekId)
+      : [];
+  const rows = isSeasonMode
+    ? getPlayerSeasonStats(seasonId).map((row, index) => ({
+        ...row,
+        rank: Number(row.rank || index + 1),
+        wrong: Math.max(
+          0,
+          Number(row.predictionCount || 0) -
+            Number(row.exact || 0) -
+            Number(row.resultOnly || 0),
+        ),
+        seasonTotal: Number(row.total || 0),
+      }))
+    : weekId
+      ? getStatsPlayerRows(weekId)
+      : [];
   const totalPredictions = rows.reduce((sum, row) => sum + row.predictionCount, 0);
   const totalExact = rows.reduce((sum, row) => sum + row.exact, 0);
   const totalCorrect = rows.reduce((sum, row) => sum + row.resultOnly, 0);
@@ -14278,11 +14299,11 @@ function renderWeeklyStatsExperience() {
   const cards = rows
     .map((row) => {
       const medal = row.rank === 1 ? "🥇" : row.rank === 2 ? "🥈" : row.rank === 3 ? "🥉" : row.rank;
-      return `<button class="weekly-player-card rank-${Math.min(row.rank, 4)}" type="button" onclick="openStatsPlayerDetail(decodeURIComponent('${encodeURIComponent(String(row.id))}'))">
+      return `<button class="weekly-player-card rank-${Math.min(row.rank, 4)}" type="button" onclick="openStatsPlayerDetail(decodeURIComponent('${encodeURIComponent(String(row.id))}'), '${isSeasonMode ? "season" : "week"}')">
         <span class="weekly-player-rank">${medal}</span>
         <span class="weekly-player-main">
           <span class="weekly-player-name">${escapeHtml(row.name)}</span>
-          <span class="weekly-player-sub"><span>🏆 ${row.weekWins} hafta lideri</span><span>Sezon ${row.seasonTotal} puan</span></span>
+          <span class="weekly-player-sub"><span>🏆 ${row.weekWins} hafta lideri</span><span>${isSeasonMode ? `${row.predictionCount} tahmin` : `Sezon ${row.seasonTotal} puan`}</span></span>
         </span>
         <span class="weekly-player-metrics">
           <span class="metric-exact"><strong>${row.exact}</strong><small>Tam Skor</small></span>
@@ -14305,8 +14326,14 @@ function renderWeeklyStatsExperience() {
     <div class="stats-desktop-workspace">
       <section class="weekly-performance-panel">
         <div class="weekly-performance-head">
-          <div><span class="stats-kicker">${week ? `${escapeHtml(String(week.number))}. HAFTA` : "HAFTA"}</span><h3>Haftalık Performans</h3></div>
-          <span class="weekly-performance-hint">Oyuncuya dokun, maçlarını gör</span>
+          <div><span class="stats-kicker">${isSeasonMode ? "SEZON GENELİ" : week ? `${escapeHtml(String(week.number))}. HAFTA` : "HAFTA"}</span><h3>${isSeasonMode ? "Sezonluk Tahmin Analizi" : "Haftalık Performans"}</h3></div>
+          <div class="stats-overview-actions">
+            <div class="stats-overview-toggle" role="group" aria-label="Analiz görünümü">
+              <button type="button" class="${!isSeasonMode ? "active" : ""}" onclick="setStatsOverviewMode('week')">⚡ Haftalık</button>
+              <button type="button" class="${isSeasonMode ? "active" : ""}" onclick="setStatsOverviewMode('season')">🏆 Sezonluk</button>
+            </div>
+            <span class="weekly-performance-hint">Oyuncuya dokun, maçlarını gör</span>
+          </div>
         </div>
         <div class="weekly-player-list">${cards || createEmptyState(getWeeklyStandingsEmptyMessage(weekId))}</div>
       </section>
@@ -14324,6 +14351,15 @@ function renderWeeklyStatsExperience() {
     renderStatsPlayerDetail();
   }
 }
+
+window.setStatsOverviewMode = function (mode) {
+  const nextMode = mode === "season" ? "season" : "week";
+  if (statsOverviewMode === nextMode) return;
+  statsOverviewMode = nextMode;
+  statsDetailPlayerId = null;
+  closeStatsPlayerDetail();
+  renderWeeklyStatsExperience();
+};
 
 function getStatsDetailMatches(playerId, mode) {
   const seasonId = getActiveSeasonId();
@@ -14414,9 +14450,9 @@ function renderStatsPlayerDetail() {
   });
 }
 
-window.openStatsPlayerDetail = function (playerId) {
+window.openStatsPlayerDetail = function (playerId, preferredMode = statsOverviewMode) {
   statsDetailPlayerId = playerId;
-  statsDetailMode = "week";
+  statsDetailMode = preferredMode === "season" ? "season" : "week";
   statsDetailSelectedWeekId = getStatsDisplayWeekId();
   renderStatsPlayerDetail();
   if (window.matchMedia("(min-width: 1001px)").matches) {

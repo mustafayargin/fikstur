@@ -21343,6 +21343,11 @@ body[data-role="user"] #predictionShareToolbar {
 .weekly-performance-head h3 { margin: 4px 0 0; font-size: 22px; }
 .stats-kicker { color: #f2b84b; font-size: 11px; font-weight: 800; letter-spacing: .12em; }
 .weekly-performance-hint { color: #8fa2bc; font-size: 12px; }
+.stats-overview-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; }
+.stats-overview-toggle { display: inline-grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border: 1px solid rgba(104,145,199,.25); border-radius: 12px; background: rgba(7,18,33,.72); }
+.stats-overview-toggle button { min-height: 32px; padding: 6px 11px; border: 1px solid transparent; border-radius: 9px; color: #8fa2bc; background: transparent; font-size: 11px; font-weight: 800; cursor: pointer; transition: .18s ease; }
+.stats-overview-toggle button:hover { color: #eef5ff; background: rgba(255,255,255,.04); }
+.stats-overview-toggle button.active { color: #07111f; border-color: rgba(255,209,100,.62); background: linear-gradient(145deg, #ffd064, #eaa62e); box-shadow: 0 5px 14px rgba(242,184,75,.18); }
 .weekly-player-list { display: grid; gap: 10px; }
 .weekly-player-card {
   width: 100%; min-height: 92px; display: grid; grid-template-columns: 48px minmax(150px,1fr) minmax(250px,1.15fr) 76px 132px;
@@ -21445,6 +21450,9 @@ body.stats-detail-open { overflow: hidden; }
   .weekly-performance-head h3 { font-size: 17px; margin-top: 2px; }
   .stats-kicker { font-size: 9px; }
   .weekly-performance-hint { display: none; }
+  .stats-overview-actions { align-items: flex-end; }
+  .stats-overview-toggle { padding: 3px; border-radius: 10px; }
+  .stats-overview-toggle button { min-height: 29px; padding: 5px 7px; border-radius: 8px; font-size: 9px; }
   .weekly-player-list { gap: 7px; }
   /* Masaüstü kart kuralının yüksek seçiciliğini mobilde kesin olarak ez.
      Aksi halde kart yaklaşık 500px genişleyip tüm sayfayı zoom yapılmış gibi gösteriyor. */
@@ -21495,4 +21503,179 @@ body.stats-detail-open { overflow: hidden; }
 @media (max-width: 1000px) {
   .stats-desktop-workspace { display: block; }
   .stats-desktop-detail { display: none; }
+}
+/* ===== ANA SAYFA: MAÇ MERKEZİ GENİŞ / SAĞ PANEL DAR ===== */
+@media (min-width: 1181px) {
+  /* Sol taraf geniş, sağ taraf sabit ve dar */
+  #tab-dashboard .dashboard-main-layout {
+    grid-template-columns: minmax(0, 1fr) 245px !important;
+    gap: 12px !important;
+  }
+
+  /* Maçları yan yana 3 kart göster */
+  #tab-dashboard .dashboard-match-hub,
+  #tab-dashboard .dashboard-match-hub.premium-match-hub {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+  }
+
+  /* Daralan sağ bölüm taşmasın */
+  #tab-dashboard .dashboard-side-stack {
+    width: 245px !important;
+    min-width: 0 !important;
+  }
+
+  #tab-dashboard .dashboard-side-card {
+    min-width: 0 !important;
+    padding: 12px !important;
+  }
+
+  /* Sağ bölümdeki uzun yazılar düzgün kırılsın */
+  #tab-dashboard .dashboard-pulse-item__content,
+  #tab-dashboard .dashboard-leader-row__name {
+    min-width: 0 !important;
+  }
+}
+/* ===== ÜÇLÜ MAÇ KARTLARINDA ALT VERİLERİ GÖSTER ===== */
+@media (min-width: 1181px) {
+  #tab-dashboard .dashboard-match-card.premium-match-card,
+  #tab-dashboard .dashboard-match-card.premium-match-card.master-match-card {
+    aspect-ratio: auto !important;
+    height: auto !important;
+    min-height: 315px !important;
+    padding-bottom: 14px !important;
+  }
+
+  #tab-dashboard .premium-card-footer {
+    position: relative !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  #tab-dashboard .premium-meta-pills {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    width: 100% !important;
+  }
+}
+/* ===== ANA SAYFA ÜST BÖLÜMÜ KOMPAKTLAŞTIR ===== */
+@media (min-width: 1181px) {
+  /* Canlı Hafta Merkezi üst başlığı */
+  #tab-dashboard .desktop-topbar {
+    margin-bottom: 8px !important;
+  }
+
+  #tab-dashboard .desktop-topbar__spacer {
+    height: 68px !important;
+    min-height: 68px !important;
+    border-radius: 18px !important;
+  }
+
+  #tab-dashboard .desktop-topbar__spacer::before {
+    top: 10px !important;
+    left: 16px !important;
+    font-size: 16px !important;
+  }
+
+  #tab-dashboard .desktop-topbar__spacer::after {
+    content: "Genel Bakış · Maçlar, skorlar ve haftanın özeti";
+    top: 35px !important;
+    left: 16px !important;
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+  }
+
+  /* Seçili hafta özeti ana alanı */
+  #tab-dashboard .dashboard-hero-strip {
+    gap: 10px !important;
+  }
+
+  #tab-dashboard .dashboard-hero-main {
+    min-height: 0 !important;
+    height: auto !important;
+    padding: 11px 14px !important;
+    border-radius: 18px !important;
+  }
+
+  #tab-dashboard .dashboard-hero-main__eyebrow {
+    margin-bottom: 3px !important;
+    font-size: 9px !important;
+  }
+
+  #tab-dashboard .dashboard-hero-main h3 {
+    font-size: 22px !important;
+  }
+
+  /* Uzun açıklamayı gizle; diğer bilgiler korunur */
+  #tab-dashboard .dashboard-hero-main__text {
+    display: none !important;
+  }
+
+  /* Sezon ve hafta seçimleri */
+  #tab-dashboard .dashboard-hero-controls {
+    margin-top: 7px !important;
+    gap: 6px !important;
+  }
+
+  #tab-dashboard .dashboard-hero-controls select {
+    height: 30px !important;
+    padding: 0 9px !important;
+    font-size: 10px !important;
+  }
+
+  /* 9 maç, doluluk ve kişi bilgileri */
+  #tab-dashboard .dashboard-hero-chips {
+    margin-top: 7px !important;
+    gap: 5px !important;
+  }
+
+  #tab-dashboard .dashboard-hero-chip {
+    min-height: 25px !important;
+    padding: 0 9px !important;
+    font-size: 9px !important;
+  }
+
+  /* Sağdaki Eksik Tahmin ve Toplam Tahmin kutuları */
+  #tab-dashboard .dashboard-hero-side {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    height: auto !important;
+    padding: 8px !important;
+    border-radius: 18px !important;
+  }
+
+  #tab-dashboard .dashboard-hero-side__stat {
+    min-height: 0 !important;
+    height: auto !important;
+    padding: 10px 12px !important;
+    gap: 3px !important;
+    border-radius: 14px !important;
+  }
+
+  #tab-dashboard .dashboard-hero-side__stat span {
+    font-size: 10px !important;
+  }
+
+  #tab-dashboard .dashboard-hero-side__stat strong {
+    font-size: 25px !important;
+  }
+
+  #tab-dashboard .dashboard-hero-side__stat small {
+    font-size: 9px !important;
+  }
+
+  /* API güncelleme bilgi çubuğu */
+  #tab-dashboard .dashboard-inline-status {
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 6px 10px !important;
+    border-radius: 10px !important;
+    font-size: 10px !important;
+  }
+
+  /* Bölümler arasındaki genel boşluk */
+  #tab-dashboard.active {
+    gap: 8px !important;
+  }
 }
