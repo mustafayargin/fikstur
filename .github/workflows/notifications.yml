@@ -395,25 +395,28 @@ jobs:
             for (const [queueId, item] of pendingManualNotifications) {
               const startedAt = new Date().toISOString();
               const queueRef = db.ref(`adminNotificationQueue/${queueId}`);
-              const claimResult = await queueRef.transaction((current) => {
-                if (!isProcessableManualItem(current)) {
-                  return;
-                }
+              const currentSnapshot = await queueRef.once("value");
+              const currentItem = currentSnapshot.val();
 
-                return {
-                  ...current,
-                  status: "processing",
-                  startedAt,
-                  updatedAt: startedAt
-                };
-              });
-
-              if (!claimResult.committed) {
-                console.log(`Manuel bildirim başka bir çalıştırma tarafından alındı: ${queueId}`);
+              if (!isProcessableManualItem(currentItem)) {
+                console.log(
+                  `Manuel bildirim işlenebilir değil: ${queueId} | durum: ${currentItem?.status || "kayıt yok"} | tip: ${currentItem?.type || "-"}`
+                );
                 continue;
               }
 
-              const claimedItem = claimResult.snapshot.val() || item;
+              // Workflow concurrency grubu aynı anda yalnızca tek gönderici
+              // çalıştırdığı için ayrıca Firebase transaction kilidi gerekmiyor.
+              // Transaction bazı kuyruk kayıtlarında committed=false dönerek
+              // manuel bildirimleri süresiz "pending" bırakıyordu.
+              const claimedItem = { ...item, ...currentItem };
+              await queueRef.update({
+                status: "processing",
+                startedAt,
+                updatedAt: startedAt,
+                processingBy: process.env.GITHUB_RUN_ID || "github-actions"
+              });
+
               const targetTokens = selectTokensForManualItem(claimedItem);
 
               console.log(
