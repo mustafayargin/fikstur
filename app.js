@@ -20589,7 +20589,9 @@ async function queueManualNotification() {
     });
   updateManualNotificationPreview();
   await renderNotificationCenter();
-  alert("Bildirim Firebase kuyruğuna alındı. Cron-job çalışınca gönderilecek.");
+  alert(
+    "Bildirim kuyruğa alındı. Bildirim servisi yaklaşık 5 dakika içinde gönderimi deneyecek.",
+  );
 }
 
 async function cleanupOldNotificationHistory() {
