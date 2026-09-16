@@ -1,6 +1,9 @@
 name: Send Notifications
 
 on:
+  schedule:
+    # Firebase manuel bildirim kuyruğunu en geç 5 dakika içinde işler.
+    - cron: "*/5 * * * *"
   workflow_dispatch:
     inputs:
       testMode:
@@ -182,10 +185,23 @@ jobs:
               return deleteCount;
             };
 
-            const sendToTokens = async (tokens, title, body, tokenRecords) => {
+            const sendToTokens = async (tokens, title, body, tokenRecords, options = {}) => {
               const safeTitle = String(title || "Skor Avcıları");
               const safeBody = String(body || "Yeni bildirimin var.");
               const safeTokens = [...new Set((tokens || []).filter(Boolean).map(String))];
+              const safeIcon = String(
+                options.iconUrl ||
+                `${SITE_URL.replace(/\/$/, "")}/app-icons/pwa-icon-192-v3.png`
+              );
+              const safeBadge = String(
+                options.badgeUrl ||
+                `${SITE_URL.replace(/\/$/, "")}/notification-icons/badge-72.png`
+              );
+              const safeImage = String(options.imageUrl || "");
+              const safeEmoji = String(options.iconEmoji || "").trim();
+              const displayTitle = safeEmoji && !safeTitle.startsWith(safeEmoji)
+                ? `${safeEmoji} ${safeTitle}`
+                : safeTitle;
 
               if (safeTokens.length === 0) {
                 return { successCount: 0, failureCount: 0, responses: [] };
@@ -196,15 +212,18 @@ jobs:
               let failureCount = 0;
 
               for (const tokenChunk of chunkArray(safeTokens, 500)) {
-                const dedupeKey = `fikstur_${Buffer.from(`${safeTitle}|${safeBody}`).toString("base64url").slice(0, 80)}`;
+                const dedupeKey = String(
+                  options.dedupeKey ||
+                  `fikstur_${Buffer.from(`${displayTitle}|${safeBody}`).toString("base64url").slice(0, 80)}`
+                );
                 const message = {
                   data: {
-                    title: safeTitle,
+                    title: displayTitle,
                     body: safeBody,
                     url: SITE_URL,
-                    icon: `${SITE_URL.replace(/\/$/, "")}/app-icons/pwa-icon-192-v3.png`,
-                    badge: `${SITE_URL.replace(/\/$/, "")}/notification-icons/badge-72.png`,
-                    image: `${SITE_URL.replace(/\/$/, "")}/app-icons/pwa-icon-512-v3.png`,
+                    icon: safeIcon,
+                    badge: safeBadge,
+                    ...(safeImage ? { image: safeImage } : {}),
                     tag: dedupeKey,
                     dedupeKey
                   },
@@ -298,6 +317,36 @@ jobs:
               return [...new Set(selected.map(i => i.token).filter(Boolean))];
             };
 
+            const getTokenOwnerIds = (item) => [
+              item?.userId,
+              item?.playerId,
+              item?.kisiId,
+              item?.username,
+              item?.kullaniciAdi
+            ].filter(Boolean).map(value => String(value));
+
+            const selectTokensForManualItem = (item) => {
+              const target = String(item?.target || "all");
+              const requestedIds = new Set(
+                (Array.isArray(item?.targetUserIds)
+                  ? item.targetUserIds
+                  : Object.values(item?.targetUserIds || {}))
+                  .filter(Boolean)
+                  .map(value => String(value))
+              );
+
+              if (target === "custom") {
+                return [...new Set(
+                  tokenRecords
+                    .filter(record => getTokenOwnerIds(record).some(id => requestedIds.has(id)))
+                    .map(record => record.token)
+                    .filter(Boolean)
+                )];
+              }
+
+              return selectTokensForTarget(target);
+            };
+
             const tokens = selectTokensForTarget("all");
 
             const matches = Object.entries(matchesSnap.val() || {});
@@ -329,8 +378,17 @@ jobs:
               return;
             }
 
+            const staleProcessingLimit = Date.now() - 5 * 60 * 1000;
+            const isProcessableManualItem = (item) => {
+              if (!item || item.type !== "manual") return false;
+              if (item.status === "pending") return true;
+              if (item.status !== "processing") return false;
+              const startedTime = new Date(item.startedAt || item.updatedAt || 0).getTime();
+              return !Number.isFinite(startedTime) || startedTime < staleProcessingLimit;
+            };
+
             const pendingManualNotifications = Object.entries(queueData)
-              .filter(([id, item]) => item && item.status === "pending" && item.type === "manual")
+              .filter(([, item]) => isProcessableManualItem(item))
               .sort((a, b) => String(a[1].createdAt || "").localeCompare(String(b[1].createdAt || "")))
               .slice(0, 5);
 
@@ -338,7 +396,7 @@ jobs:
               const startedAt = new Date().toISOString();
               const queueRef = db.ref(`adminNotificationQueue/${queueId}`);
               const claimResult = await queueRef.transaction((current) => {
-                if (!current || current.status !== "pending" || current.type !== "manual") {
+                if (!isProcessableManualItem(current)) {
                   return;
                 }
 
@@ -356,9 +414,11 @@ jobs:
               }
 
               const claimedItem = claimResult.snapshot.val() || item;
-              const targetTokens = selectTokensForTarget(claimedItem.target || "all");
+              const targetTokens = selectTokensForManualItem(claimedItem);
 
-              console.log(`Manuel bildirim gönderiliyor: ${queueId} | hedef token: ${targetTokens.length}`);
+              console.log(
+                `Manuel bildirim gönderiliyor: ${queueId} | hedef: ${claimedItem.target || "all"} | ikon: ${claimedItem.icon || "default"} | token: ${targetTokens.length}`
+              );
 
               try {
                 if (targetTokens.length === 0) {
@@ -372,7 +432,20 @@ jobs:
                     targetTokens,
                     claimedItem.title || "Skor Avcıları",
                     claimedItem.message || "Yeni bildirimin var.",
-                    tokenRecords
+                    tokenRecords,
+                    {
+                      iconUrl: claimedItem.iconUrl,
+                      badgeUrl: claimedItem.badgeUrl,
+                      imageUrl: claimedItem.imageUrl,
+                      iconEmoji: claimedItem.iconEmoji,
+                      dedupeKey: `manual_${queueId}`
+                    }
+                  );
+                }
+
+                if (process.env.TEST_MODE === "normal" && (res.successCount || 0) < 1) {
+                  throw new Error(
+                    `FCM bildirimi hiçbir cihaza ulaşmadı (${res.failureCount || 0} başarısız).`
                   );
                 }
 
@@ -382,6 +455,10 @@ jobs:
                   status: "sent",
                   successCount: res.successCount || 0,
                   errorCount: res.failureCount || 0,
+                  icon: claimedItem.icon || "default",
+                  iconEmoji: claimedItem.iconEmoji || "🔔",
+                  iconUrl: claimedItem.iconUrl || "",
+                  badgeUrl: claimedItem.badgeUrl || "",
                   finishedAt,
                   updatedAt: finishedAt
                 });
@@ -392,6 +469,11 @@ jobs:
                   title: claimedItem.title || "Skor Avcıları",
                   message: claimedItem.message || "Yeni bildirimin var.",
                   target: claimedItem.target || "all",
+                  targetUserIds: claimedItem.targetUserIds || [],
+                  icon: claimedItem.icon || "default",
+                  iconEmoji: claimedItem.iconEmoji || "🔔",
+                  iconUrl: claimedItem.iconUrl || "",
+                  badgeUrl: claimedItem.badgeUrl || "",
                   successCount: res.successCount || 0,
                   errorCount: res.failureCount || 0,
                   createdAt: finishedAt
@@ -414,6 +496,11 @@ jobs:
                   title: claimedItem.title || "Skor Avcıları",
                   message: claimedItem.message || "Yeni bildirimin var.",
                   target: claimedItem.target || "all",
+                  targetUserIds: claimedItem.targetUserIds || [],
+                  icon: claimedItem.icon || "default",
+                  iconEmoji: claimedItem.iconEmoji || "🔔",
+                  iconUrl: claimedItem.iconUrl || "",
+                  badgeUrl: claimedItem.badgeUrl || "",
                   errorMessage: error.message || String(error),
                   createdAt: failedAt
                 });
