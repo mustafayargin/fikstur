@@ -1665,6 +1665,7 @@ function setAppLoading(show, options = {}) {
 
   if (!show) {
     els.overlay.classList.remove("show");
+    delete els.overlay.dataset.initialLoading;
     return;
   }
 
@@ -4074,9 +4075,11 @@ async function hydrateOnlineStateForSession(options = {}) {
         showSuccess: true,
       });
 
-      window.setTimeout(() => {
-        setAppLoading(false);
-      }, 700);
+      if (!isSessionRestore) {
+        window.setTimeout(() => {
+          setAppLoading(false);
+        }, 700);
+      }
     }
 
     if (queueResult.flushed) {
@@ -4622,6 +4625,11 @@ function updateLoginOverlay() {
   setLoginScrollLock(!auth || loginSceneActive);
 
   if (!auth && !loginSceneActive) {
+    const initialLoading = document.getElementById("appLoadingOverlay");
+    if (initialLoading?.dataset.initialLoading) {
+      initialLoading.classList.remove("show");
+      delete initialLoading.dataset.initialLoading;
+    }
     resetLoginForm();
     clearLoginErrorState();
     setLoginSubmitting(false);
@@ -18747,6 +18755,16 @@ async function bootstrapApplication() {
       console.error("Uygulama Firebase olmadan başlatılmadı:", error);
       appBootstrapInProgress = false;
       updateLoginOverlay();
+      if (isAuthenticated()) {
+        setAppLoading(true, {
+          title: "Bağlantı kurulamadı",
+          message: "Bağlantıyı kontrol edip sayfayı yenileyin.",
+          stepLabel: "Başlangıç tamamlanamadı.",
+          showSuccess: false,
+        });
+      } else {
+        setLoginFeedback("error", "Bağlantı kurulamadı. Sayfayı yenileyin.");
+      }
       return false;
     }
 
@@ -18790,6 +18808,7 @@ async function bootstrapApplication() {
         console.log("[START] Birleşik başlangıç eşitlemesi başladı");
 
         (async () => {
+          let startupSyncOk = false;
           try {
             const sessionHydrationOk = await runSessionHydrationWithFastOverlay(
               {
@@ -18803,6 +18822,7 @@ async function bootstrapApplication() {
 
             const fullHydrationOk =
               await hydrateFromFirebaseRealtime("startup-auto");
+            startupSyncOk = sessionHydrationOk && fullHydrationOk;
             validateFreshActiveSelection({ forceNewestPublished: true });
             ensureActiveSelections();
             saveState(true);
@@ -18830,6 +18850,16 @@ async function bootstrapApplication() {
           } finally {
             appBootstrapInProgress = false;
             renderAll();
+            if (!isAuthenticated() || startupSyncOk) {
+              setAppLoading(false);
+            } else {
+              setAppLoading(true, {
+                title: "Veriler yüklenemedi",
+                message: "Bağlantıyı kontrol edip sayfayı yenileyin.",
+                stepLabel: "Oturum verileri hazırlanamadı.",
+                showSuccess: false,
+              });
+            }
           }
         })();
       } else {
@@ -18849,6 +18879,16 @@ async function bootstrapApplication() {
 function startApplicationBootstrap() {
   bootstrapApplication().catch((error) => {
     console.error("Uygulama bootstrap hatası:", error);
+    updateLoginOverlay();
+    if (isAuthenticated()) {
+      setAppLoading(true, {
+        title: "Başlangıç tamamlanamadı",
+        message: "Bağlantıyı kontrol edip sayfayı yenileyin.",
+        showSuccess: false,
+      });
+    } else {
+      setLoginFeedback("error", "Başlangıç tamamlanamadı. Sayfayı yenileyin.");
+    }
   });
 }
 

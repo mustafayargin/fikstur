@@ -19,6 +19,47 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=3" />
   </head>
   <body>
+    <div class="app-loading-overlay show" id="appLoadingOverlay" data-initial-loading="true">
+      <div class="app-loading-card">
+        <div class="app-loading-hero">
+          <div class="app-loading-spinner" id="appLoadingSpinner"></div>
+          <div class="app-loading-success hidden" id="appLoadingSuccess">✓</div>
+        </div>
+        <h3 id="appLoadingTitle">Uygulama hazırlanıyor</h3>
+        <p id="appLoadingMessage">
+          Oturum kontrol ediliyor...
+        </p>
+        <div class="app-loading-progress-wrap">
+          <div class="app-loading-progress-top">
+            <span id="appLoadingStepLabel">Bağlantı hazırlanıyor...</span>
+            <strong id="appLoadingPercent">0%</strong>
+          </div>
+          <div class="app-loading-progress-track">
+            <div
+              class="app-loading-progress-bar"
+              id="appLoadingProgressBar"
+            ></div>
+          </div>
+        </div>
+        <div class="app-loading-checklist" id="appLoadingChecklist">
+          <div class="app-loading-checkitem pending" id="loadingCheckLogin">
+            Giriş bekleniyor
+          </div>
+          <div class="app-loading-checkitem pending" id="loadingCheckUsers">
+            Kullanıcılar hazırlanıyor
+          </div>
+          <div class="app-loading-checkitem pending" id="loadingCheckMatches">
+            Maç verileri yükleniyor
+          </div>
+          <div
+            class="app-loading-checkitem pending"
+            id="loadingCheckPredictions"
+          >
+            Tahminler yükleniyor
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="app-shell">
       <aside class="sidebar" id="sidebar">
         <div>
@@ -1860,47 +1901,6 @@
       </div>
     </div>
     <div id="confettiLayer"></div>
-    <div class="app-loading-overlay" id="appLoadingOverlay">
-      <div class="app-loading-card">
-        <div class="app-loading-hero">
-          <div class="app-loading-spinner" id="appLoadingSpinner"></div>
-          <div class="app-loading-success hidden" id="appLoadingSuccess">✓</div>
-        </div>
-        <h3 id="appLoadingTitle">Veriler yükleniyor</h3>
-        <p id="appLoadingMessage">
-          Lütfen bekleyin, maçlar ve tahminler hazırlanıyor...
-        </p>
-        <div class="app-loading-progress-wrap">
-          <div class="app-loading-progress-top">
-            <span id="appLoadingStepLabel">Bağlantı hazırlanıyor...</span>
-            <strong id="appLoadingPercent">0%</strong>
-          </div>
-          <div class="app-loading-progress-track">
-            <div
-              class="app-loading-progress-bar"
-              id="appLoadingProgressBar"
-            ></div>
-          </div>
-        </div>
-        <div class="app-loading-checklist" id="appLoadingChecklist">
-          <div class="app-loading-checkitem pending" id="loadingCheckLogin">
-            Giriş bekleniyor
-          </div>
-          <div class="app-loading-checkitem pending" id="loadingCheckUsers">
-            Kullanıcılar hazırlanıyor
-          </div>
-          <div class="app-loading-checkitem pending" id="loadingCheckMatches">
-            Maç verileri yükleniyor
-          </div>
-          <div
-            class="app-loading-checkitem pending"
-            id="loadingCheckPredictions"
-          >
-            Tahminler yükleniyor
-          </div>
-        </div>
-      </div>
-    </div>
     <style>
       .hidden {
         display: none !important;
@@ -2062,6 +2062,6 @@
 
 <script src="login/login.js?v=1"></script>
 <script src="login/penalty.js?v=2"></script>
-<script src="app.js?v=20260919-arena-login-v2"></script>
+<script src="app.js?v=20260919-arena-login-v3"></script>
   </body>
 </html>

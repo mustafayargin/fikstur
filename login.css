@@ -1,0 +1,28 @@
+/* Giriş görünümü: uygulamanın genel stillerini etkilemez. */
+#loginOverlay.arena-login{z-index:99999;overflow:auto;display:grid;place-items:center;min-height:100dvh;height:100dvh;padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));background:#080a0c url('../images/login/background-mobile.webp') center / cover no-repeat;box-sizing:border-box;overscroll-behavior:contain}
+#loginOverlay.arena-login.hidden{display:none!important}
+.arena-login__layout{width:min(100%,1060px);min-height:min(620px,100%);display:grid;grid-template-columns:1fr minmax(340px,440px);gap:clamp(24px,5vw,100px);align-items:center;margin:auto}
+.arena-login__brand{text-align:center;color:white;text-shadow:0 3px 15px #0009}
+.arena-login__brand img{display:block;width:clamp(110px,15vw,230px);max-height:230px;object-fit:contain;margin:0 auto 14px}
+.arena-login__brand h1{font-size:clamp(27px,3.4vw,43px);line-height:1.12;margin:0 0 10px;font-weight:800}
+.arena-login__brand p{font-size:11px;letter-spacing:4px;color:#c8ced5;margin:0}
+#loginOverlay .login-card{width:100%;max-width:none;box-sizing:border-box;max-height:none;padding:clamp(18px,3vw,32px);border:1px solid #a22f3a;border-radius:24px;background:linear-gradient(130deg,#1d1b1edc,#10151ae8);box-shadow:0 22px 75px #000a;color:#f7f7fa}
+#loginOverlay .login-card h2{font-size:clamp(23px,3vw,30px);text-align:center;line-height:1.18;margin:0 0 22px;color:#fff}
+.arena-login__form label{display:block;margin:0 0 7px;font-weight:650;font-size:14px}
+#loginOverlay .arena-login__form input{display:block;width:100%;min-width:0;height:50px;box-sizing:border-box;padding:0 15px;margin:0 0 15px;border:1px solid #48505b;border-radius:12px;background:#12161bbf;color:#fff;font:inherit;font-size:15px}
+#loginOverlay .arena-login__form input:focus-visible{outline:2px solid #ff5968;outline-offset:1px}
+.arena-login__password{position:relative}.arena-login__password input{padding-right:55px!important}.arena-login__password button{position:absolute;right:5px;top:3px;width:44px;height:44px;background:transparent;border:0;color:#d6dbe2;font-size:21px;cursor:pointer}
+.arena-login__links,.arena-login__signup{text-align:right;font-size:13px;margin:4px 0 18px}
+.arena-login__links button,.arena-login__signup button{color:#ff6b77;background:none;border:0;padding:5px;cursor:pointer;font:inherit}
+.arena-login__signup{text-align:center;margin:12px 0 0;color:#bbc4cf}
+.arena-login__future[hidden],#arenaAuthForm[hidden],#arenaRetry[hidden]{display:none!important}
+.arena-login__future{text-align:center}.arena-login__future p{color:#c6ced8;font-size:14px;line-height:1.5}.arena-login__back{border:0;background:none;color:#ff7d87;padding:12px;cursor:pointer;font:inherit}
+#loginOverlay .arena-login__primary{min-height:50px;width:100%;border:1px solid #ff7a83;border-radius:12px;background:linear-gradient(110deg,#ff303b,#c40035);color:white;font-size:17px;font-weight:800;cursor:pointer}
+#loginOverlay .arena-login__primary:disabled{opacity:.65;cursor:wait}
+#loginOverlay .arena-login__status{font-size:13px;min-height:18px;color:#a9b4c1;margin:13px 0 0;text-align:center}
+#loginOverlay .arena-login__status.is-error{color:#ff9aa3}
+#loginOverlay .arena-login__status.is-success{color:#8aebc1}
+@media(min-width:800px){#loginOverlay.arena-login{background-image:url('../images/login/background-desktop.webp')}}
+@media(max-width:799px){.arena-login__layout{display:flex;flex-direction:column;gap:12px;min-height:0;max-width:410px}.arena-login__brand img{width:clamp(62px,13vh,105px);max-height:105px;margin-bottom:4px}.arena-login__brand h1{font-size:clamp(20px,3vh,27px);margin:0}.arena-login__brand p{font-size:9px;letter-spacing:2px}.arena-login__layout .login-card{padding:17px 20px}#loginOverlay .login-card h2{margin-bottom:14px}#loginOverlay .arena-login__form input{height:46px;margin-bottom:9px}.arena-login__links{margin:0 0 10px}}
+@media(max-height:610px) and (max-width:799px){.arena-login__brand img{width:50px}.arena-login__brand p{display:none}.arena-login__layout{gap:5px}#loginOverlay .login-card{padding:12px 17px}#loginOverlay .arena-login__form input{height:42px}.arena-login__signup{margin:4px 0 0}}
+@media(prefers-reduced-motion:reduce){#loginOverlay.arena-login *,#loginOverlay.arena-login *::before{animation-duration:.01ms!important;transition-duration:.01ms!important}}
