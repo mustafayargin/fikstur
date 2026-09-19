@@ -1,0 +1,15 @@
+/* Kullanıcı posteri, aynı giriş kartında büyüyerek açılır. */
+.arena-login__poster{text-align:center;animation:arena-poster-enter .42s ease-out both}
+.arena-login__season,.arena-login__eyebrow{display:block;letter-spacing:3px;font-size:11px;font-weight:800;color:#f8a1a7;margin:0 0 12px}
+.arena-login__eyebrow{color:#adb9c6;margin:9px 0 4px}
+.arena-login__poster-frame{overflow:hidden;display:grid;place-items:center;width:100%;height:clamp(170px,32vh,300px);border-radius:18px;background:#090b10;border:1px solid #db525c66;animation:arena-poster-grow .52s cubic-bezier(.2,.75,.2,1) both}
+.arena-login__poster-frame img{display:block;width:100%;height:100%;object-fit:contain}
+.arena-login__poster-frame img[hidden],.arena-login__poster-frame span[hidden]{display:none}
+.arena-login__poster-frame span{font-size:68px;color:#f3727a}
+#loginOverlay .arena-login__poster h2{font-size:clamp(20px,3vw,26px);margin:0}
+.arena-login__poster p:not(.arena-login__eyebrow){color:#c6ccd5;font-size:14px;margin:8px 0 20px}
+#arenaEnter{animation:arena-button-enter .25s .5s both}
+@keyframes arena-poster-enter{from{opacity:.4}to{opacity:1}}
+@keyframes arena-poster-grow{from{opacity:0;transform:scale(.32)}to{opacity:1;transform:scale(1)}}
+@keyframes arena-button-enter{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@media(max-height:610px){.arena-login__poster-frame{height:clamp(110px,25vh,170px)}.arena-login__poster p:not(.arena-login__eyebrow){margin:5px 0 12px}}
