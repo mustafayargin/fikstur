@@ -1657,6 +1657,12 @@ function setAppLoading(show, options = {}) {
   const els = getAppLoadingElements();
   if (!els.overlay) return;
 
+  if (window.FiksturLoginScene?.isActive()) {
+    els.overlay.classList.remove("show");
+    if (show) window.FiksturLoginScene.progress(options.message || options.stepLabel || "Veriler hazırlanıyor...");
+    return;
+  }
+
   if (!show) {
     els.overlay.classList.remove("show");
     return;
@@ -4594,6 +4600,7 @@ function setLoginScrollLock(isLocked) {
 
 function clearRememberedSession() {
   try {
+    window.FiksturLoginScene?.reset();
     state.settings.auth.isAuthenticated = false;
     state.settings.auth.role = "admin";
     state.settings.auth.playerId = null;
@@ -4610,10 +4617,11 @@ function updateLoginOverlay() {
 
   const auth = isAuthenticated();
 
-  overlay.classList.toggle("hidden", auth);
-  setLoginScrollLock(!auth);
+  const loginSceneActive = window.FiksturLoginScene?.isActive() === true;
+  overlay.classList.toggle("hidden", auth && !loginSceneActive);
+  setLoginScrollLock(!auth || loginSceneActive);
 
-  if (!auth) {
+  if (!auth && !loginSceneActive) {
     resetLoginForm();
     clearLoginErrorState();
     setLoginSubmitting(false);
@@ -4648,6 +4656,7 @@ function logoutUser() {
   state.settings.auth.user = null;
 
   saveState(true);
+  window.FiksturLoginScene?.reset();
   updateLoginOverlay();
   updateAdminSyncToggleButton();
   applyRolePermissions();
@@ -4673,21 +4682,24 @@ async function loginUser() {
     return;
   }
 
+  if (document.getElementById("loginBtn")?.disabled) return;
   setLoginSubmitting(true);
   setLoginFeedback("idle", "Giriş kontrol ediliyor...");
+  window.FiksturLoginScene?.start();
 
   try {
     const result = await loginWithGoogleSheet(username, password);
 
     if (!result?.success || !result?.user) {
+      const errorMessage = result?.message || "Kullanıcı adı veya şifre hatalı.";
+      if (window.FiksturLoginScene) await window.FiksturLoginScene.decision(false, errorMessage);
       resetLoginForm();
-      setLoginFeedback(
-        "error",
-        result?.message || "Kullanıcı adı veya şifre hatalı.",
-      );
+      setLoginFeedback("error", errorMessage);
       document.getElementById("loginUsername")?.focus();
       return;
     }
+
+    const penaltyResult = window.FiksturLoginScene?.decision(true);
 
     const nextUser = {
       id:
@@ -4776,11 +4788,22 @@ async function loginUser() {
     });
     renderAll();
 
-    window.setTimeout(() => {
-      showWelcomeOverlay(nextUser, { duration: 4000 });
-    }, 860);
+    if (window.FiksturLoginScene) {
+      await penaltyResult;
+      if (sessionHydrationOk && fullHydrationOk) {
+        window.FiksturLoginScene.poster(nextUser);
+      } else {
+        window.FiksturLoginScene.syncError();
+      }
+    } else {
+      window.setTimeout(() => showWelcomeOverlay(nextUser, { duration: 4000 }), 860);
+    }
   } catch (error) {
     console.error("Login hatası:", error);
+    if (window.FiksturLoginScene?.isActive()) {
+      if (isAuthenticated()) window.FiksturLoginScene.syncError();
+      else window.FiksturLoginScene.abort("Sunucu bağlantı hatası oluştu.");
+    }
     resetLoginForm();
     setLoginFeedback("error", "Sunucu bağlantı hatası oluştu.");
     document.getElementById("loginUsername")?.focus();

@@ -1,0 +1,31 @@
+FİKSTÜR GİRİŞ ENTEGRASYONU
+
+Yeni görünüm dosyaları: login/login.js, login/login.css, login/penalty.js,
+login/penalty.css, login/welcome.css ve images/login/*.webp.
+Mevcut app.js ve index.html giriş bağlantısı için güncellendi.
+
+Akış: gerçek hesap doğrulaması -> başarılıysa gol, hatalıysa kurtarış;
+veriler hazırlanırken aynı sahne bekler -> kullanıcının posteri büyür ->
+Arenaya Gir. Firebase yüklemesi başarısızsa yanlış şifre denmez,
+yenileme çağrısı gösterilir. Giriş animasyonu normal ayarlarda yaklaşık
+2,5 saniyedir (400 + 950 + 1150 ms). Yavaş ağda veri hazır olana kadar
+bekler. Hareket azaltma ayarında animasyon daha kısadır.
+
+Poster: images/welcome/<kullanıcının ilk adı>.png.
+Örnek: Mustafa Yargın -> images/welcome/mustafa.png.
+Görsel yoksa top simgesi görünür. Eski yönetici karşılama önizlemesi
+mevcuttur; giriş sonrasında ikinci bir karşılama açılmaz.
+
+Kaydol/Şifremi unuttum: yalnızca görsel altyapı, işlem yapmaz.
+Beni hatırla: bu entegrasyonda eklenmedi. Var olan oturum saklama davranışı
+korunur. Kullanıcı adı ve parola alanları tarayıcı otomatik doldurma
+özelliklerine uygun işaretlendi; parola kaydetme istemi cihaz/tarayıcıya
+bağlıdır, henüz iOS/Android üzerinde doğrulanmadı.
+
+Test: dosya sözdizimi, dosya/sıra kontrolleri ve penaltı durum geçişleri
+kontrol edildi. Gerçek hesap ve Firebase ile canlı oturum açma testi
+kullanıcı ortamında yapılmalıdır. Eski karşılama bileşeni yönetici ayar
+önizlemesi ve geri dönüş için yerinde durur.
+
+Değişen/eklenen dosyaları tek başına yükleyeceksen klasör yapısını koru.
+Arka plan görselleri mevcut demodaki optimize WebP sürümleridir.
