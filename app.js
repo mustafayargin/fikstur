@@ -4586,6 +4586,9 @@ function resetLoginForm() {
 }
 function setLoginScrollLock(isLocked) {
   const scrollY = window.__loginScrollY || 0;
+  const alreadyLocked = document.body.classList.contains("login-locked");
+
+  if (isLocked === alreadyLocked) return;
 
   if (isLocked) {
     window.__loginScrollY = window.scrollY || window.pageYOffset || 0;
@@ -4604,6 +4607,7 @@ function setLoginScrollLock(isLocked) {
 function clearRememberedSession() {
   try {
     window.FiksturLoginScene?.reset();
+    resetLoginForm();
     state.settings.auth.isAuthenticated = false;
     state.settings.auth.role = "admin";
     state.settings.auth.playerId = null;
@@ -4630,10 +4634,6 @@ function updateLoginOverlay() {
       initialLoading.classList.remove("show");
       delete initialLoading.dataset.initialLoading;
     }
-    resetLoginForm();
-    clearLoginErrorState();
-    setLoginSubmitting(false);
-    setLoginFeedback("idle", "Hazır.");
   }
 
   updateSessionCard();
@@ -4665,6 +4665,10 @@ function logoutUser() {
 
   saveState(true);
   window.FiksturLoginScene?.reset();
+  resetLoginForm();
+  clearLoginErrorState();
+  setLoginSubmitting(false);
+  setLoginFeedback("idle", "Hazır.");
   updateLoginOverlay();
   updateAdminSyncToggleButton();
   applyRolePermissions();
