@@ -6755,7 +6755,14 @@ function getStoredTeamLogoCache() {
 function getTeamLogoCacheKey(teamName) {
   return slugify(normalizeText(teamName)) || sanitizeFirebaseKey(teamName);
 }
+const TEAM_LOGO_FALLBACKS = {
+  amed: "https://r2.thesportsdb.com/images/media/team/badge/4fqdgh1783788571.png",
+  erzurumspor: "https://r2.thesportsdb.com/images/media/team/badge/7sepx01783701613.png",
+};
 
+function getTeamLogoFallbackUrl(teamName) {
+  return TEAM_LOGO_FALLBACKS[normalizeText(teamName)] || "";
+}
 function getTeamLogoUrl(teamName, seasonId = getActiveSeasonId()) {
   const team = getTeamMetaByName(teamName, seasonId);
   const directUrl = String(team?.badgeUrl || team?.logoUrl || "").trim();
@@ -6774,16 +6781,31 @@ function getTeamLogoUrl(teamName, seasonId = getActiveSeasonId()) {
     const url = typeof value === "string" ? value : value?.badgeUrl;
     if (url) return String(url).trim();
   }
-  return "";
+    return getTeamLogoFallbackUrl(teamName);
+
 }
 
 function handleTeamLogoError(img) {
   if (!img) return;
+
+  const backupUrl = getTeamLogoFallbackUrl(img.dataset.teamName);
+
+  if (
+    backupUrl &&
+    img.dataset.logoBackupTried !== "1" &&
+    img.getAttribute("src") !== backupUrl
+  ) {
+    img.dataset.logoBackupTried = "1";
+    img.src = backupUrl;
+    return;
+  }
+
   img.style.display = "none";
   img.dataset.logoFailed = "1";
+
   const fallback = img.nextElementSibling;
   if (fallback) fallback.style.display = "grid";
-}
+} 
 
 function hydrateTeamLogosIn(container = document) {
   container.querySelectorAll?.(".team-logo-img").forEach((img) => {
@@ -7367,7 +7389,7 @@ function isPostponedStatus(statusText = "") {
 }
 
 const MATCH_FIRST_HALF_MINUTES = 45;
-const MATCH_HALFTIME_MINUTES = 20;
+const MATCH_HALFTIME_MINUTES = 15;
 const MATCH_SECOND_HALF_MINUTES = 45;
 const MATCH_TOTAL_RUNTIME_MINUTES =
   MATCH_FIRST_HALF_MINUTES + MATCH_HALFTIME_MINUTES + MATCH_SECOND_HALF_MINUTES;
@@ -17259,13 +17281,22 @@ async function importSeasonTeamsFromApi(buttonOrEvent) {
       );
 
       if (existing) {
-        const preservedSlug = existing.slug || mapped.slug;
-        Object.assign(existing, mapped, {
-          id: existing.id,
-          slug: preservedSlug,
-        });
-        updatedCount += 1;
-      } else {
+  const preservedSlug = existing.slug || mapped.slug;
+
+  const preservedBadgeUrl =
+    mapped.badgeUrl ||
+    existing.badgeUrl ||
+    existing.logoUrl ||
+    "";
+
+  Object.assign(existing, mapped, {
+    id: existing.id,
+    slug: preservedSlug,
+    badgeUrl: preservedBadgeUrl,
+  });
+
+  updatedCount += 1;
+} else {
         state.teams.push({ id: uid("team"), ...mapped });
         addedCount += 1;
       }
@@ -17376,7 +17407,32 @@ function applyApiEventToMatch(match, event, allowCreateIfMissing = false) {
   } else if (target.postponed) {
     target.postponed = false;
   }
-  if (hasScore && !manualScoreLocked) {
+  const apiStatus = String(event.statusText || "")
+  .trim()
+  .toLowerCase();
+
+const apiFinished =
+  /^(ft|aet|pen|finished|match finished|full time|full-time|after extra time|after penalties|bitti)$/.test(
+    apiStatus
+  );
+
+const apiStillRunning =
+  /live|in play|in progress|halftime|half time|half-time|^ht$|^1h$|^2h$|first half|second half|canlı/.test(
+    apiStatus
+  );
+
+const runtime = getMatchRuntimeInfo(target);
+
+const canAcceptFinalScore =
+  apiFinished ||
+  (!apiStatus && runtime.phase === "finished-time");
+
+if (
+  hasScore &&
+  !manualScoreLocked &&
+  !apiStillRunning &&
+  canAcceptFinalScore
+) {
     target.homeScore = event.homeScore;
     target.awayScore = event.awayScore;
     target.played = true;

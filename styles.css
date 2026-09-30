@@ -22620,3 +22620,22 @@ body.team-analysis-open { overflow: hidden; }
   .team-analysis-side { padding: 14px 12px; }
   .team-analysis-team-head .team-logo-wrap { width: 48px; height: 48px; flex-basis: 48px; }
 }
+/* Takım logolarının arkasındaki kutuyu kaldır */
+.team-logo-wrap,
+.team-logo-img,
+.premium-logo-aura {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.team-logo-img {
+  filter: none !important;
+}
+
+.team-logo-wrap::before,
+.team-logo-wrap::after,
+.premium-logo-aura::before,
+.premium-logo-aura::after {
+  content: none !important;
+}
