@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fikstür Tahmin Paneli Pro</title>
     <link rel="stylesheet" href="styles.css?v=20260824-auto-update-v1" />
+    <link rel="stylesheet" href="data-admin.css?v=20260930-v1" />
     <link rel="stylesheet" href="login/login.css?v=1" />
     <link rel="stylesheet" href="login/penalty.css?v=1" />
     <link rel="stylesheet" href="login/welcome.css?v=1" />
@@ -120,6 +121,11 @@
               <span>Bildirim Merkezi</span>
             </button>
           
+            <button class="nav-tab admin-only" data-tab="data-management">
+              <span class="nav-tab-icon">🗂️</span>
+              <span>Veri Yönetimi</span>
+            </button>
+
             <button class="nav-tab admin-only" data-tab="backup">
               <span class="nav-tab-icon">💾</span>
               <span>Yedekleme</span>
@@ -1327,6 +1333,10 @@
           </div>
         </section>
 
+        <section class="tab-panel admin-only" id="tab-data-management">
+          <div id="dataManagementRoot"></div>
+        </section>
+
         <section class="tab-panel" id="tab-backup">
           <div class="page-header">
             <div>
@@ -1695,6 +1705,10 @@
             🔔 Bildirimler
           </button>
     
+          <button class="mobile-admin-menu-item" type="button" data-tab="data-management">
+            🗂️ Veri Yönetimi
+          </button>
+
           <button class="mobile-admin-menu-item" type="button" data-tab="backup">
             💾 Yedekleme
           </button>
@@ -2062,6 +2076,7 @@
 
 <script src="login/login.js?v=1"></script>
 <script src="login/penalty.js?v=2"></script>
-<script src="app.js?v=20260919-arena-login-v4"></script>
+<script src="app.js?v=20260930-data-management-v1"></script>
+<script src="data-admin.js?v=20260930-v1"></script>
   </body>
 </html>

@@ -1,0 +1,118 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "settings": {
+      ".read": true,
+      ".write": true,
+      "teamSceneSlugs": {
+        ".validate": "newData.val() == null || newData.isString() || newData.hasChildren()"
+      },
+      "auditLogs": {
+        "$logId": {
+          ".validate": "newData.val() == null || (newData.hasChildren(['id','actionType','createdAt']) && newData.child('createdAt').isString())"
+        },
+        ".indexOn": [
+          "createdAt"
+        ]
+      },
+      "dataManagementTrash": {
+        ".indexOn": [
+          "createdAt"
+        ]
+      }
+    },
+    "users": {
+      ".read": true,
+      ".write": true,
+      "$userId": {
+        ".validate": "newData.val() == null || (newData.hasChildren(['id','kullaniciAdi','adSoyad','rol']) && newData.child('id').isString() && newData.child('kullaniciAdi').isString() && newData.child('adSoyad').isString() && (newData.child('rol').val() == 'admin' || newData.child('rol').val() == 'user'))"
+      }
+    },
+    "matches": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": [
+        "season",
+        "sezon",
+        "weekNo",
+        "haftaNo",
+        "seasonId",
+        "weekId"
+      ],
+      "$matchId": {
+        ".validate": "newData.val() == null || (newData.hasChildren(['id']) && newData.child('id').isString())"
+      }
+    },
+    "predictions": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": [
+        "matchId",
+        "playerId",
+        "kullaniciId",
+        "seasonId",
+        "weekId"
+      ],
+      "$predictionId": {
+        ".validate": "newData.val() == null || (newData.hasChildren(['id','matchId','playerId']) && newData.child('matchId').isString() && newData.child('playerId').isString())"
+      }
+    },
+    "predictionLogs": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": [
+        "createdAt",
+        "seasonId",
+        "weekId",
+        "playerId",
+        "matchId",
+        "type",
+        "actorRole"
+      ],
+      "$logId": {
+        ".validate": "newData.val() == null || (newData.hasChildren(['id','createdAt']) && newData.child('createdAt').isString())"
+      }
+    },
+    "presence": {
+      ".read": true,
+      ".write": true,
+      "$userId": {
+        ".validate": "newData.val() == null || newData.hasChildren()"
+      }
+    },
+    "fcmTokens": {
+      ".read": true,
+      ".write": true,
+      "$tokenId": {
+        ".validate": "newData.val() == null || (newData.hasChildren(['token']) && newData.child('token').isString())"
+      }
+    },
+    "adminNotificationQueue": {
+      ".read": true,
+      ".write": true,
+      "$notificationId": {
+        "targetUserIds": {
+          ".validate": "newData.val() == null || newData.hasChildren()"
+        },
+        "icon": {
+          ".validate": "newData.isString() || newData.val() == null"
+        },
+        "status": {
+          ".validate": "newData.isString() || newData.val() == null"
+        }
+      }
+    },
+    "notificationLogs": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": [
+        "createdAt"
+      ]
+    },
+    "sentNotifications": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}

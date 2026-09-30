@@ -1480,8 +1480,37 @@ function scheduleFirebaseRealtimeHydration(source = "realtime") {
       );
       return;
     }
+    if (firebaseRealtimeHydrationPromise) {
+      // A change arriving during hydration must not be swallowed.
+      firebaseRealtimeHydrationPromise.finally(() => {
+        scheduleFirebaseRealtimeHydration(source);
+      });
+      return;
+    }
     hydrateFromFirebaseRealtime(source);
   }, 250);
+}
+
+// Only complete Firebase snapshots may confirm a remote deletion.
+let firebaseMatchSnapshotRevision = 0;
+let firebaseLatestMatchSnapshot = null;
+const firebasePendingMatchWrites = new Set();
+
+function reconcileLocalMatchesWithFirebase(remoteMatches) {
+  if (!remoteMatches || typeof remoteMatches !== "object" || Array.isArray(remoteMatches)) {
+    return { removed: 0 };
+  }
+  const remoteKeys = new Set(Object.keys(remoteMatches));
+  const removedIds = state.matches.filter((match) => {
+    const remoteId = match.sheetMatchId || match.remoteMatchId || match.macId;
+    const key = sanitizeFirebaseKey(remoteId || match.id);
+    if (!key || firebasePendingMatchWrites.has(key) || match.firebaseSyncFailed) return false;
+    // Unpublished local drafts have not been sent to the shared matches node.
+    if (!remoteId && isWeekPreparing(match.weekId)) return false;
+    return !remoteKeys.has(key);
+  }).map((match) => match.id);
+  removeMatchesFromLocalState(removedIds);
+  return { removed: removedIds.length };
 }
 
 function ensureFirebaseRealtimeBridge() {
@@ -1490,8 +1519,20 @@ function ensureFirebaseRealtimeBridge() {
   if (!db) return;
 
   ["users", "matches", "predictions", "settings"].forEach((path) => {
-    db.ref(path).on("value", () => {
+    db.ref(path).on("value", (snapshot) => {
+      if (path === "matches") {
+        firebaseMatchSnapshotRevision += 1;
+        firebaseLatestMatchSnapshot = snapshot.val() || {};
+        const result = reconcileLocalMatchesWithFirebase(firebaseLatestMatchSnapshot);
+        if (result.removed) {
+          recalculateAllPoints();
+          saveState();
+          debounceFirebaseRealtimeRender();
+        }
+      }
       scheduleFirebaseRealtimeHydration(path);
+    }, (error) => {
+      console.error(`Firebase canlı ${path} okuma hatası:`, error);
     });
   });
 
@@ -2814,23 +2855,33 @@ async function syncOnlineMatchesFromSheet(options = {}) {
     "";
 
   try {
-    let response = await fetchOnlineMatches(requestedSeasonLabel || "", "");
-    let rows = normalizeOnlineMatchRows(response);
-
-    if (!rows.length && requestedSeasonLabel) {
-      response = await fetchOnlineMatches("", "");
+    let rows;
+    if (isFirebaseReady()) {
+      const revisionAtRead = firebaseMatchSnapshotRevision;
+      const fetchedMap = (await firebaseRead("matches")) || {};
+      // Prefer a newer value event if deletion happened while this read ran.
+      const remoteMap = firebaseMatchSnapshotRevision !== revisionAtRead &&
+        firebaseLatestMatchSnapshot !== null
+        ? firebaseLatestMatchSnapshot
+        : fetchedMap;
+      reconcileLocalMatchesWithFirebase(remoteMap);
+      rows = firebaseSnapshotToArray(remoteMap);
+      if (requestedSeasonLabel) {
+        rows = rows.filter((row) =>
+          String(row.season || row.sezon || "").trim() === requestedSeasonLabel
+        );
+      }
+    } else {
+      const response = await fetchOnlineMatches(requestedSeasonLabel || "", "");
       rows = normalizeOnlineMatchRows(response);
+      // A filtered/non-Firebase response cannot prove that a match was deleted.
     }
-
-    // Uzak maç listesi eksik/gecikmiş gelebilir. API/Firebase okuması hiçbir
-    // zaman yerel maç, tahmin, hafta veya sezon silmeye yetkili değildir.
-    // Silme işlemleri yalnızca adminin açık silme butonlarından yapılır.
 
     if (!rows.length) {
       recalculateAllPoints();
       saveState(true);
       if (!options.silent) renderAll();
-      return false;
+      return true;
     }
 
     const touchedWeekIds = new Set();
@@ -2877,7 +2928,7 @@ async function syncOnlineMatchesFromSheet(options = {}) {
         (match) =>
           match.seasonId === seasonId &&
           (String(
-            match.sheetMatchId || match.remoteMatchId || match.macId || "",
+            match.sheetMatchId || match.remoteMatchId || match.macId || match.id || "",
           ) === String(row.id || row.sheetMatchId || row.macId || "") ||
             (Number(getWeekNumberById(match.weekId)) === weekNo &&
               normalizeText(match.homeTeam) === normalizeText(homeTeam) &&
@@ -3367,7 +3418,31 @@ async function sendMatchesToSheet(matches, options = {}) {
     );
 
   if (!payloadMatches.length) return null;
-  return await addOnlineMatches(payloadMatches);
+  const writeKeys = payloadMatches.map((item) => sanitizeFirebaseKey(item.id));
+  writeKeys.forEach((key) => firebasePendingMatchWrites.add(key));
+  try {
+    const result = await addOnlineMatches(payloadMatches);
+    if (!result?.success) {
+      throw new Error(result?.message || "Maçlar buluta kaydedilemedi.");
+    }
+    matches.forEach((match) => {
+      const key = sanitizeFirebaseKey(
+        match.sheetMatchId || match.remoteMatchId || match.macId || match.id
+      );
+      if (writeKeys.includes(key)) {
+        match.sheetMatchId = key;
+        delete match.firebaseSyncFailed;
+      }
+    });
+    saveState();
+    return result;
+  } catch (error) {
+    matches.forEach((match) => { match.firebaseSyncFailed = true; });
+    saveState();
+    throw error;
+  } finally {
+    writeKeys.forEach((key) => firebasePendingMatchWrites.delete(key));
+  }
 }
 
 async function syncWeekMatchesToSheet(weekId) {
@@ -4645,6 +4720,7 @@ function closeLoginOverlay() {
   updateAdminSyncToggleButton();
 }
 function logoutUser() {
+  if (typeof window.resetDataManagement === "function") window.resetDataManagement();
   closeAccountMenus();
   if (typeof stopIdleLogoutTimer === "function") stopIdleLogoutTimer();
   clearSessionRuntimeCaches();
@@ -5233,6 +5309,7 @@ function applyRolePermissions() {
     [
       "backup",
       "notifications",
+      "data-management",
       "seasons",
       "weeks",
       "matches",
@@ -10424,6 +10501,9 @@ window.removeMatch = async function (matchId) {
     return;
 
   try {
+    if (useOnlineMode && !isFirebaseReady()) {
+      throw new Error("Firebase bağlantısı hazır değil. Maç silinmedi; bağlantı geldikten sonra tekrar dene.");
+    }
     if (useOnlineMode && isFirebaseReady()) {
       const predictionsMap = (await firebaseRead("predictions")) || {};
       const remotePredictions = firebaseSnapshotToArray(predictionsMap).filter(
@@ -15633,6 +15713,11 @@ function renderCurrentTabOnly(
       }
       break;
 
+    case "data-management":
+      if (typeof window.renderDataManagement === "function")
+        window.renderDataManagement();
+      break;
+
     case "backup":
       renderBackupPanel();
       break;
@@ -16324,6 +16409,7 @@ function switchTab(tabName, options = {}) {
     [
       "backup",
       "notifications",
+      "data-management",
       "seasons",
       "weeks",
       "matches",

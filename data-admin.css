@@ -1,0 +1,99 @@
+/* Veri Yönetimi — uygulamanın mevcut renkleriyle, PC ve mobil. */
+#tab-data-management { padding-bottom: 30px; }
+#dataManagementRoot { max-width: 1500px; margin: 0 auto; color: var(--text, #eff6ff); }
+#dataManagementRoot button, #dataManagementRoot input, #dataManagementRoot select { min-height: 42px; font-size: 14px; }
+#dataManagementRoot button { cursor: pointer; }
+#dataManagementRoot button:disabled { opacity: .45; cursor: not-allowed; }
+#dataManagementRoot :focus-visible { outline: 2px solid #38bdf8; outline-offset: 3px; }
+.dm-head { display: flex; gap: 20px; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+.dm-head h2 { margin: 6px 0; font-size: clamp(24px, 3vw, 32px); letter-spacing: -.7px; }
+.dm-head p { color: var(--muted); margin: 8px 0 0; }
+.dm-eyebrow { color: #68d4f6; font-size: 11px; font-weight: 800; letter-spacing: 1.4px; }
+.dm-type-tabs { display: flex; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid var(--line); padding-bottom: 16px; }
+.dm-type-tabs button { border: 1px solid var(--line); background: rgba(255,255,255,.035); color: var(--muted); border-radius: 12px; padding: 9px 16px; }
+.dm-type-tabs button.active { background: rgba(56,189,248,.14); border-color: rgba(56,189,248,.5); color: #e0f7ff; }
+.dm-summary { display: grid; grid-template-columns: 1fr 1fr 1fr 1.8fr; gap: 12px; margin: 20px 0; }
+.dm-summary > div { background: linear-gradient(125deg, rgba(56,189,248,.065), rgba(255,255,255,.03)); border: 1px solid var(--line); border-radius: 15px; padding: 16px 18px; }
+.dm-summary span { color: var(--muted); font-size: 12px; display: block; margin-bottom: 8px; }
+.dm-summary strong { font-size: 26px; }
+.dm-summary .dm-last strong { font-size: 15px; display: block; padding-top: 8px; }
+.dm-filters { display: grid; grid-template-columns: 1.7fr repeat(3, 1fr); gap: 12px; border: 1px solid var(--line); background: rgba(7,16,30,.3); padding: 18px; border-radius: 16px; }
+.dm-filters label, .dm-edit-form label { display: grid; gap: 7px; color: var(--muted); font-size: 12px; font-weight: 600; min-width: 0; }
+#dataManagementRoot input:not([type=checkbox]), #dataManagementRoot select { width: 100%; max-width: 100%; border: 1px solid var(--line-strong); border-radius: 10px; color: var(--text); background: #0b1525; padding: 10px 12px; color-scheme: dark; }
+.dm-search { grid-column: span 2; }
+.dm-toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 10px; }
+.dm-hint { font-size: 12px; line-height: 1.6; color: var(--muted); margin: 10px 0; }
+.dm-status { font-size: 13px; color: #86efac; min-height: 20px; margin-bottom: 8px; overflow-wrap: anywhere; }
+.dm-status.is-error { color: #fda4af; }
+.dm-table-shell { border: 1px solid var(--line); border-radius: 16px; overflow-x: auto; background: rgba(10,19,33,.5); }
+#dataManagementRoot .dm-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 0; }
+.dm-table th { text-align: left; font-size: 11px; color: var(--muted); letter-spacing: .5px; background: rgba(255,255,255,.04); padding: 14px; }
+.dm-table th:nth-child(2) { width: 34%; }
+.dm-table th:nth-child(3) { width: 15%; }
+.dm-table th:nth-child(4) { width: 14%; }
+.dm-table td { padding: 16px 14px; border-top: 1px solid var(--line); vertical-align: middle; font-size: 14px; overflow-wrap: anywhere; }
+.dm-table td > strong { display: block; font-size: 15px; line-height: 1.45; }
+.dm-table tr:hover { background: rgba(56,189,248,.025); }
+#dataManagementRoot .dm-check { width: 42px; padding: 14px 10px; }
+#dataManagementRoot input[type=checkbox] { min-height: 20px; width: 20px; height: 20px; accent-color: #38bdf8; cursor: pointer; }
+.dm-subtitle { display: block; color: var(--muted); font-size: 12px; margin-top: 6px; line-height: 1.5; }
+.dm-id { display: block; color: #7187a8; font-size: 10px; margin-top: 6px; overflow-wrap: anywhere; }
+.dm-badge { display: inline-block; border: 1px solid var(--line); background: rgba(255,255,255,.035); padding: 6px 9px; border-radius: 8px; font-size: 12px; }
+.dm-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+#dataManagementRoot .dm-actions button { min-height: 36px; padding: 8px 10px; font-size: 12px; border-radius: 9px; }
+.dm-pagination { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 18px 0; color: var(--muted); font-size: 13px; }
+.dm-pagination > div { display: flex; align-items: center; gap: 12px; }
+.dm-empty { display: grid; gap: 12px; place-content: center; padding: 65px 20px; text-align: center; border: 1px dashed var(--line-strong); border-radius: 16px; color: var(--muted); }
+.dm-empty strong { font-size: 19px; color: var(--text); }
+.dm-dialog-backdrop { position: fixed; inset: 0; z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(2,6,15,.78); backdrop-filter: blur(5px); }
+.dm-dialog { width: min(100%, 560px); max-height: calc(100dvh - 48px); overflow-y: auto; border: 1px solid var(--line-strong); border-radius: 20px; background: #101e32; box-shadow: 0 20px 80px #0008; padding: 24px; }
+.dm-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dm-dialog h3 { font-size: 21px; margin: 0; }
+.dm-dialog > p { font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+.dm-edit-form { display: grid; gap: 16px; }
+.dm-details { margin: 20px 0; }
+.dm-details > div { display: grid; grid-template-columns: 110px 1fr; gap: 15px; border-bottom: 1px solid var(--line); padding: 12px 0; }
+.dm-details dt { color: var(--muted); font-size: 12px; }
+.dm-details dd { margin: 0; font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 1000px) {
+ .dm-filters { grid-template-columns: repeat(3, minmax(0,1fr)); }
+ .dm-search { grid-column: span 3; }
+ .dm-table th:nth-child(2) { width: 29%; }
+}
+@media (max-width: 720px) {
+ #tab-data-management { padding: 0 0 95px; }
+ .dm-head { gap: 12px; margin-bottom: 16px; align-items: flex-start; }
+ .dm-head p { font-size: 13px; line-height: 1.5; }
+ #dataManagementRoot .dm-refresh { min-width: 76px; padding: 9px 12px; }
+ .dm-type-tabs { flex-wrap: nowrap; overflow-x: auto; padding: 0 0 12px; scrollbar-width: thin; }
+ .dm-type-tabs button { flex-shrink: 0; }
+ .dm-summary { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin: 16px 0; }
+ .dm-summary > div { padding: 12px; }
+ .dm-summary strong { font-size: 22px; }
+ .dm-summary .dm-last { grid-column: span 3; display: flex; align-items: center; justify-content: space-between; }
+ .dm-summary .dm-last span { margin-bottom: 0; }
+ .dm-summary .dm-last strong { font-size: 12px; padding: 0; }
+ .dm-filters { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; padding: 14px; }
+ .dm-search { grid-column: span 2; }
+ .dm-toolbar button { flex: 1 1 auto; }
+ .dm-table-shell { border: 0; overflow: visible; background: transparent; }
+ #dataManagementRoot .dm-table, .dm-table tbody { display: block; width: 100%; }
+ .dm-table thead { display: none; }
+ .dm-table tr { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); position: relative; padding: 15px; gap: 12px; margin-bottom: 12px; border: 1px solid var(--line-strong); background: #111e31; border-radius: 16px; }
+ .dm-table td { display: block; border: 0; padding: 0; min-width: 0; }
+ #dataManagementRoot .dm-table .dm-check { position: absolute; top: 15px; right: 15px; width: 24px; padding: 0; }
+ .dm-table td:nth-child(2) { grid-column: span 2; padding-right: 30px; }
+ .dm-table td:last-child { grid-column: span 2; border-top: 1px solid var(--line); padding-top: 12px; }
+ .dm-table td:nth-child(3)::before, .dm-table td:nth-child(4)::before { content: attr(data-label); display: block; color: var(--muted); font-size: 10px; margin-bottom: 6px; }
+ #dataManagementRoot .dm-actions button { min-height: 42px; font-size: 12px; flex: 1 1 auto; }
+ .dm-pagination { font-size: 12px; }
+ .dm-dialog-backdrop { padding: 12px; }
+ .dm-dialog { padding: 20px 16px; max-height: calc(100dvh - 24px); border-radius: 16px; }
+ .dm-details > div { grid-template-columns: 80px minmax(0,1fr); gap: 10px; }
+}
+/* Date inputs have an intrinsic minimum on Chromium/iOS. */
+#dataManagementRoot input:not([type=checkbox]),
+#dataManagementRoot select { min-width: 0; }
+@media (max-width: 360px) {
+  .dm-filters label:has(input[type=date]) { grid-column: span 2; }
+}
