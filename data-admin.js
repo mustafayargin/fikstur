@@ -27,9 +27,25 @@
   }
   const entries = map => Object.entries(map || {}).filter(([, value]) => value && typeof value === 'object');
   const matchIds = (key, value) => new Set([key, value.id, value.sheetMatchId, value.remoteMatchId, value.macId].filter(Boolean).map(String));
-  function linkedPrediction(pred, ids) { return [pred.matchId, pred.localMatchId, pred.macId].some(id => id != null && ids.has(String(id))); }
-  function findMatch(id) {
-    return entries(model.maps.matches).find(([key, value]) => matchIds(key, value).has(String(id)))?.[1];
+  function predictionMatchIds(pred) {
+    return [pred.sheetMatchId, pred.remoteMatchId, pred.matchId, pred.localMatchId, pred.macId]
+      .filter(id => id !== undefined && id !== null && text(id)).map(String);
+  }
+  function linkedPrediction(pred, ids) {
+    return predictionMatchIds(pred).some(id => ids.has(id));
+  }
+  function findMatchEntry(pred, map) {
+    // The device-local matchId may differ on every device. Check the stored
+    // shared identity as well; never infer ownership just from a team name.
+    const candidates = predictionMatchIds(pred);
+    for (const id of candidates) {
+      const found = entries(map).find(([key, value]) => matchIds(key, value).has(id));
+      if (found) return found;
+    }
+    return null;
+  }
+  function findMatch(pred) {
+    return findMatchEntry(pred, model.maps.matches)?.[1];
   }
   function findUser(id) {
     return entries(model.maps.users).find(([key, value]) => key === String(id) || String(value.id) === String(id))?.[1];
@@ -41,7 +57,7 @@
   function userLabel(value) { return text(value?.adSoyad || value?.name || value?.kullaniciAdi || value?.username) || 'Kullanıcı'; }
   function matchLabel(value) { return `${text(value?.homeTeam || value?.evSahibi) || '?'} – ${text(value?.awayTeam || value?.deplasman) || '?'}`; }
   function row(key, value, type = model.type) {
-    const m = type === 'predictions' ? findMatch(value.matchId || value.localMatchId) : null;
+    const m = type === 'predictions' ? findMatch(value) : null;
     const seasonId = value.seasonId || m?.seasonId;
     const season = text(value.season || value.sezon || m?.season || m?.sezon || (seasonId ? getSeasonById(seasonId)?.name : '') || value.summary?.season);
     const weekId = value.weekId || m?.weekId;
@@ -56,7 +72,8 @@
       title = matchLabel(value); subtitle = dateLabel(rawDate);
       status = value.played || value.oynandiMi === 1 ? 'Sonuç işlendi' : 'Sonuç bekliyor';
     } else if (type === 'predictions') {
-      title = m ? matchLabel(m) : text(value.matchLabel || value.matchId) || 'Maç kaydı bulunamadı';
+      title = m ? matchLabel(m) : text(value.matchLabel) ||
+        ((value.homeTeam || value.evSahibi) && (value.awayTeam || value.deplasman) ? matchLabel(value) : 'Maç eşleştirilemedi');
       subtitle = user;
       status = `${value.homePred ?? value.tahminEv ?? '—'} – ${value.awayPred ?? value.tahminDep ?? '—'}`;
     } else if (type === 'users') {
@@ -268,9 +285,13 @@
     const existing=await Promise.all(entry.records.map(r=>firebaseRead(r.path)));
     if(existing.some((r,index)=>r!==null&&!equal(r,entry.records[index].value)))throw new Error('Aynı kimlikle farklı kayıt zaten var. Üzerine yazmamak için geri yükleme durduruldu.');
     const matchRecords=entry.records.filter(r=>r.path.startsWith('matches/'));
-    for(const r of entry.records.filter(r=>r.path.startsWith('predictions/'))) {
-      const id=text(r.value.matchId||r.value.localMatchId);
-      if(id&&!matchRecords.some(m=>matchIds(m.path.split('/')[1],m.value).has(id))&&!(await firebaseRead(`matches/${sanitizeFirebaseKey(id)}`)))throw new Error('Tahminin bağlı olduğu maç yok. Önce maçı geri yükle.');
+    const archivedMatches=Object.fromEntries(matchRecords.map(r=>[r.path.split('/')[1],r.value]));
+    const predictionRecords=entry.records.filter(r=>r.path.startsWith('predictions/'));
+    const liveMatches=predictionRecords.length?(await firebaseRead('matches'))||{}:{};
+    for(const r of predictionRecords) {
+      if(!findMatchEntry(r.value, archivedMatches)&&!findMatchEntry(r.value, liveMatches)) {
+        throw new Error('Tahminin bağlı olduğu maç bulutta veya bu yedekte yok. Önce maçı geri yükle.');
+      }
     }
     let restored = 0;
     try {
