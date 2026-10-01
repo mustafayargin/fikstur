@@ -8171,8 +8171,8 @@ function renderPlayers() {
           if (getPlayerRole(player) === "admin") return "";
           const isAdminUser = getPlayerRole(player) === "admin";
           const presence = getPresenceStatusForUser(player.id);
-          const statusClass = presence.isOnline ? "is-online" : "is-offline";
-          const statusText = presence.isOnline ? "Online" : "Offline";
+          const statusClass = player.aktif === false ? "is-offline" : presence.isOnline ? "is-online" : "is-offline";
+          const statusText = player.aktif === false ? "Hesap pasif" : presence.isOnline ? "Aktif · Online" : "Aktif · Offline";
           const lastSeenText = presence.lastSeen
             ? formatAdminPanelDateTime(presence.lastSeen)
             : "Henüz giriş yok";
@@ -8297,8 +8297,8 @@ function buildPlayerDetailModalContent(player) {
         : `<div class="player-empty-seasons">Önce sezon ekle. Sezonlar oluştukça burada kutular çıkacak.</div>`;
 
   const presence = getPresenceStatusForUser(player.id);
-  const statusClass = presence.isOnline ? "is-online" : "is-offline";
-  const statusText = presence.isOnline ? "Online" : "Offline";
+  const statusClass = player.aktif === false ? "is-offline" : presence.isOnline ? "is-online" : "is-offline";
+  const statusText = player.aktif === false ? "Hesap pasif" : presence.isOnline ? "Aktif · Online" : "Aktif · Offline";
   const supportedTeam = getPlayerSupportedTeamName(player);
   const teamSelectorOptions = buildPlayerSupportedTeamOptions(player);
 
@@ -8403,7 +8403,7 @@ function buildPlayerDetailModalContent(player) {
           <button class="small secondary" onclick="changePlayerPassword('${player.id}', this)">Geçici Şifre Ver</button>
 
           ${isAdminUser ? "" : `<button class="small secondary" onclick="forceLogoutUserSession('${player.id}', this)">Sistemden At</button>`}
-          ${isAdminUser ? "" : `<button class="small danger" onclick="removePlayer('${player.id}', this)">Pasifleştir</button>`}
+          ${isAdminUser ? "" : player.aktif === false ? `<button class="small secondary" onclick="activatePlayer('${player.id}', this)">Aktifleştir</button>` : `<button class="small danger" onclick="removePlayer('${player.id}', this)">Pasifleştir</button>`}
         `
             : isOwnUserProfile
               ? `
@@ -8725,6 +8725,25 @@ window.changePlayerPassword = async function (id) {
   if (!(await showConfirm(`${player.name} için yeni geçici şifre oluşturulsun mu? Mevcut oturumları kapatılacak.`, {title:"Geçici şifre ver"}))) return;
   try { await window.SkorxAuth.manage("updateUser", {id, resetPassword:true}); }
   catch (error) { await showAlert(error.message); }
+};
+
+window.activatePlayer = async function (id, buttonOrEvent) {
+  if (getCurrentRole() !== "admin") return showAlert("Bu işlem için admin girişi gerekiyor.");
+  const player = getPlayerById(id);
+  if (!player || getPlayerRole(player) === "admin" || player.aktif !== false) return;
+  if (!(await showConfirm(`${player.name} hesabı yeniden aktifleştirilsin mi? Mevcut şifresi, tahminleri ve puanları korunacak.`, {title:"Hesabı aktifleştir", confirmText:"Aktifleştir"}))) return;
+  const button = getActionButtonFromArg(buttonOrEvent);
+  setAsyncButtonState(button, "loading", {loading:"Aktifleştiriliyor..."});
+  try {
+    const result = await window.SkorxAuth.manage("updateUser", {id:player.id, aktif:true});
+    if (!result?.success) throw new Error(result?.message || "Hesap aktifleştirilemedi.");
+    player.aktif = true;
+    await syncUsersFromSheet();
+    renderAll();refreshPlayerDetailModal();
+  } catch (error) {
+    setAsyncButtonState(button, "error", {error:"Tekrar dene"});
+    await showAlert(error.message || "Hesap aktifleştirilemedi.");
+  }
 };
 
 window.removePlayer = async function (id, buttonOrEvent) {
