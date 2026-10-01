@@ -53,4 +53,14 @@ async function run({args=process.argv.slice(2),env=process.env,servicesFactory=s
  else log('Veri değişmedi. Yedek ve bakım hazır olduğunda --apply --backup-confirmed ile çalıştırın.');
 }
 module.exports={run};
-if(require.main===module)run().catch(e=>{console.error('Geçiş durduruldu:',e.message);process.exitCode=1;});
+if (require.main === module) {
+  run()
+    .catch(e => {
+      console.error('Geçiş durduruldu:', e.message);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      const { getApps, deleteApp } = require('firebase-admin/app');
+      await Promise.all(getApps().map(app => deleteApp(app)));
+    });
+}
