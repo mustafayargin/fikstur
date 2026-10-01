@@ -41,13 +41,13 @@
     return session;
   }
   async function passwordPrompt(message,title='Şifre değiştir') {
-    return openAppModal({type:'prompt',title,message,inputValue:'',inputPlaceholder:'En az 12 karakter',inputType:'password'});
+    return openAppModal({type:'prompt',title,message,inputValue:'',inputPlaceholder:'En az 8 karakter',inputType:'password'});
   }
   async function finishPasswordChange(result) {
     if(!result.mustChangePassword)return true;
-    const next=await passwordPrompt('Geçici şifrenizi kullanmaya devam edemezsiniz. Kendinize en az 12 karakterlik yeni bir şifre belirleyin.');
+    const next=await passwordPrompt('Geçici şifrenizi kullanmaya devam edemezsiniz. Kendinize en az 8 karakterlik yeni bir şifre belirleyin.');
     if(!next){await signOut();return false;}
-    if(next.length<12){await showAlert('Şifre en az 12 karakter olmalı.');return finishPasswordChange(result);}
+    if(next.length<8){await showAlert('Şifre en az 8 karakter olmalı.');return finishPasswordChange(result);}
     const repeat=await passwordPrompt('Yeni şifrenizi tekrar yazın.');
     if(next!==repeat){await showAlert('Şifreler eşleşmedi.');return finishPasswordChange(result);}
     await request('changePassword',{password:next});
@@ -106,9 +106,28 @@
   }
   async function showTemporary(result){
     if(result.temporaryPassword){
-      await openAppModal({type:'info',title:'Geçici şifre — yalnızca şimdi gösterilir',message:`Geçici şifre: ${result.temporaryPassword}\n\nBu şifreyi kullanıcıya özel olarak iletin. İlk girişte değiştirmesi istenecek.`,confirmText:'Kaydettim, kapat'});
-      document.getElementById('appModalText').textContent='';
-      result.temporaryPassword=undefined;
+      const closed=openAppModal({type:'info',title:'Geçici şifre — yalnızca şimdi gösterilir',message:`Geçici şifre: ${result.temporaryPassword}\n\nBu şifreyi kullanıcıya özel olarak iletin. İlk girişte değiştirmesi istenecek.`,confirmText:'Kaydettim, kapat'});
+      const copy=document.createElement('button');
+      copy.type='button';copy.id='temporaryPasswordCopyBtn';copy.textContent='Geçici şifreyi kopyala';
+      copy.style.cssText='display:block;width:100%;padding:12px;margin-top:16px;border-radius:10px;cursor:pointer;';
+      const copyPassword=async()=>{
+        try{
+          if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(result.temporaryPassword);
+          else {
+            const field=document.createElement('textarea');field.value=result.temporaryPassword;
+            field.style.cssText='position:fixed;opacity:0;';document.body.appendChild(field);
+            try{field.select();if(!document.execCommand('copy'))throw new Error('copy');}finally{field.value='';field.remove();}
+          }
+          copy.textContent='Kopyalandı ✓';
+        }catch{copy.textContent='Kopyalanamadı; şifreyi seçip kopyalayın';}
+      };
+      copy.addEventListener('click',copyPassword);
+      document.getElementById('appModalText')?.after(copy);
+      try{await closed;}finally{
+        copy.removeEventListener('click',copyPassword);copy.remove();
+        const text=document.getElementById('appModalText');if(text)text.textContent='';
+        result.temporaryPassword=undefined;
+      }
     }
     return result;
   }
