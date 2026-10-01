@@ -19,10 +19,24 @@ function parseDate(value) {
   return Date.parse(/Z$|[+-]\d{2}:\d{2}$/.test(s) ? s : `${s}+03:00`);
 }
 function resolveMatch(payload, map) {
-  const ids = [payload.sheetMatchId, payload.remoteMatchId, payload.matchId, payload.localMatchId].filter(Boolean).map(String);
+  const ids = [payload.sheetMatchId, payload.remoteMatchId, payload.matchId, payload.localMatchId, payload.macId, payload.match_id, payload.eventId].filter(Boolean).map(String);
   for (const id of ids) {
     const entry = Object.entries(map || {}).find(([k,m]) => [k,m.id,m.sheetMatchId,m.remoteMatchId,m.macId].filter(Boolean).map(String).includes(id));
     if (entry) return entry;
+  }
+  // Older imports can retain a device-local ID. Only a complete, unique
+  // season/week/team identity may substitute for a shared match ID.
+  const season = payload.season || payload.sezon || payload.seasonName || payload.sezonAdi;
+  const week = Number(payload.weekNo || payload.haftaNo || payload.week || payload.hafta);
+  const home = payload.homeTeam || payload.evSahibi || payload.home || payload.home_name;
+  const away = payload.awayTeam || payload.deplasman || payload.away || payload.away_name;
+  if (season && Number.isInteger(week) && week > 0 && home && away) {
+    const entries = Object.entries(map || {}).filter(([,m]) =>
+      normalizeName(m.season || m.sezon || m.seasonName || m.sezonAdi) === normalizeName(season) &&
+      Number(m.weekNo || m.haftaNo || m.week || m.hafta) === week &&
+      normalizeName(m.homeTeam || m.evSahibi || m.home || m.home_name) === normalizeName(home) &&
+      normalizeName(m.awayTeam || m.deplasman || m.away || m.away_name) === normalizeName(away));
+    if (entries.length === 1) return entries[0];
   }
   throw new Fault(409, 'Maç ortak veritabanında bulunamadı. Önce haftayı yayınlayın.');
 }
@@ -31,7 +45,7 @@ function contextualMatch(match, settings) {
   const season=seasons.find(s=>String(s.id)===String(match.seasonId)) || seasons.find(s=>normalizeName(s.name)===normalizeName(match.season || match.sezon));
   const seasonId=String(season?.id || match.seasonId || '');
   const week=weeks.find(w=>String(w.id)===String(match.weekId) && (!seasonId || String(w.seasonId)===seasonId)) || weeks.find(w=>String(w.seasonId)===seasonId && Number(w.number)===Number(match.weekNo || match.haftaNo));
-  return {...match,seasonId,weekId:String(week?.id || match.weekId || ''),date:match.date || match.tarih || '',played:match.played===true || Number(match.oynandiMi)===1};
+  return {...match,seasonId,weekId:String(week?.id || match.weekId || ''),date:match.date || match.tarih || '',played:match.played===true || match.played===1 || match.played==='1' || match.played==='true' || Number(match.oynandiMi)===1};
 }
 function weekContext(match, matches, settings) {
   match=contextualMatch(match,settings);
@@ -58,6 +72,9 @@ function assertPredictionAllowed(actor, playerId, match, matches, settings, now 
 function canReveal(actor, prediction, matches, settings, now = Date.now()) {
   if (actor.admin || String(prediction.playerId || prediction.kullaniciId) === actor.playerId) return true;
   let match; try { match = resolveMatch(prediction, matches)[1]; } catch { return false; }
+  match=contextualMatch(match,settings);
+  // A completed match is public even if old week metadata is missing.
+  if (match.played) return true;
   const {week,first,sameWeek} = weekContext(match,matches,settings);
   if(!week) return false;
   if (week?.predictionManualLocked === true) return true;
