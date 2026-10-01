@@ -1,0 +1,54 @@
+name: Authentication Migration
+on:
+  workflow_dispatch:
+    inputs:
+      adminPlayerId:
+        description: 'Realtime Database users içindeki mevcut admin kayıt anahtarı'
+        required: true
+        default: 'admin'
+      mode:
+        description: 'Önce dry-run. apply tüm kullanıcı şifrelerini yeniler.'
+        required: true
+        type: choice
+        options: [dry-run, apply]
+        default: dry-run
+      backupConfirmed:
+        description: 'JSON yedeği alındı ve veritabanı bakım için kapatıldı'
+        required: true
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: skorx-auth-migration
+  cancel-in-progress: false
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --omit=dev
+      - name: Validate migration inputs and run
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_DATABASE_URL: https://superlig-tahmin-panel-default-rtdb.europe-west1.firebasedatabase.app
+          ADMIN_EMAIL: mustafayargin@gmail.com
+          ADMIN_PLAYER_ID: ${{ inputs.adminPlayerId }}
+          MIGRATION_MODE: ${{ inputs.mode }}
+          BACKUP_CONFIRMED: ${{ inputs.backupConfirmed }}
+        run: |
+          node <<'NODE'
+          const {spawnSync}=require('node:child_process');
+          const args=['scripts/migrate-auth.cjs','--admin-player-id',process.env.ADMIN_PLAYER_ID];
+          if(process.env.MIGRATION_MODE==='apply'){
+            if(process.env.BACKUP_CONFIRMED!=='true')throw new Error('Önce yedek ve bakım gerekli.');
+            args.push('--apply','--backup-confirmed');
+          }
+          const result=spawnSync(process.execPath,args,{stdio:'inherit',env:process.env});
+          process.exit(result.status??1);
+          NODE

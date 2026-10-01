@@ -91,32 +91,7 @@ function startFiksturAutomaticUpdateMonitor() {
 
 startFiksturAutomaticUpdateMonitor();
 
-const FIREBASE_DEFAULT_USERS = [
-  {
-    id: "admin-root",
-    kullaniciAdi: "admin",
-    sifre: "1234",
-    adSoyad: "ADMIN",
-    rol: "admin",
-    aktif: true,
-  },
-  {
-    id: "player-mustafa",
-    kullaniciAdi: "mustafa",
-    sifre: "1234",
-    adSoyad: "MUSTAFA",
-    rol: "user",
-    aktif: true,
-  },
-  {
-    id: "player-veli",
-    kullaniciAdi: "veli",
-    sifre: "1234",
-    adSoyad: "VELI",
-    rol: "user",
-    aktif: true,
-  },
-];
+const FIREBASE_DEFAULT_USERS = [];
 
 function getFirebaseConfig() {
   return window.FIKSTUR_FIREBASE_CONFIG || null;
@@ -275,6 +250,13 @@ async function firebaseRead(path) {
   const db = getFirebaseDb();
   if (!db) throw new Error("Firebase henüz yapılandırılmadı.");
   const safePath = String(path ?? "").trim();
+  if (safePath === "settings" && !window.SkorxAuth.admin) {
+    return (await window.SkorxAuth.request("getSettings")).settings;
+  }
+  if (safePath === "predictions" && !window.SkorxAuth.admin) {
+    const result = await window.SkorxAuth.request("getPredictions");
+    return Object.fromEntries(result.predictions.map(row => [row.id, row]));
+  }
   const snapshot = await (safePath ? db.ref(safePath) : db.ref()).get();
   return snapshot.exists() ? snapshot.val() : null;
 }
@@ -303,63 +285,8 @@ async function firebaseRemove(path) {
 }
 
 async function ensureFirebaseDefaults() {
-  if (!isFirebaseReady()) return { success: false, skipped: true };
-
-  const users = (await firebaseRead("users")) || {};
-  const matches = (await firebaseRead("matches")) || {};
-  const predictions = (await firebaseRead("predictions")) || {};
-  const settings = (await firebaseRead("settings")) || {};
-
-  if (!Object.keys(users).length || settings?.init === true) {
-    const seededUsers = {};
-    FIREBASE_DEFAULT_USERS.forEach((user) => {
-      seededUsers[sanitizeFirebaseKey(user.id)] = {
-        ...user,
-        aktif: true,
-      };
-    });
-    await firebaseWrite("users", seededUsers);
-  }
-
-  // Realtime Database boş nesne/dizileri kalıcı düğüm olarak saklamaz.
-  // Bu koleksiyonlara her HYDRATE sırasında {} veya [] yazmak, value
-  // listener'larını yeniden tetikleyerek sonsuz HYDRATE döngüsü oluşturur.
-  // matches ve predictions boşken oluşturulmaları gerekmez; ilk gerçek kayıt
-  // ilgili düğümü zaten oluşturacaktır.
-
-  if (!settings || settings.init === true || !Object.keys(settings).length) {
-    const now = new Date().toISOString();
-    await firebaseWrite("settings", {
-      init: false,
-      source: "firebase",
-      createdAt: now,
-      defaultUsersSeeded: true,
-      welcomeCard: {
-        enabled: true,
-        title: "Hoş geldin!",
-        message: "İyi haftalar, bol şans! ✨",
-        imageFile: "",
-        imageFit: "cover",
-        showOnce: false,
-        updatedAt: now,
-      },
-    });
-  } else if (!settings.welcomeCard) {
-    const now = new Date().toISOString();
-    await firebaseUpdate("settings", {
-      welcomeCard: {
-        enabled: true,
-        title: "Hoş geldin!",
-        message: "İyi haftalar, bol şans! ✨",
-        imageFile: "",
-        imageFit: "cover",
-        showOnce: false,
-        updatedAt: now,
-      },
-    });
-  }
-
-  return { success: true };
+  // Auth accounts and defaults are created only by the server migration tool.
+  return { success: true, skipped: true };
 }
 
 async function firebaseApiGet(action, params = {}) {
@@ -661,156 +588,10 @@ window.writeAppAuditLogEntry = writeAppAuditLogEntry;
 
 async function firebaseApiPost(action, payload = {}) {
   switch (action) {
-    case "login": {
-      await ensureFirebaseDefaults();
-      const username = normalizeLoginName(
-        payload.kullaniciAdi || payload.username || "",
-      );
-      const password = String(payload.sifre || payload.password || "");
-      const users = firebaseSnapshotToArray(await firebaseRead("users"));
-      const user = users.find(
-        (item) =>
-          normalizeLoginName(
-            item.kullaniciAdi || item.username || item.adSoyad || "",
-          ) === username &&
-          String(item.sifre || item.password || "") === password &&
-          item.aktif !== false,
-      );
-      if (!user) {
-        return { success: false, message: "Kullanıcı adı veya şifre hatalı." };
-      }
-      return { success: true, user };
-    }
-    case "addUser": {
-      const usersMap = (await firebaseRead("users")) || {};
-
-      const rawDisplayName = String(
-        payload.adSoyad ||
-          payload.name ||
-          payload.kullaniciAdi ||
-          payload.username ||
-          "",
-      )
-        .trim()
-        .toUpperCase();
-
-      const rawUsername = normalizeLoginName(
-        payload.kullaniciAdi ||
-          payload.username ||
-          payload.adSoyad ||
-          payload.name ||
-          "user",
-      );
-
-      const id = sanitizeFirebaseKey(
-        payload.id ||
-          buildPlayerKeyFromName(rawDisplayName || rawUsername, usersMap),
-      );
-
-      if (usersMap[id]) {
-        return {
-          success: false,
-          message: "Bu kullanıcı anahtarı zaten var. Farklı bir isim deneyin.",
-        };
-      }
-
-      const record = {
-        id,
-        kullaniciAdi: rawUsername,
-        sifre: String(payload.sifre || payload.password || "1234"),
-        adSoyad: rawDisplayName,
-        rol:
-          String(payload.rol || "user").toLowerCase() === "admin"
-            ? "admin"
-            : "user",
-        panelAdmin: payload.panelAdmin === true,
-        supportedTeam: String(
-          payload.supportedTeam ||
-            payload.teamName ||
-            payload.favoriteTeam ||
-            "",
-        ).trim(),
-        aktif: true,
-        createdAt: new Date().toISOString(),
-      };
-
-      await firebaseWrite(`users/${id}`, record);
-      return { success: true, id, user: record };
-    }
-    case "updateUser": {
-      const id = sanitizeFirebaseKey(payload.id);
-      if (!id) return { success: false, message: "Kullanıcı id gerekli." };
-      const current = (await firebaseRead(`users/${id}`)) || { id };
-      const next = {
-        ...current,
-        ...(payload.adSoyad
-          ? { adSoyad: String(payload.adSoyad).trim().toUpperCase() }
-          : {}),
-        ...(payload.kullaniciAdi
-          ? { kullaniciAdi: normalizeLoginName(payload.kullaniciAdi) }
-          : {}),
-        ...(payload.sifre ? { sifre: String(payload.sifre) } : {}),
-        ...(payload.rol
-          ? {
-              rol:
-                String(payload.rol).toLowerCase() === "admin"
-                  ? "admin"
-                  : "user",
-            }
-          : {}),
-        ...(Object.prototype.hasOwnProperty.call(payload, "panelAdmin")
-          ? { panelAdmin: payload.panelAdmin === true }
-          : {}),
-        ...(Object.prototype.hasOwnProperty.call(payload, "aktif")
-          ? { aktif: payload.aktif !== false }
-          : {}),
-        ...(payload.seasonStates ? { seasonStates: payload.seasonStates } : {}),
-        ...(Object.prototype.hasOwnProperty.call(payload, "supportedTeam")
-          ? {
-              supportedTeam: String(
-                payload.supportedTeam ||
-                  payload.teamName ||
-                  payload.favoriteTeam ||
-                  "",
-              ).trim(),
-            }
-          : {}),
-        ...(payload.seasonMemberships
-          ? { seasonMemberships: payload.seasonMemberships }
-          : {}),
-        ...(payload.activeSeasons
-          ? { activeSeasons: payload.activeSeasons }
-          : {}),
-        updatedAt: new Date().toISOString(),
-      };
-      await firebaseWrite(`users/${id}`, next);
-      return { success: true, id, user: next };
-    }
-    case "deleteUser": {
-      const id = sanitizeFirebaseKey(payload.id);
-      if (!id) return { success: false, message: "Kullanıcı id gerekli." };
-      const current = (await firebaseRead(`users/${id}`)) || null;
-      if (current && String(current.rol || "user").toLowerCase() === "admin") {
-        return {
-          success: false,
-          message: "Admin kullanıcısı silinemez.",
-        };
-      }
-      await firebaseRemove(`users/${id}`);
-      const predictions = firebaseSnapshotToArray(
-        await firebaseRead("predictions"),
-      );
-      await Promise.all(
-        predictions
-          .filter((item) => String(item.playerId) === String(id))
-          .map((item) =>
-            firebaseRemove(
-              `predictions/${sanitizeFirebaseKey(item.id || makePredictionRecordId(item.matchId, item.playerId))}`,
-            ),
-          ),
-      );
-      return { success: true };
-    }
+    case "login": return window.SkorxAuth.login(payload.kullaniciAdi || payload.username, payload.sifre || payload.password);
+    case "addUser": return window.SkorxAuth.manage("addUser", payload);
+    case "updateUser": return window.SkorxAuth.manage("updateUser", payload);
+    case "deleteUser": return window.SkorxAuth.manage("deleteUser", payload);
     case "addMatches": {
       const rawMatches =
         typeof payload.matches === "string"
@@ -841,147 +622,8 @@ async function firebaseApiPost(action, payload = {}) {
       }
       return { success: true };
     }
-    case "savePrediction": {
-      const normalizedMatchId = String(payload.matchId || "");
-      const normalizedPlayerId = String(
-        payload.playerId || payload.kullaniciId || "",
-      );
-      const canonicalId = sanitizeFirebaseKey(
-        makePredictionRecordId(normalizedMatchId, normalizedPlayerId),
-      );
-      const requestedId = sanitizeFirebaseKey(
-        payload.predictionId || payload.id || canonicalId,
-      );
-      const id = canonicalId || requestedId;
-      let currentRecord = null;
-      let duplicatePredictionIds = [];
-
-      try {
-        const allPredictions = (await firebaseRead("predictions")) || {};
-        duplicatePredictionIds = Object.entries(allPredictions)
-          .filter(([existingId, item]) => {
-            const sameMatch =
-              String(item?.matchId || item?.localMatchId || "") ===
-              normalizedMatchId;
-            const samePlayer =
-              String(
-                item?.playerId || item?.kullaniciId || item?.userId || "",
-              ) === normalizedPlayerId;
-            return (
-              sameMatch && samePlayer && sanitizeFirebaseKey(existingId) !== id
-            );
-          })
-          .map(([existingId]) => sanitizeFirebaseKey(existingId));
-
-        currentRecord =
-          allPredictions[id] ||
-          allPredictions[requestedId] ||
-          Object.entries(allPredictions).find(([existingId, item]) => {
-            const sameMatch =
-              String(item?.matchId || item?.localMatchId || "") ===
-              normalizedMatchId;
-            const samePlayer =
-              String(
-                item?.playerId || item?.kullaniciId || item?.userId || "",
-              ) === normalizedPlayerId;
-            return sameMatch && samePlayer;
-          })?.[1] ||
-          null;
-      } catch (error) {
-        console.warn("Eski tahmin okunamadı, kayıt yine de yapılacak:", error);
-      }
-
-      const record = {
-        ...payload,
-        id,
-        predictionId: id,
-        season: payload.season || payload.sezon || "",
-        sezon: payload.sezon || payload.season || "",
-        weekNo: payload.weekNo || payload.haftaNo || "",
-        haftaNo: payload.haftaNo || payload.weekNo || "",
-        playerId: normalizedPlayerId,
-        kullaniciId: normalizedPlayerId,
-        matchId: normalizedMatchId,
-        localMatchId: normalizedMatchId,
-        homePred: payload.homePred,
-        awayPred: payload.awayPred,
-        tahminEv: payload.tahminEv ?? payload.homePred,
-        tahminDep: payload.tahminDep ?? payload.awayPred,
-        updatedAt: new Date().toISOString(),
-      };
-
-      await firebaseWrite(`predictions/${id}`, record);
-
-      for (const duplicateId of duplicatePredictionIds) {
-        if (duplicateId && duplicateId !== id) {
-          await firebaseRemove(`predictions/${duplicateId}`);
-        }
-      }
-
-      await writePredictionLogEntry({
-        actionType: currentRecord ? "update" : "create",
-        predictionId: id,
-        oldRecord: currentRecord,
-        newRecord: record,
-        payload,
-      });
-      return { success: true, id, predictionId: id };
-    }
-    case "deletePrediction": {
-      const normalizedMatchId = String(payload.matchId || "");
-      const normalizedPlayerId = String(
-        payload.playerId || payload.kullaniciId || "",
-      );
-      const id = sanitizeFirebaseKey(
-        payload.predictionId ||
-          payload.id ||
-          makePredictionRecordId(normalizedMatchId, normalizedPlayerId),
-      );
-      let currentRecord = null;
-      let idsToDelete = [id];
-      try {
-        const allPredictions = (await firebaseRead("predictions")) || {};
-        const duplicateIds = Object.entries(allPredictions)
-          .filter(([existingId, item]) => {
-            const sameMatch =
-              String(item?.matchId || item?.localMatchId || "") ===
-              normalizedMatchId;
-            const samePlayer =
-              String(
-                item?.playerId || item?.kullaniciId || item?.userId || "",
-              ) === normalizedPlayerId;
-            return sameMatch && samePlayer;
-          })
-          .map(([existingId]) => sanitizeFirebaseKey(existingId));
-        idsToDelete = Array.from(
-          new Set([...idsToDelete, ...duplicateIds]),
-        ).filter(Boolean);
-        currentRecord =
-          allPredictions[id] ||
-          duplicateIds
-            .map((duplicateId) => allPredictions[duplicateId])
-            .find(Boolean) ||
-          null;
-      } catch (error) {
-        console.warn(
-          "Silinecek tahmin okunamadı, silme yine de yapılacak:",
-          error,
-        );
-      }
-      for (const deleteId of idsToDelete) {
-        await firebaseRemove(`predictions/${deleteId}`);
-      }
-      if (currentRecord) {
-        await writePredictionLogEntry({
-          actionType: "delete",
-          predictionId: id,
-          oldRecord: currentRecord,
-          newRecord: null,
-          payload,
-        });
-      }
-      return { success: true, id };
-    }
+    case "savePrediction": return window.SkorxAuth.request("savePrediction", payload);
+    case "deletePrediction": return window.SkorxAuth.request("deletePrediction", payload);
     default:
       throw new Error(`Firebase POST aksiyonu tanımlı değil: ${action}`);
   }
@@ -1086,25 +728,9 @@ function getPlayerRole(player) {
 }
 
 function hasPanelAdminAccess(userOrPlayer) {
-  if (!userOrPlayer) return false;
-
-  const rawRole = String(
-    userOrPlayer?.rol ||
-      userOrPlayer?.role ||
-      userOrPlayer?.kullaniciRol ||
-      "user",
-  ).toLowerCase();
-  if (rawRole === "admin") return true;
-
-  const rawUsername = String(
-    userOrPlayer?.kullaniciAdi || userOrPlayer?.username || "",
-  )
-    .trim()
-    .toLowerCase();
-  if (rawUsername === "admin") return true;
-
-  return userOrPlayer?.panelAdmin === true;
+  return userOrPlayer === getAuthUser() ? window.SkorxAuth.admin : String(userOrPlayer?.rol || userOrPlayer?.role) === "admin";
 }
+
 
 function getOnlineThresholdMs() {
   return 35000;
@@ -1514,11 +1140,11 @@ function reconcileLocalMatchesWithFirebase(remoteMatches) {
 }
 
 function ensureFirebaseRealtimeBridge() {
-  if (!isFirebaseReady() || firebaseRealtimeBindingsInitialized) return;
+  if (!isFirebaseReady() || !isAuthenticated() || firebaseRealtimeBindingsInitialized) return;
   const db = getFirebaseDb();
   if (!db) return;
 
-  ["users", "matches", "predictions", "settings"].forEach((path) => {
+  (window.SkorxAuth.admin ? ["users", "matches", "predictions", "settings"] : ["users", "matches", "settings/weeksMeta", "settings/seasonsMeta", "settings/welcomeCard", "settings/teamSceneSlugs"]).forEach((path) => {
     db.ref(path).on("value", (snapshot) => {
       if (path === "matches") {
         firebaseMatchSnapshotRevision += 1;
@@ -2313,6 +1939,8 @@ function closeAppModal() {
   if (!modal) return;
   modal.classList.add("hidden");
   modal.dataset.mode = "";
+  const input=document.getElementById("appModalInput");
+  if(input?.type === "password") input.value="";
 }
 
 function resolveAppModal(payload) {
@@ -2332,6 +1960,7 @@ function openAppModal({
   cancelText = "Vazgeç",
   inputValue = "",
   inputPlaceholder = "",
+  inputType = "text",
 }) {
   const modal = document.getElementById("appModal");
   const icon = document.getElementById("appModalIcon");
@@ -2380,6 +2009,8 @@ function openAppModal({
   cancelBtn.style.display =
     type === "info" || type === "success" ? "none" : "inline-flex";
   inputWrap.style.display = type === "prompt" ? "block" : "none";
+  input.type = inputType;
+  input.autocomplete = inputType === "password" ? "new-password" : "off";
   input.value = inputValue || "";
   input.placeholder = inputPlaceholder || "";
   modal.classList.remove("hidden");
@@ -3264,6 +2895,7 @@ async function syncSeasonRegistryFromFirebase() {
 }
 
 async function persistWeekRegistryToFirebase(options = {}) {
+  if (!window.SkorxAuth.admin) return false;
   if (!isFirebaseReady()) return false;
   const localWeeksMeta = state.weeks
     .map((week) => ({
@@ -3309,6 +2941,7 @@ async function persistWeekRegistryToFirebase(options = {}) {
 }
 
 async function persistSeasonRegistryToFirebase() {
+  if (!window.SkorxAuth.admin) return false;
   if (!isFirebaseReady()) return false;
   const seasonsMeta = state.seasons
     .map((season) => ({
@@ -3334,7 +2967,7 @@ async function syncUsersFromSheet(options = {}) {
   const users = result.users.map((user) => ({
     id: String(user.id),
     name: user.adSoyad || user.kullaniciAdi || "",
-    password: user.sifre || "1234",
+
     username: user.kullaniciAdi || "",
     role:
       String(user.rol || "user").toLowerCase() === "admin" ? "admin" : "user",
@@ -3390,6 +3023,8 @@ async function sendMatchesToSheet(matches, options = {}) {
         match.macId ||
         match.id ||
         "",
+      seasonId: match.seasonId || "",
+      weekId: match.weekId || "",
       season:
         getSeasonById(match.seasonId)?.name || getActiveSeasonLabel() || "",
       sezon:
@@ -3465,7 +3100,7 @@ function ensureAuthState(stateObj) {
   stateObj.settings = stateObj.settings || {};
   stateObj.settings.auth = {
     adminUsername: "admin",
-    adminPassword: "1234",
+
     isAuthenticated: false,
     role: "admin",
     playerId: null,
@@ -3474,15 +3109,12 @@ function ensureAuthState(stateObj) {
   };
   stateObj.players = (stateObj.players || []).map((player) => ({
     ...player,
-    password: player.password || "1234",
+
     panelAdmin: player.panelAdmin === true,
   }));
 }
 
-function getCurrentRole() {
-  if (hasPanelAdminAccess(getAuthUser())) return "admin";
-  return state.settings?.auth?.role === "user" ? "user" : "admin";
-}
+function getCurrentRole() { return window.SkorxAuth.admin ? "admin" : "user"; }
 
 function getCurrentPlayerId() {
   const value = state.settings?.auth?.playerId;
@@ -3496,7 +3128,7 @@ function getCurrentPlayer() {
 }
 
 function isAuthenticated() {
-  return !!state.settings?.auth?.isAuthenticated;
+  return window.SkorxAuth.ready && !!state.settings?.auth?.isAuthenticated;
 }
 
 function setCurrentRole(role) {
@@ -3774,9 +3406,10 @@ function upsertLocalPredictionRecord({
 
 function resolveMatchIdFromOnlineRow(row) {
   const directMatchCandidates = [
+    row.sheetMatchId,
+    row.remoteMatchId,
     row.matchId,
     row.localMatchId,
-    row.sheetMatchId,
     row.macId,
     row.match_id,
     row.eventId,
@@ -3785,6 +3418,7 @@ function resolveMatchIdFromOnlineRow(row) {
     .map((value) => String(value));
 
   if (directMatchCandidates.length) {
+    for (const candidate of directMatchCandidates) {
     const directMatch = state.matches.find((item) => {
       const candidates = [
         item.id,
@@ -3796,11 +3430,10 @@ function resolveMatchIdFromOnlineRow(row) {
           (value) => value !== null && value !== undefined && value !== "",
         )
         .map((value) => String(value));
-      return directMatchCandidates.some((candidate) =>
-        candidates.includes(candidate),
-      );
+      return candidates.includes(candidate);
     });
     if (directMatch) return String(directMatch.id);
+    }
   }
 
   const seasonLabel =
@@ -4549,58 +4182,7 @@ function toggleMobileAdminMenu(forceOpen = null) {
   trigger?.classList.toggle("is-open", willOpen);
 }
 
-async function changeOwnPassword() {
-  if (!isAuthenticated() || getCurrentRole() === "admin") return;
-  const player = getCurrentPlayer();
-  if (!player) return;
-  const password = await showPrompt(
-    "Yeni şifreni yaz:",
-    player.password || "1234",
-    {
-      title: "Şifre değiştir",
-      placeholder: "Örn: 1234",
-    },
-  );
-  if (!password?.trim()) return;
-
-  if (useOnlineMode) {
-    try {
-      const result = await updateOnlineUser({
-        id: player.id,
-        sifre: password.trim(),
-      });
-      if (!result?.success) {
-        showAlert(result?.message || "Şifre güncellenemedi.", {
-          title: "Kayıt Hatası",
-          type: "warning",
-        });
-        return;
-      }
-      await syncUsersFromSheet();
-    } catch (error) {
-      console.error("Kendi şifre güncelleme hatası:", error);
-      showAlert(error?.message || "Şifre güncellenemedi.", {
-        title: "Kayıt Hatası",
-        type: "warning",
-      });
-      return;
-    }
-  } else {
-    player.password = password.trim();
-  }
-
-  if (currentSessionUser) currentSessionUser.password = password.trim();
-  if (state?.settings?.auth?.user)
-    state.settings.auth.user.password = password.trim();
-  saveState(true);
-  updateSessionCard();
-  closeAccountMenus();
-  renderAll();
-  showAlert("Şifren başarıyla güncellendi.", {
-    title: "İşlem tamam",
-    type: "success",
-  });
-}
+async function changeOwnPassword() { return window.SkorxAuth.changeOwn(); }
 
 function clearLoginErrorState() {
   const status = document.getElementById("loginStatus");
@@ -4720,6 +4302,12 @@ function closeLoginOverlay() {
   updateAdminSyncToggleButton();
 }
 function logoutUser() {
+  window.SkorxAuth.signOut().catch(() => {});
+  state.predictions = [];
+  const db = getFirebaseDb();
+  for (const path of ["users", "matches", "predictions", "settings", "settings/weeksMeta", "settings/seasonsMeta", "settings/welcomeCard", "settings/teamSceneSlugs", "presence"]) db?.ref(path).off();
+  firebaseRealtimeBindingsInitialized = false;
+  firebaseLatestMatchSnapshot = null;
   if (typeof window.resetDataManagement === "function") window.resetDataManagement();
   closeAccountMenus();
   if (typeof stopIdleLogoutTimer === "function") stopIdleLogoutTimer();
@@ -4817,6 +4405,8 @@ async function loginUser() {
     state.settings.auth.isAuthenticated = true;
     state.settings.auth.role = role;
     setAuthenticatedUser(nextUser);
+    ensureFirebaseRealtimeBridge();
+    window.SkorxAuth.startPoll();
     forceDefaultLandingAfterLogin("login-before-hydration");
 
     setLoginFeedback(
@@ -6483,7 +6073,7 @@ if (currentSessionUser && !state.settings?.auth?.playerId) {
 }
 
 function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(window.SkorxAuth.scrub(state)));
 }
 
 let predictionIndexCache = null;
@@ -8581,8 +8171,8 @@ function renderPlayers() {
           if (getPlayerRole(player) === "admin") return "";
           const isAdminUser = getPlayerRole(player) === "admin";
           const presence = getPresenceStatusForUser(player.id);
-          const statusClass = presence.isOnline ? "is-online" : "is-offline";
-          const statusText = presence.isOnline ? "Online" : "Offline";
+          const statusClass = player.aktif === false ? "is-offline" : presence.isOnline ? "is-online" : "is-offline";
+          const statusText = player.aktif === false ? "Hesap pasif" : presence.isOnline ? "Aktif · Online" : "Aktif · Offline";
           const lastSeenText = presence.lastSeen
             ? formatAdminPanelDateTime(presence.lastSeen)
             : "Henüz giriş yok";
@@ -8707,8 +8297,8 @@ function buildPlayerDetailModalContent(player) {
         : `<div class="player-empty-seasons">Önce sezon ekle. Sezonlar oluştukça burada kutular çıkacak.</div>`;
 
   const presence = getPresenceStatusForUser(player.id);
-  const statusClass = presence.isOnline ? "is-online" : "is-offline";
-  const statusText = presence.isOnline ? "Online" : "Offline";
+  const statusClass = player.aktif === false ? "is-offline" : presence.isOnline ? "is-online" : "is-offline";
+  const statusText = player.aktif === false ? "Hesap pasif" : presence.isOnline ? "Aktif · Online" : "Aktif · Offline";
   const supportedTeam = getPlayerSupportedTeamName(player);
   const teamSelectorOptions = buildPlayerSupportedTeamOptions(player);
 
@@ -8765,7 +8355,7 @@ function buildPlayerDetailModalContent(player) {
               ? `
           <div class="player-stat-pill">
             <span class="player-stat-label">Şifre</span>
-            <strong>${escapeHtml(player.password || "1234")}</strong>
+            <strong>Görüntülenemez</strong>
           </div>
           `
               : ""
@@ -8810,10 +8400,10 @@ function buildPlayerDetailModalContent(player) {
           isAdminMode
             ? `
           <button class="small secondary" onclick="renamePlayer('${player.id}', this)">Düzenle</button>
-          <button class="small secondary" onclick="changePlayerPassword('${player.id}', this)">Ş. Değiştir</button>
-          ${isAdminUser ? "" : `<button class="small secondary" onclick="togglePanelAdmin('${player.id}', this)">${player.panelAdmin ? "Admin Yetkisini Kaldır" : "Admin Yap"}</button>`}
+          <button class="small secondary" onclick="changePlayerPassword('${player.id}', this)">Geçici Şifre Ver</button>
+
           ${isAdminUser ? "" : `<button class="small secondary" onclick="forceLogoutUserSession('${player.id}', this)">Sistemden At</button>`}
-          ${isAdminUser ? "" : `<button class="small danger" onclick="removePlayer('${player.id}', this)">Sil</button>`}
+          ${isAdminUser ? "" : player.aktif === false ? `<button class="small secondary" onclick="activatePlayer('${player.id}', this)">Aktifleştir</button>` : `<button class="small danger" onclick="removePlayer('${player.id}', this)">Pasifleştir</button>`}
         `
             : isOwnUserProfile
               ? `
@@ -9128,65 +8718,34 @@ window.togglePanelAdmin = async function (id, buttonOrEvent) {
   setAsyncButtonState(actionButton, "success", { success: "Kaydedildi" });
 };
 
-window.changePlayerPassword = async function (id, buttonOrEvent) {
-  const actionButton = getActionButtonFromArg(buttonOrEvent);
+window.changePlayerPassword = async function (id) {
+  if (getCurrentRole() !== "admin") return changeOwnPassword();
   const player = getPlayerById(id);
-  if (!player) return;
-  if (!canManagePlayerProfile(player))
-    return showAlert("Sadece kendi şifreni değiştirebilirsin.", {
-      title: "Yetki yok",
-      type: "warning",
-    });
-  const password = await showPrompt(
-    "Yeni kullanıcı şifresini yaz:",
-    player.password || "1234",
-    {
-      title: "Şifre değiştir",
-      placeholder: "Örn: 1234",
-    },
-  );
-  if (!password?.trim()) return;
-
-  if (useOnlineMode) {
-    setAsyncButtonState(actionButton, "loading", {
-      loading: "Kaydediliyor...",
-      success: "Kaydedildi",
-    });
-    try {
-      const result = await updateOnlineUser({
-        id: player.id,
-        sifre: password.trim(),
-      });
-      if (!result?.success) {
-        showAlert(result?.message || "Şifre güncellenemedi.", {
-          title: "Kayıt Hatası",
-          type: "warning",
-        });
-        setAsyncButtonState(actionButton, "error", { error: "Hata" });
-        return;
-      }
-      await syncUsersFromSheet();
-      renderAll();
-      refreshPlayerDetailModal();
-      setAsyncButtonState(actionButton, "success", { success: "Kaydedildi" });
-      return;
-    } catch (error) {
-      console.error("Şifre güncelleme hatası:", error);
-      showAlert(error?.message || "Firebase güncellemesi başarısız.", {
-        title: "Kayıt Hatası",
-        type: "warning",
-      });
-      setAsyncButtonState(actionButton, "error", { error: "Hata" });
-      return;
-    }
-  }
-
-  player.password = password.trim();
-  saveState();
-  renderAll();
-  refreshPlayerDetailModal();
-  setAsyncButtonState(actionButton, "success", { success: "Kaydedildi" });
+  if (!player || String(player.role) === "admin") return;
+  if (!(await showConfirm(`${player.name} için yeni geçici şifre oluşturulsun mu? Mevcut oturumları kapatılacak.`, {title:"Geçici şifre ver"}))) return;
+  try { await window.SkorxAuth.manage("updateUser", {id, resetPassword:true}); }
+  catch (error) { await showAlert(error.message); }
 };
+
+window.activatePlayer = async function (id, buttonOrEvent) {
+  if (getCurrentRole() !== "admin") return showAlert("Bu işlem için admin girişi gerekiyor.");
+  const player = getPlayerById(id);
+  if (!player || getPlayerRole(player) === "admin" || player.aktif !== false) return;
+  if (!(await showConfirm(`${player.name} hesabı yeniden aktifleştirilsin mi? Mevcut şifresi, tahminleri ve puanları korunacak.`, {title:"Hesabı aktifleştir", confirmText:"Aktifleştir"}))) return;
+  const button = getActionButtonFromArg(buttonOrEvent);
+  setAsyncButtonState(button, "loading", {loading:"Aktifleştiriliyor..."});
+  try {
+    const result = await window.SkorxAuth.manage("updateUser", {id:player.id, aktif:true});
+    if (!result?.success) throw new Error(result?.message || "Hesap aktifleştirilemedi.");
+    player.aktif = true;
+    await syncUsersFromSheet();
+    renderAll();refreshPlayerDetailModal();
+  } catch (error) {
+    setAsyncButtonState(button, "error", {error:"Tekrar dene"});
+    await showAlert(error.message || "Hesap aktifleştirilemedi.");
+  }
+};
+
 window.removePlayer = async function (id, buttonOrEvent) {
   if (isReadOnlyMode())
     return showAlert("Kullanıcı görünümünde kişi silinemez.", {
@@ -9204,38 +8763,35 @@ window.removePlayer = async function (id, buttonOrEvent) {
   }
   if (
     !(await showConfirm(
-      `${player.name} kaydını ve tüm tahminlerini silmek istiyor musun?`,
-      { title: "Kişi silinsin mi?", type: "danger", confirmText: "Sil" },
+      `${player.name} hesabını pasifleştirmek istiyor musun? Tahminleri ve puanları korunacak.`,
+      { title: "Hesap pasifleştirilsin mi?", type: "danger", confirmText: "Pasifleştir" },
     ))
   )
     return;
 
   if (useOnlineMode) {
     setAsyncButtonState(actionButton, "loading", {
-      loading: "Siliniyor...",
-      success: "Silindi",
+      loading: "Pasifleştiriliyor...",
+      success: "Pasifleştirildi",
     });
     try {
       const result = await deleteOnlineUser({ id: player.id });
       if (!result?.success) {
-        showAlert(result?.message || "Kullanıcı silinemedi.", {
+        showAlert(result?.message || "Hesap pasifleştirilemedi.", {
           title: "Kayıt Hatası",
           type: "warning",
         });
         setAsyncButtonState(actionButton, "error", { error: "Hata" });
         return;
       }
-      state.predictions = state.predictions.filter(
-        (p) => String(p.playerId) !== String(id),
-      );
       await syncUsersFromSheet();
       renderAll();
       refreshPlayerDetailModal();
-      setAsyncButtonState(actionButton, "success", { success: "Silindi" });
+      setAsyncButtonState(actionButton, "success", { success: "Pasifleştirildi" });
       return;
     } catch (error) {
       console.error("Kullanıcı silme hatası:", error);
-      showAlert(error?.message || "Firebase silme işlemi başarısız.", {
+      showAlert(error?.message || "Hesap pasifleştirilemedi.", {
         title: "Kayıt Hatası",
         type: "warning",
       });
@@ -9251,7 +8807,7 @@ window.removePlayer = async function (id, buttonOrEvent) {
   saveState();
   renderAll();
   refreshPlayerDetailModal();
-  setAsyncButtonState(actionButton, "success", { success: "Silindi" });
+  setAsyncButtonState(actionButton, "success", { success: "Pasifleştirildi" });
 };
 
 /* 03-management-ui.js */
@@ -10182,10 +9738,7 @@ window.forceLogoutUserSession = async function (playerId) {
     return;
 
   try {
-    await firebaseUpdate(`users/${sanitizeFirebaseKey(player.id)}`, {
-      forcedLogoutAt: new Date().toISOString(),
-    });
-    await firebaseRemove(`presence/${sanitizeFirebaseKey(player.id)}`);
+    await window.SkorxAuth.request("forceLogout", {id:player.id});
     showAlert(`${player.name} sistemden çıkarıldı.`, {
       title: "İşlem tamamlandı",
       type: "success",
@@ -16099,7 +15652,7 @@ function addPlayer(buttonOrEvent) {
   const passwordInput = document.getElementById("playerPassword");
   const supportedTeamInput = document.getElementById("playerSupportedTeam");
   const name = input?.value?.trim() || "";
-  const password = passwordInput?.value?.trim() || "1234";
+  const password = passwordInput?.value || "";
   const supportedTeam = supportedTeamInput?.value?.trim() || "";
   if (!name)
     return showAlert("Kişi adı boş olamaz.", {
@@ -16144,7 +15697,7 @@ async function addUserOnline(player, actionButton = null) {
   try {
     const result = await addOnlineUser({
       kullaniciAdi: normalizeLoginName(player.name),
-      sifre: player.password || "1234",
+      sifre: player.password || "",
       adSoyad: player.name,
       seasonStates: player.seasonStates || createDefaultSeasonStateMap(true),
       supportedTeam: player.supportedTeam || "",
@@ -16494,7 +16047,7 @@ function forceExcelText(value) {
   return `="${text.replace(/"/g, '""')}"`;
 }
 function serializeStateForBackup(stateObj = state) {
-  return JSON.parse(JSON.stringify(stateObj));
+  return window.SkorxAuth.scrub(JSON.parse(JSON.stringify(stateObj)));
 }
 
 function buildFullBackupPayload() {
@@ -16706,7 +16259,8 @@ async function restoreFirebaseSeasonBackupData(firebaseData) {
   const writeRows = async (path, rows) => {
     const entries = Object.entries(backupArrayToFirebaseMap(rows));
     for (const [key, value] of entries) {
-      await firebaseWrite(`${path}/${key}`, value);
+      if (path === "users") continue;
+      await firebaseWrite(`${path}/${key}`, window.SkorxAuth.scrub(value));
     }
   };
 
@@ -16836,7 +16390,7 @@ async function syncBackupStateToFirebase(stateObj) {
     usersMap[id] = {
       id,
       kullaniciAdi: normalizeLoginName(player.username || player.name || id),
-      sifre: String(player.password || "1234"),
+
       adSoyad: String(player.name || player.username || id)
         .trim()
         .toUpperCase(),
@@ -16906,7 +16460,7 @@ async function syncBackupStateToFirebase(stateObj) {
   });
 
   await Promise.all([
-    firebaseWrite("users", usersMap),
+    Promise.resolve(), // Auth users are managed separately; preserve their identities.
     firebaseWrite("matches", matchesMap),
     firebaseWrite("predictions", predictionsMap),
     firebaseUpdate("settings", {
@@ -18895,6 +18449,14 @@ async function bootstrapApplication() {
   window.__fiksturAppBootstrapPromise = (async () => {
     try {
       await initializeFirebaseOnce();
+      const verified = await window.SkorxAuth.init();
+      clearRememberedSession();
+      state.predictions = [];
+      if (verified && !verified.mustChangePassword) {
+        setAuthenticatedUser(verified.user);
+        state.settings.auth.isAuthenticated = true;
+        state.settings.auth.role = verified.user.rol;
+      }
       await ensureFirebaseDefaults();
       ensureFirebaseRealtimeBridge();
     } catch (error) {
@@ -18915,6 +18477,7 @@ async function bootstrapApplication() {
     }
 
     bindEvents();
+    window.SkorxAuth.bind();
     ensureHeaderSyncButtons();
     ensureAvatarDirectoryReady();
 
@@ -19375,7 +18938,7 @@ async function cleanupDuplicateFiksturFcmTokens(
   token,
   owner,
 ) {
-  if (!token || !currentDeviceKey || !isFirebaseReady?.()) return;
+  if (!window.SkorxAuth.admin || !token || !currentDeviceKey || !isFirebaseReady?.()) return;
 
   try {
     const rows =
@@ -19509,6 +19072,7 @@ async function saveFiksturFcmTokenToFirebase(token) {
 
   const payload = {
     token,
+    authUid: window.firebase.auth().currentUser.uid,
     previousToken:
       previousToken && previousToken !== token ? previousToken : null,
     deviceId: safeDeviceKey,
@@ -19520,16 +19084,7 @@ async function saveFiksturFcmTokenToFirebase(token) {
   };
 
   try {
-    if (typeof firebaseUpdate === "function") {
-      await firebaseUpdate(`fcmTokens/${safeDeviceKey}`, payload);
-    } else if (window.firebase?.database) {
-      await window.firebase
-        .database()
-        .ref(`fcmTokens/${safeDeviceKey}`)
-        .update(payload);
-    } else {
-      throw new Error("Firebase Database kayıt fonksiyonu bulunamadı.");
-    }
+    await window.SkorxAuth.request("registerFcmToken", payload);
 
     await cleanupDuplicateFiksturFcmTokens(safeDeviceKey, token, owner);
     localStorage.setItem(PREDICTION_NOTIFICATION_FCM_TOKEN_KEY, token);

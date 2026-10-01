@@ -1,0 +1,8 @@
+node_modules/
+public/
+.env
+.env.*
+!.env.example
+*-debug.log
+*.zip
+service-account*.json

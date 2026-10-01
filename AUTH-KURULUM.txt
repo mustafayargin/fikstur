@@ -1,0 +1,132 @@
+SKORX — FIREBASE AUTHENTICATION GEÇİŞİ
+Admin Google hesabı: mustafayargin@gmail.com
+Bu paket henüz canlıya uygulanmadı. Kod, rules ve geçiş aracı birlikte kurulmalıdır.
+Realtime Database korunur; Firestore'a taşınmaz.
+
+1. İLK ADIM: FIREBASE AUTHENTICATION
+Firebase Console > mevcut proje > Authentication > Sign-in method.
+Google sağlayıcısını açın; destek e-postası olarak kendi Gmail'inizi seçin.
+Email/Password sağlayıcısını da açın. Email link seçeneğine gerek yok.
+Authentication > Settings > Authorized domains içine skorx.vercel.app ekleyin.
+Test dağıtımının alan adını da ekleyin. Gmail şifrenizi uygulamaya yazmayın.
+Bu adım eski giriş sistemini tek başına değiştirmez veya mevcut açığı kapatmaz.
+
+2. YEDEK VE AYRI TEST
+Realtime Database > Export JSON ile yedek alın. Yedeği GitHub'a veya public klasörüne
+koymayın: eski yedek düz metin şifre içerir. Mevcut GitHub sürümünü de saklayın.
+Önce ayrı Firebase test projesi ve Vercel test dağıtımı önerilir. Test projesinde
+index.html ve firebase-messaging-sw.js Firebase config değerlerini test projesine
+uyarlayın; sunucu ve migration database URL'si de aynı test projesini göstermelidir.
+Google ve Email/Password sağlayıcılarını test projesinde de açın.
+Test projesinde gerçek şifreleri kullanmayın; örnek kullanıcı/maç/tahmin verileri kullanın.
+Paketin .github/workflows/auth-migration.yml dosyası CANLI database URL'sini içerir.
+Test projesinde o URL'yi değiştirmeden workflow'u çalıştırmayın.
+
+3. VERCEL SUNUCU AYARLARI
+Proje artık sadece statik dosyalardan oluşmuyor; api/account.js sunucu fonksiyonudur.
+Vercel Framework Preset: Other. Build: npm run build. Output directory: public.
+Node.js: 22 veya desteklenen daha yeni sürüm. package-lock.json dosyasını da yükleyin.
+Vercel > Settings > Environment Variables:
+- FIREBASE_SERVICE_ACCOUNT: ilgili Firebase projesinin service account JSON içeriği.
+  Mevcut GitHub bildirim işinde kullanılan yetkili hesap kullanılabilir.
+  Bu içeriği yalnızca platformun gizli değişken alanına koyun. Bana göndermeyin,
+  kaynak koda, index.html'e veya public klasörüne eklemeyin.
+- FIREBASE_DATABASE_URL: ilgili Realtime Database URL'si.
+- APP_ORIGINS: izinli site kökleri, virgülle ayrılır, sonuna / konmaz.
+  Canlı örnek: https://skorx.vercel.app
+  Preview için test dağıtımının tam https://...vercel.app kökünü ekleyin.
+Değişkenler Preview/Production ortamına doğru atanmalı; değişince redeploy gerekir.
+vercel.json ve scripts/build.cjs yalnızca tarayıcı dosyalarını public içine kopyalar.
+api/, server/, scripts/, .env ve yedekler public içine kopyalanmaz.
+
+4. ADMIN HESABINI OLUŞTURMA
+Yeni TEST/PREVIEW dağıtımındaki "Admin — Google ile giriş yap" düğmesinden
+mustafayargin@gmail.com ile bir kez giriş deneyin. Henüz yetki tanımlanmadığı için
+"Bu hesap uygulamaya yetkili değil" mesajı normaldir. Authentication içinde
+Google hesabının oluştuğunu kontrol edin. Bu işlem kendi başına admin yetkisi vermez.
+
+5. DRY-RUN: HENÜZ VERİ DEĞİŞMEZ
+Realtime Database users düğümünde eski admin kaydının ANAHTARINI belirleyin.
+Ekranda görünen isimle kayıt anahtarı aynı olmak zorunda değil.
+GitHub'a yeni workflow dosyası eklendikten sonra Actions > Authentication Migration.
+adminPlayerId: eski admin kayıt anahtarı. mode: dry-run. Çalıştırın.
+GitHub Secrets içindeki FIREBASE_SERVICE_ACCOUNT bu işlem için gereklidir.
+Araç Google hesabını, kayıt anahtarını ve çakışan kullanıcı adlarını kontrol eder.
+Dry-run kullanıcı, şifre, yetki veya tahmin kaydı değiştirmez.
+Yerel alternatif: npm ci; .env.example'daki değerleri terminal ortamında gizlice
+ayarlayın; npm run auth:migrate -- --admin-player-id ADMIN_KAYIT_ANAHTARI
+.env.example otomatik yüklenmez; servis hesabının gerçek içeriğini commit etmeyin.
+
+6. CANLI GEÇİŞ: SIRAYI DEĞİŞTİRMEYİN
+Önce test projesinde bütün akışı tamamlayın; sonra kısa bakım zamanı belirleyin.
+- Kullanıcılara geçiş sırasında giriş/tahmin işlemlerine ara vermelerini bildirin.
+- Güncel JSON yedeğini ve GitHub sürümünü tekrar alın; kullanıcı/maç/tahmin sayılarını kaydedin.
+- CANLI Realtime Database rules'u geçici olarak tamamen kapatın:
+  {"rules":{".read":false,".write":false}}
+  Bu sırada eski uygulama çalışmaz. Admin SDK geçiş aracı çalışabilir.
+  Böylece geçiş sırasında açık rules üzerinden kayıt değiştirilmesini engelleriz.
+- Authentication Migration workflow: doğru adminPlayerId, mode=apply,
+  backupConfirmed=true. Bu kutu yedek ve bakım yapıldığı anlamına gelir.
+- Geçiş aracı kullanıcı ve tahmin kimliklerini korur. Admin Google UID ile,
+  diğerleri deterministik Auth UID ile eşleştirilir. Eski şifreler kullanılmaz.
+  Rastgele bilinmeyen başlangıç şifreleri oluşturulur; panelden yeni geçici şifre verilir.
+  Kullanıcı kayıtları ve çöp kutusundaki düz metin şifre alanları temizlenir.
+  Araç ikinci kez apply çalıştırılmasını engeller. Kısmi hata halinde bakımda kalın;
+  hata sebebini düzeltmeden final rules veya canlı erişim açmayın.
+- Başarılı geçişten sonra database.rules.json içeriğini CANLI rules olarak yayınlayın.
+  rules-indexes.json aynı güvenli kuralları içerir; eski açık rules'u kullanmayın.
+- Yeni kodu Vercel Production'a yayınlayın. Google oturumunu kapatıp yeniden açın;
+  yeni admin claim'inin alınması gerekir.
+- Admin hesabından eski kullanıcıları, maçları, tahminleri ve puanları karşılaştırın.
+- Kişiler > kullanıcı kartı > Geçici Şifre Ver. Her arkadaşınıza ayrı şifreyi özel iletin.
+  İlk girişte kullanıcı en az 12 karakterlik kendi şifresini belirler; ardından yeniden girer.
+
+7. HESAP DAVRANIŞI
+Admin: Google girişi; uygulama Google şifresini almaz.
+Kullanıcı: eski kullanıcı adı + uygulama şifresi. Arka plandaki @accounts.skorx.invalid
+adresleri posta kutusu değildir; Gmail/Hotmail açmak gerekmez. E-postayla kurtarma yoktur.
+Şifre unutulursa admin aynı hesaba yeni geçici şifre verir. Tahmin ve puanlar korunur.
+Admin mevcut şifreyi göremez. Üretilen geçici şifre o işlemde bir kez gösterilir.
+Şifre alanı boş bırakılarak yeni kullanıcı oluşturulursa şifre otomatik üretilir.
+Kişiler'deki Pasifleştir hesabı durdurur; tahminleri silmez.
+Veri Yönetimi > Kullanıcılar bölümünden tekrar aktifleştirilebilir.
+"Sistemden At" eski oturumları sunucuda geçersizleştirir.
+Admin Yap düğmesi kaldırıldı; yetki client/localStorage üzerinden dağıtılmaz.
+
+8. TEST LİSTESİ
+PC: Google admin. Telefon: normal kullanıcı.
+- Kullanıcı kendi tahminini kaydetsin; başka kullanıcının tahminini değiştiremesin.
+- Admin skor güncellesin; maç eklesin; Veri Yönetimi'nden silip geri yüklesin.
+- Tahmin kilidi, manuel hafta açma ve sezon katılımı çalışsın.
+- Şifre sıfırla: eski şifre/oturum çalışmasın; yeni geçici şifre ilk girişte değişsin.
+- Pasifleştir: hesap erişimi kesilsin; tekrar aktif olduğunda tahminler korunsun.
+- Bildirim izni/token kaydı ve GitHub otomatik/manuel bildirim işi kontrol edilsin.
+- Gizli tahminler normal kullanıcıya sunucudan erken gönderilmesin.
+- Oturumsuz /users.json ve /predictions.json istekleri Permission denied dönsün.
+- LocalStorage rolünü admin yapma sunucuda yetki kazandırmasın.
+Normal kullanıcı tahmin eşitlemesi yaklaşık 3 saniyelik sorguyla yapılır; maç/skor
+ve hafta verileri Realtime Database dinleyicileriyle eşitlenir. Sekme arka plandayken
+sorgulama durur. Bu pakette tahminler için sıfır gecikme garantisi verilmez.
+Google gerçek giriş ve Vercel üretim fonksiyonu, kurulum sonrası ayrıca doğrulanmalıdır.
+
+9. GERİ DÖNÜŞ
+Eski uygulama kodu + eski açık rules ile geri dönmek güvenlik açığını yeniden açar.
+Sorun olursa bakımda kalın ve güvenli kodu düzeltin. Authentication kayıtları ile
+Realtime Database ayrı sistemlerdir; yalnız JSON geri yüklemek Auth'u geri almaz.
+Eski yedeği yeni sistemin üzerine doğrudan yüklemeyin: plaintext şifre ve eski
+UID eşleştirmelerini tekrar getirebilir. Tahmin/maç kurtarması kontrollü yapılmalıdır.
+
+10. YEREL DOĞRULAMA
+npm ci
+npm test
+npm run build
+Rules emülatör testi (yalnız demo proje):
+npm install --no-save firebase-tools@14 @firebase/rules-unit-testing firebase
+npx firebase emulators:exec --only database --project demo-skorx --config firebase.test.json "node tests/rules.emulator.cjs"
+Java gerekir. Test kodu gerçek Firebase'e bağlanmaz.
+
+Resmi belgeler:
+https://firebase.google.com/docs/auth/admin/manage-users
+https://firebase.google.com/docs/auth/admin/custom-claims
+https://firebase.google.com/docs/database/security
+https://vercel.com/docs/functions/runtimes/node-js

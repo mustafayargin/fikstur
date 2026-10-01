@@ -328,7 +328,7 @@
     if(hasPanelAdminAccess(value))throw new Error('Admin hesapları bu ekrandan pasife alınamaz.');
     const active=value.aktif===false;
     if(!(await showConfirm(`${userLabel(value)} ${active?'aktifleştirilecek':'pasife alınacak'}. Geçmiş tahminleri korunacak.`,{title:'Kullanıcı durumu',confirmText:active?'Aktifleştir':'Pasife al'})))return;
-    await updateRecord(`users/${key}`,value,{...value,aktif:active,updatedAt:new Date().toISOString()});
+    await window.SkorxAuth.manage('updateUser',{id:key,aktif:active});
     audit('data_user_status',`${userLabel(value)}: ${active?'aktif':'pasif'}.`);model.note='Kullanıcı durumu güncellendi.';await afterMutation();
   }
   async function updateRecord(path,expected,next) {

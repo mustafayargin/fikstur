@@ -1,0 +1,7 @@
+#googleAdminLoginBtn{margin-top:12px;min-height:46px;background:#fff;color:#182536;border:1px solid #c9d3df;font-weight:700;width:100%}
+#googleAdminLoginBtn:disabled{opacity:.6}
+.secure-login-note{font-size:13px;line-height:1.5;color:#a8bad0;margin:10px 0 0}
+#appModalInput[type=password]{font-size:16px}
+#appModal{z-index:100001!important}
+
+.password-setup-overlay{position:fixed;inset:0;z-index:100000;background:#000b;display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto}.password-setup-card{width:100%;max-width:440px;max-height:calc(100dvh - 40px);overflow:auto;background:#171b24;color:#fff;padding:24px;border:1px solid #454b5b;border-radius:18px;box-sizing:border-box}.password-setup-card h2{margin:0 0 12px}.password-setup-card p{line-height:1.5}.password-setup-card label{display:block;margin:16px 0 8px}.password-setup-field{display:flex;gap:8px}.password-setup-field input{min-width:0;width:100%;padding:12px;font-size:16px;background:#10141c;color:#fff;border:1px solid #647084;border-radius:8px}.password-setup-card button{padding:12px;border-radius:8px;border:1px solid #647084;cursor:pointer;font-size:15px}.password-setup-field button{min-width:48px;background:#293241;color:#fff}.password-setup-card>button{display:block;width:100%;margin-top:12px}.password-setup-card button[type=submit]{background:#e61d45;color:#fff}.password-setup-card button:disabled{opacity:.5;cursor:default}#passwordSetupStatus{min-height:24px;color:#ffc2c2}#passwordSetupStatus[data-valid=true]{color:#83e8aa}
