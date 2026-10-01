@@ -44,21 +44,72 @@
     return openAppModal({type:'prompt',title,message,inputValue:'',inputPlaceholder:'En az 8 karakter',inputType:'password'});
   }
   async function finishPasswordChange(result) {
-    if(!result.mustChangePassword)return true;
-    const next=await passwordPrompt('Geçici şifrenizi kullanmaya devam edemezsiniz. Kendinize en az 8 karakterlik yeni bir şifre belirleyin.');
-    if(!next){await signOut();return false;}
-    if(next.length<8){await showAlert('Şifre en az 8 karakter olmalı.');return finishPasswordChange(result);}
-    const repeat=await passwordPrompt('Yeni şifrenizi tekrar yazın.');
-    if(next!==repeat){await showAlert('Şifreler eşleşmedi.');return finishPasswordChange(result);}
-    await request('changePassword',{password:next});
-    await signOut();await showAlert('Şifreniz değişti. Yeni şifrenizle giriş yapın.');return false;
+    if(!result.mustChangePassword)return result;
+    const email=auth().currentUser.email;
+    const previousFocus=document.activeElement;
+    return new Promise(resolve=>{
+      const overlay=document.createElement('div');overlay.className='password-setup-overlay';
+      overlay.innerHTML=`<form class="password-setup-card" role="dialog" aria-modal="true" aria-labelledby="passwordSetupTitle">
+        <h2 id="passwordSetupTitle">Kendi şifrenizi oluşturun</h2>
+        <p>En az 8 karakter kullanın. Kaydettikten sonra uygulama açılacak.</p>
+        <label for="passwordSetupNew">Yeni şifre</label>
+        <div class="password-setup-field"><input id="passwordSetupNew" type="password" autocomplete="new-password" minlength="8" maxlength="128" required><button type="button" data-eye="passwordSetupNew" aria-label="Şifreyi göster" aria-pressed="false">◉</button></div>
+        <label for="passwordSetupRepeat">Şifre tekrarı</label>
+        <div class="password-setup-field"><input id="passwordSetupRepeat" type="password" autocomplete="new-password" minlength="8" maxlength="128" required><button type="button" data-eye="passwordSetupRepeat" aria-label="Şifreyi göster" aria-pressed="false">◉</button></div>
+        <p id="passwordSetupStatus" role="status" aria-live="polite"></p>
+        <button id="passwordSetupSave" type="submit" disabled>Şifreyi kaydet ve devam et</button>
+        <button id="passwordSetupCancel" type="button">Vazgeç</button>
+      </form>`;
+      document.body.appendChild(overlay);
+      const form=overlay.querySelector('form'),first=overlay.querySelector('#passwordSetupNew'),repeat=overlay.querySelector('#passwordSetupRepeat'),status=overlay.querySelector('#passwordSetupStatus'),save=overlay.querySelector('#passwordSetupSave'),cancel=overlay.querySelector('#passwordSetupCancel');
+      let saving=false,saved=false;
+      const finish=value=>{first.value='';repeat.value='';overlay.remove();previousFocus?.focus();resolve(value);};
+      const validate=()=>{
+        const valid=first.value.length>=8 && first.value.length<=128 && first.value===repeat.value;
+        save.disabled=saving||!valid;
+        status.textContent=!first.value&&!repeat.value?'':first.value.length<8?'Şifre en az 8 karakter olmalı.':!repeat.value?'Şifrenizi tekrar yazın.':valid?'Şifreler eşleşiyor ✓':'Şifreler eşleşmiyor.';
+        status.dataset.valid=String(valid);
+      };
+      first.addEventListener('input',validate);repeat.addEventListener('input',validate);
+      overlay.querySelectorAll('[data-eye]').forEach(button=>button.addEventListener('click',()=>{
+        const input=overlay.querySelector('#'+button.dataset.eye),visible=input.type==='password';
+        input.type=visible?'text':'password';button.setAttribute('aria-pressed',String(visible));button.setAttribute('aria-label',visible?'Şifreyi gizle':'Şifreyi göster');
+      }));
+      cancel.addEventListener('click',async()=>{if(!saving){await signOut();finish(null);}});
+      form.addEventListener('submit',async event=>{
+        event.preventDefault();if(saving||save.disabled)return;
+        saving=true;save.disabled=true;cancel.disabled=true;first.readOnly=true;repeat.readOnly=true;
+        status.textContent=saved?'Oturum açılıyor…':'Şifreniz kaydediliyor…';
+        try{
+          if(!saved){await request('changePassword',{password:first.value});saved=true;}
+          // Revoked tokens use second precision. A fresh sign-in must occur after the cutoff.
+          await new Promise(r=>setTimeout(r,1100));
+          await auth().signInWithEmailAndPassword(email,first.value);
+          const fresh=await request('session');
+          if(fresh.mustChangePassword)throw new Error('Şifre değişikliği doğrulanamadı.');
+          finish(fresh);
+        }catch(error){
+          status.textContent=saved?'Şifreniz kaydedildi, ancak oturum açılamadı. Devam etmek için yeniden deneyin.':error.message||'Şifre kaydedilemedi.';
+          if(saved)save.textContent='Uygulamaya devam et';
+          saving=false;save.disabled=false;cancel.disabled=false;first.readOnly=saved;repeat.readOnly=saved;
+        }
+      });
+      overlay.addEventListener('keydown',event=>{
+        if(event.key!=='Tab')return;
+        const fields=Array.from(overlay.querySelectorAll('input,button')).filter(el=>!el.disabled);
+        const start=fields[0],end=fields[fields.length-1];
+        if(event.shiftKey&&document.activeElement===start){event.preventDefault();end.focus();}
+        else if(!event.shiftKey&&document.activeElement===end){event.preventDefault();start.focus();}
+      });
+      first.focus();
+    });
   }
   async function login(username,password) {
     busy=true;
     try{
       await auth().signInWithEmailAndPassword(await emailFor(username),password);
-      const result=await request('session');
-      if(!(await finishPasswordChange(result)))return {success:false,message:'Yeni şifrenizle giriş yapın.'};
+      const result=await finishPasswordChange(await request('session'));
+      if(!result)return {success:false,message:'Şifre oluşturma iptal edildi.'};
       session=result;return result;
     }catch(error){await signOut();return {success:false,message:error.code?.startsWith('auth/')?'Kullanıcı adı veya şifre hatalı.':error.message};}
     finally{busy=false;}
