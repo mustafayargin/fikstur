@@ -1,0 +1,5 @@
+#googleAdminLoginBtn{margin-top:12px;min-height:46px;background:#fff;color:#182536;border:1px solid #c9d3df;font-weight:700;width:100%}
+#googleAdminLoginBtn:disabled{opacity:.6}
+.secure-login-note{font-size:13px;line-height:1.5;color:#a8bad0;margin:10px 0 0}
+#appModalInput[type=password]{font-size:16px}
+#appModal{z-index:100001!important}

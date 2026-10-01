@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fikstür Tahmin Paneli Pro</title>
     <link rel="stylesheet" href="styles.css?v=20260824-auto-update-v1" />
+    <link rel="stylesheet" href="secure-auth.css?v=20261001" />
     <link rel="stylesheet" href="data-admin.css?v=20260930-v1" />
     <link rel="stylesheet" href="login/login.css?v=1" />
     <link rel="stylesheet" href="login/penalty.css?v=1" />
@@ -454,11 +455,12 @@
                 <input type="text" id="playerName" placeholder="Örn: Veli" />
               </div>
               <div class="field">
-                <label for="playerPassword">Şifre</label>
+                <label for="playerPassword">Geçici şifre (isteğe bağlı)</label>
                 <input
-                  type="text"
-                  id="playerPassword"
-                  placeholder="Örn: 1234"
+                  type="password"
+                  id="playerPassword" autocomplete="new-password"
+                  placeholder="Boş bırak: otomatik oluşturulur"
+                  minlength="12"
                 />
               </div>
               <div class="field">
@@ -1783,6 +1785,8 @@
           </div>
         </div>
         <button class="full" id="loginBtn">Giriş Yap</button>
+        <button type="button" id="googleAdminLoginBtn">Admin — Google ile giriş yap</button>
+        <p class="secure-login-note">Şifrenizi unuttuysanız yöneticiyle iletişime geçin.</p>
 
         <div class="status-note" id="loginStatus">Hazır.</div>
       </div>
@@ -2042,6 +2046,7 @@
 
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 
     <script>
@@ -2074,9 +2079,10 @@
       window.__fiksturFirebaseReady = true;
     </script>
 
-<script src="login/login.js?v=1"></script>
+<script src="login/login.js?v=20261001-auth-v1"></script>
 <script src="login/penalty.js?v=2"></script>
-<script src="app.js?v=20260930-data-management-v1"></script>
-<script src="data-admin.js?v=20260930-v2"></script>
+<script src="secure-auth.js?v=20261001"></script>
+<script src="app.js?v=20261001-auth-v1"></script>
+<script src="data-admin.js?v=20261001-auth-v1"></script>
   </body>
 </html>
