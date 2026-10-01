@@ -118,7 +118,9 @@
     session=result;
     setAuthenticatedUser({...result.user,sessionStartedAt:new Date().toISOString(),connectedAt:new Date().toISOString()});
     state.settings.auth.isAuthenticated=true;state.settings.auth.role=result.user.rol;
-    forceDefaultLandingAfterLogin('auth-login');saveState();updateLoginOverlay();applyRolePermissions();
+    forceDefaultLandingAfterLogin('auth-login');
+    switchTab('dashboard',{skipPersistPrevious:true,skipViewportRestore:true});
+    saveState();updateLoginOverlay();applyRolePermissions();
     ensureFirebaseRealtimeBridge();startPoll();
     await hydrateFromFirebaseRealtime('login-auth');startPresenceTracking();renderAll();
   }
