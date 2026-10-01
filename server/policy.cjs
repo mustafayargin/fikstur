@@ -6,7 +6,7 @@ const hash = v => crypto.createHash('sha256').update(v).digest('hex');
 const accountEmail = name => `u.${hash(normalizeName(name))}@accounts.skorx.invalid`;
 const accountUid = id => `skorx_${hash(String(id)).slice(0, 40)}`;
 const key = v => { const s = String(v || '').trim(); if (!s || /[.#$\[\]\/]/.test(s) || s.length > 180) throw new Fault(400, 'Geçersiz kayıt kimliği.'); return s; };
-const password = v => { if (typeof v !== 'string' || v.length < 12 || v.length > 128) throw new Fault(400, 'Şifre 12–128 karakter olmalı.'); return v; };
+const password = v => { if (typeof v !== 'string' || v.length < 8 || v.length > 128) throw new Fault(400, 'Şifre 8–128 karakter olmalı.'); return v; };
 const temporaryPassword = () => crypto.randomBytes(18).toString('base64url');
 const clean = value => {
   if (Array.isArray(value)) return value.map(clean);
