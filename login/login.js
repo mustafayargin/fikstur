@@ -15,15 +15,16 @@
         <div class="arena-login__password"><input id="loginPassword" name="password" type="password" autocomplete="current-password" placeholder="Şifrenizi girin"><button type="button" id="arenaPasswordToggle" aria-label="Şifreyi göster">◉</button></div>
         <div class="arena-login__links"><button type="button" id="arenaForgot">Şifremi unuttum</button></div>
         <button class="arena-login__primary" id="loginBtn" type="submit">Giriş Yap</button>
+        <button type="button" id="googleAdminLoginBtn">Admin — Google ile giriş yap</button>
         <p class="arena-login__status" id="loginStatus" role="status" aria-live="polite">Hazır.</p>
         <div class="arena-login__signup">Hesabın yok mu? <button type="button" id="arenaSignup">Kaydol</button></div>
         </form>
         <section id="arenaSignupPanel" class="arena-login__future" hidden>
-          <h2 tabindex="-1">Kayıt ol</h2><p>Yeni kayıt işlemleri henüz açılmadı. Firebase Authentication geçişinde bu ekran etkinleşecek.</p>
+          <h2 tabindex="-1">Kayıt ol</h2><p>Hesapları yönetici oluşturur. Katılmak için yöneticiyle iletişime geçin.</p>
           <button type="button" class="arena-login__back" data-arena-back>← Girişe dön</button>
         </section>
         <section id="arenaResetPanel" class="arena-login__future" hidden>
-          <h2 tabindex="-1">Şifremi unuttum</h2><p>Şifre sıfırlama işlemleri henüz açılmadı. Yardım için yöneticiyle iletişime geçin.</p>
+          <h2 tabindex="-1">Şifremi unuttum</h2><p>Yöneticiyle iletişime geçin. Size yeni bir geçici şifre verebilir; tahminleriniz ve puanlarınız korunur.</p>
           <button type="button" class="arena-login__back" data-arena-back>← Girişe dön</button>
         </section>
       </div>
