@@ -2,11 +2,14 @@
 const p = require('./policy.cjs');
 const read = async (db,path) => (await db.ref(path).get()).val();
 async function identify(auth,db,token) {
-  let decoded; try { decoded = await auth.verifyIdToken(token,true); } catch { throw new p.Fault(401,'Oturum geçersiz. Yeniden giriş yapın.'); }
+  let decoded; try { decoded = await auth.verifyIdToken(token,true); } catch(error) {
+    if (!['auth/id-token-expired','auth/id-token-revoked','auth/invalid-id-token','auth/argument-error','auth/user-disabled','auth/user-not-found'].includes(error.code)) throw error;
+    throw new p.Fault(401,'Oturum geçersiz. Yeniden giriş yapın.');
+  }
   const access = await read(db,`authAccess/${decoded.uid}`);
-  if (!access || access.active !== true) throw new p.Fault(403,'Bu hesap uygulamaya yetkili değil.');
+  if (!access || access.active !== true) throw Object.assign(new p.Fault(403,'Bu hesap uygulamaya yetkili değil.'),{publicCode:'SESSION_DENIED'});
   const profile = await read(db,`users/${p.key(access.playerId)}`);
-  if (!profile || profile.aktif === false || profile.authUid !== decoded.uid) throw new p.Fault(403,'Hesabınız pasif veya eşleştirilmemiş.');
+  if (!profile || profile.aktif === false || profile.authUid !== decoded.uid) throw Object.assign(new p.Fault(403,'Hesabınız pasif veya eşleştirilmemiş.'),{publicCode:'SESSION_DENIED'});
   if (access.revokeTime && Number(decoded.auth_time) <= Number(access.revokeTime)) throw new p.Fault(401,'Oturum sonlandırılmış. Yeniden giriş yapın.');
   return {authTime:Number(decoded.auth_time),uid:decoded.uid,playerId:String(access.playerId),access,profile,admin:decoded.admin === true && access.role === 'admin'};
 }
