@@ -29,6 +29,6 @@ module.exports=async function(req,res){
     const status=error instanceof Fault?error.status:500;
     // Never log request bodies, passwords, tokens or service credentials.
     if(status===500) console.error('Account API failed:',error.code||error.name||'Error');
-    res.status(status).json({success:false,message:status===500?'Sunucu işlemi tamamlanamadı. Yapılandırmayı kontrol edin.':error.message});
+    res.status(status).json({success:false,...(error.publicCode?{code:error.publicCode}:{}),message:status===500?'Sunucu işlemi tamamlanamadı. Yapılandırmayı kontrol edin.':error.message});
   }
 };
