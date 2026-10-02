@@ -3572,6 +3572,16 @@ function getUnsyncedPredictionDraftsForScope(seasonId, weekId = null) {
     .map((pred) => ({ ...pred }));
 }
 
+// API row/property order is not a data change.
+function predictionResponseFingerprint(rows) {
+  const canonical = value => {
+    if (Array.isArray(value)) return value.map(canonical);
+    if (!value || typeof value !== "object") return value;
+    return Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])]));
+  };
+  return JSON.stringify((rows || []).map(row => JSON.stringify(canonical(row))).sort());
+}
+
 // Increment at both boundaries: a read started before/during a write is stale.
 let predictionSyncRevision = 0;
 const predictionPendingWrites = new Set();
@@ -6807,6 +6817,32 @@ function formatPredictionLockCountdown(diffMs) {
   return parts.join(" ");
 }
 
+// Countdown ticks update text in place instead of recreating notification buttons.
+function setPredictionBannerMarkup(banner, markup) {
+  const template = document.createElement("template");
+  template.innerHTML = markup;
+  const patch = (parent, desired) => {
+    const oldNodes = Array.from(parent.childNodes);
+    const newNodes = Array.from(desired.childNodes);
+    newNodes.forEach((next, index) => {
+      const current = oldNodes[index];
+      if (!current) { parent.appendChild(next.cloneNode(true)); return; }
+      if (current.nodeType !== next.nodeType || current.nodeName !== next.nodeName) {
+        parent.replaceChild(next.cloneNode(true), current); return;
+      }
+      if (next.nodeType === 3) {
+        if (current.nodeValue !== next.nodeValue) current.nodeValue = next.nodeValue;
+      } else if (next.nodeType === 1) {
+        for (const attr of Array.from(current.attributes)) if (!next.hasAttribute(attr.name)) current.removeAttribute(attr.name);
+        for (const attr of Array.from(next.attributes)) if (current.getAttribute(attr.name) !== attr.value) current.setAttribute(attr.name, attr.value);
+        patch(current, next);
+      }
+    });
+    oldNodes.slice(newNodes.length).forEach(node => node.remove());
+  };
+  patch(banner, template.content);
+}
+
 function renderPredictionLockBanner(weekId) {
   const banner = document.getElementById("predictionLockBanner");
   if (!banner) return;
@@ -6816,7 +6852,7 @@ function renderPredictionLockBanner(weekId) {
   if (!weekId) {
     clearPredictionRevealRefreshTimer();
     banner.className = "prediction-lock-banner is-hidden";
-    banner.innerHTML = "";
+    setPredictionBannerMarkup(banner, "");
     return;
   }
 
@@ -6837,25 +6873,25 @@ function renderPredictionLockBanner(weekId) {
 
     if (manualState === "locked") {
       banner.className = `prediction-lock-banner ${isAdmin ? "admin" : "closed"}`;
-      banner.innerHTML = isAdmin
+      setPredictionBannerMarkup(banner, isAdmin
         ? `<strong>🔒 Hafta admin tarafından kilitlendi</strong><span>Kullanıcılar tahmin giremez. 2 saat / 1 saat otomatik hatırlatma bildirimleri bu hafta için gönderilmez.</span>${adminControl}`
-        : `<strong>🔒 Tahminler kilitlendi</strong><span>Admin bu haftayı manuel olarak kilitledi. Tahminler artık görünür.</span>`;
+        : `<strong>🔒 Tahminler kilitlendi</strong><span>Admin bu haftayı manuel olarak kilitledi. Tahminler artık görünür.</span>`);
       refreshPredictionViewsAfterRevealChange(weekId);
       return;
     }
 
     if (manualState === "open") {
       banner.className = `prediction-lock-banner ${isAdmin ? "admin" : "open"}`;
-      banner.innerHTML = isAdmin
+      setPredictionBannerMarkup(banner, isAdmin
         ? `<strong>🔓 Hafta admin tarafından açık tutuluyor</strong><span>Normal 6 saatlik kilit zamanı geçmiş olsa bile kullanıcılar tahmin girmeye devam edebilir.</span>${adminControl}${notificationButton}`
-        : `<strong>🔓 Tahminler admin tarafından yeniden açıldı</strong><span>Bu hafta için tahmin girişi şu anda açık.</span>${notificationButton}`;
+        : `<strong>🔓 Tahminler admin tarafından yeniden açıldı</strong><span>Bu hafta için tahmin girişi şu anda açık.</span>${notificationButton}`);
       refreshPredictionViewsAfterRevealChange(weekId);
       return;
     }
 
     if (lockTs === null) {
       banner.className = "prediction-lock-banner is-hidden";
-      banner.innerHTML = "";
+      setPredictionBannerMarkup(banner, "");
       return;
     }
 
@@ -6880,11 +6916,11 @@ function renderPredictionLockBanner(weekId) {
     banner.className = `prediction-lock-banner ${isAdmin ? "admin" : toneClass}`;
 
     if (isAdmin) {
-      banner.innerHTML = `<strong>🔓 Admin görünümü · ${countdown}</strong><span>Kullanıcılar için otomatik kilit bu sürenin sonunda devreye girer. İstersen daha erken manuel kilitleyebilirsin.</span>${adminControl}${notificationButton}`;
+      setPredictionBannerMarkup(banner, `<strong>🔓 Admin görünümü · ${countdown}</strong><span>Kullanıcılar için otomatik kilit bu sürenin sonunda devreye girer. İstersen daha erken manuel kilitleyebilirsin.</span>${adminControl}${notificationButton}`);
       return;
     }
 
-    banner.innerHTML = `<strong>⏳ Tahmin vermek için kalan süre: ${countdown}</strong><span>Haftanın ilk maçından 6 saat önce tüm tahminler otomatik kilitlenir.</span>${notificationButton}`;
+    setPredictionBannerMarkup(banner, `<strong>⏳ Tahmin vermek için kalan süre: ${countdown}</strong><span>Haftanın ilk maçından 6 saat önce tüm tahminler otomatik kilitlenir.</span>${notificationButton}`);
     refreshPredictionViewsAfterRevealChange(weekId);
   };
 
@@ -11778,6 +11814,16 @@ function getLockedPredictionBlockReason(matchIdOrMatch, playerId) {
   return "";
 }
 
+// Compare generated markup, not live DOM: logo hydration and typing mutate the DOM.
+const focusedPredictionMarkupCache = new WeakMap();
+function commitFocusedPredictionMarkup(container, markup) {
+  const previous = focusedPredictionMarkupCache.get(container);
+  if (previous?.markup === markup && previous.root === container.firstElementChild) return false;
+  container.innerHTML = markup;
+  focusedPredictionMarkupCache.set(container, {markup, root: container.firstElementChild});
+  return true;
+}
+
 function renderFocusedUserPredictions(container, matches) {
   if (!container) return;
   const currentPlayerId = getCurrentPlayerId();
@@ -11948,7 +11994,7 @@ function renderFocusedUserPredictions(container, matches) {
     })
     .join("");
 
-  container.innerHTML = `
+  const nextMarkup = `
     <section class="focused-predictions-shell">
       <div class="focused-predictions-hero">
         <div>
@@ -11965,6 +12011,7 @@ function renderFocusedUserPredictions(container, matches) {
       <div class="focused-prediction-list">${cards}</div>
     </section>`;
 
+  if (!commitFocusedPredictionMarkup(container, nextMarkup)) return;
   hydrateTeamLogosIn(container);
   bindPredictionActionElements(container);
 }
@@ -15089,6 +15136,7 @@ async function persistLeagueStandingsCache(seasonId, rows) {
   saveState();
 
   if (
+    window.SkorxAuth?.admin === true &&
     typeof isFirebaseReady === "function" &&
     isFirebaseReady() &&
     typeof firebaseUpdate === "function"

@@ -68,7 +68,7 @@ function authFixture(code=authSource){
   const auth={currentUser:user,setPersistence:async()=>{},onAuthStateChanged:cb=>{queueMicrotask(()=>cb(user));return ()=>{}},onIdTokenChanged:()=>{},signOut:async()=>{signouts++;auth.currentUser=null;}};
   const firebase={auth:()=>auth};firebase.auth.Auth={Persistence:{LOCAL:'local'}};
   const session={success:true,user:{id:'u',authUid:'uid-u',rol:'user'}};
-  const context={console,window:{firebase},localStorage:{getItem:()=>null},document:{visibilityState:'visible'},setTimeout:fn=>{timers.set(++next,fn);return next},clearTimeout:id=>timers.delete(id),fetch:async()=>{calls++;return {status:200,ok:true,json:async()=>session}},setLoginFeedback:()=>{},predictionSyncRevision:0,syncOnlinePredictions:async()=>true,debounceFirebaseRealtimeRender:()=>{}};
+  const context={console,window:{firebase},localStorage:{getItem:()=>null},document:{visibilityState:'visible'},setTimeout:fn=>{timers.set(++next,fn);return next},clearTimeout:id=>timers.delete(id),fetch:async()=>{calls++;return {status:200,ok:true,json:async()=>session}},setLoginFeedback:()=>{},predictionResponseFingerprint:rows=>JSON.stringify(rows),predictionSyncRevision:0,syncOnlinePredictions:async()=>true,debounceFirebaseRealtimeRender:()=>{}};
   vm.createContext(context);vm.runInContext(code,context);
   return {context,auth,user,session,timers,stats:()=>({calls,signouts,forced})};
 }
@@ -200,4 +200,43 @@ test('realtime bridge is bound once; initial/unchanged snapshots and heartbeat d
   for(const fn of bindings.values()){fn(initial);fn(initial);}assert.equal(scheduled,0);assert.equal(renders,0);
   bindings.get('matches')(changed);assert.equal(scheduled,1);
   bindings.get('presence')(changed);assert.equal(renders,0);
+});
+test('normal user standings cache stays local; verified admin can persist it',async()=>{
+  let writes=0;const c={state:{settings:{}},getLeagueStandingsCacheKey:()=> 's',saveState:()=>{},isFirebaseReady:()=>true,firebaseUpdate:async()=>{writes++},window:{SkorxAuth:{admin:false}}};
+  vm.createContext(c);vm.runInContext(section('async function persistLeagueStandingsCache(','function renderLeagueStandingsModal('),c);
+  const result=await c.persistLeagueStandingsCache('s',[{points:3}]);assert.equal(result.rows[0].points,3);assert.equal(writes,0);
+  c.window.SkorxAuth.admin=true;await c.persistLeagueStandingsCache('s',[{points:3}]);assert.equal(writes,1);
+});
+test('unchanged card markup does not recreate root or overwrite live input/logo DOM',()=>{
+  let replacements=0;const container={firstElementChild:null,set innerHTML(markup){replacements++;this.firstElementChild={markup}}};
+  const c={WeakMap};vm.createContext(c);vm.runInContext(section('// Compare generated markup,','function renderFocusedUserPredictions('),c);
+  const html='<article><input value="1"></article>';
+  assert.equal(c.commitFocusedPredictionMarkup(container,html),true);const root=container.firstElementChild;root.liveInputValue='7';root.logoHydrated=true;
+  for(let i=0;i<30;i++)assert.equal(c.commitFocusedPredictionMarkup(container,html),false);
+  assert.equal(replacements,1);assert.equal(container.firstElementChild,root);assert.equal(root.liveInputValue,'7');assert.equal(root.logoHydrated,true);
+  assert.equal(c.commitFocusedPredictionMarkup(container,'<article><input value="4"></article>'),true);assert.equal(replacements,2);
+  container.firstElementChild={otherView:true};assert.equal(c.commitFocusedPredictionMarkup(container,'<article><input value="4"></article>'),true);
+});
+test('row and property order do not trigger a prediction refresh; changed scores do',()=>{
+  const c={};vm.createContext(c);vm.runInContext(section('function predictionResponseFingerprint(','// Increment at both boundaries:'),c);
+  const a=[{id:'a',homePred:1,awayPred:0},{id:'b',homePred:2,awayPred:1}];
+  const b=[{awayPred:1,homePred:2,id:'b'},{awayPred:0,id:'a',homePred:1}];
+  assert.equal(c.predictionResponseFingerprint(a),c.predictionResponseFingerprint(b));
+  b[0].homePred=3;assert.notEqual(c.predictionResponseFingerprint(a),c.predictionResponseFingerprint(b));
+});
+test('banner countdown changes text without replacing controls',()=>{
+  function textNode(value){return {nodeType:3,nodeName:'#text',nodeValue:value,cloneNode(){return textNode(this.nodeValue)}};}
+  function element(name,value){return {nodeType:1,nodeName:name,childNodes:[textNode(value)],attributes:[],hasAttribute:()=>false,getAttribute:()=>null,removeAttribute:()=>{},setAttribute:()=>{},cloneNode(){return element(name,this.childNodes[0].nodeValue)}};}
+  const strong=element('STRONG','10 saniye'),button=element('BUTTON','Bildirim');button.boundHandler={};
+  const banner={childNodes:[strong,button],appendChild(){throw Error('unexpected append')},replaceChild(){throw Error('unexpected replacement')}};
+  const c = { document: { createElement: () => ({
+    set innerHTML(value) {
+      const first = value.split('<strong>')[1].split('</strong>')[0];
+      const second = value.split('<button>')[1].split('</button>')[0];
+      this.content = { childNodes: [element('STRONG', first), element('BUTTON', second)] };
+    }
+  }) } };
+  vm.createContext(c);vm.runInContext(section('function setPredictionBannerMarkup(','function renderPredictionLockBanner('),c);
+  for(let i=9;i>=0;i--)c.setPredictionBannerMarkup(banner,`<strong>${i} saniye</strong><button>Bildirim</button>`);
+  assert.equal(banner.childNodes[0],strong);assert.equal(banner.childNodes[1],button);assert.equal(strong.childNodes[0].nodeValue,'0 saniye');assert.ok(button.boundHandler);
 });
