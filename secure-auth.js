@@ -11,14 +11,24 @@
   async function request(action,payload={}) {
     const user=auth().currentUser;
     if(!user) throw new Error('Giriş yapmanız gerekiyor.');
-    const token=await user.getIdToken();
-    const response=await fetch('/api/account',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({action,payload}),cache:'no-store'});
-    let result;try{result=await response.json();}catch{throw new Error('Sunucu bağlantısı hazır değil.');}
-    if(!response.ok || !result.success) {
-      if(response.status===401 || (response.status===403 && action==='session')) await signOut();
-      throw new Error(result.message||'İşlem tamamlanamadı.');
+    for(let attempt=0;attempt<2;attempt++) {
+      const token=await user.getIdToken(attempt===1);
+      const response=await fetch('/api/account',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({action,payload}),cache:'no-store'});
+      let result;try{result=await response.json();}catch{throw new Error('Sunucu bağlantısı hazır değil. Tekrar deneyin.');}
+      // A request from the previous account must never close or update a new session.
+      if(auth().currentUser!==user)throw new Error('Oturum değişti. İşlemi yeniden deneyin.');
+      if(response.status===401 && attempt===0)continue;
+      if(!response.ok || !result.success) {
+        const error=new Error(result.message||'İşlem tamamlanamadı.');
+        error.status=response.status;
+        if(response.status===401 || result.code==='SESSION_DENIED') {
+          await signOut();
+          if(typeof logoutUser==='function')logoutUser();
+        }
+        throw error;
+      }
+      return result;
     }
-    return result;
   }
   function scrub(value) {
     if(Array.isArray(value))return value.map(scrub);
@@ -33,7 +43,7 @@
   async function init() {
     await auth().setPersistence(window.firebase.auth.Auth.Persistence.LOCAL);
     await new Promise(resolve=>{const unsub=auth().onAuthStateChanged(()=>{unsub();resolve();});});
-    try { if(auth().currentUser)session=await request('session'); }catch { await signOut(); }
+    try { if(auth().currentUser)session=await request('session'); }catch(error) { console.warn('Oturum doğrulaması tamamlanamadı:',error.message); throw error; }
     auth().onIdTokenChanged(user=>{
       if(!user && session){session=null;stopPoll();if(typeof logoutUser==='function')logoutUser();}
     });
@@ -111,7 +121,7 @@
       const result=await finishPasswordChange(await request('session'));
       if(!result)return {success:false,message:'Şifre oluşturma iptal edildi.'};
       session=result;return result;
-    }catch(error){await signOut();return {success:false,message:error.code?.startsWith('auth/')?'Kullanıcı adı veya şifre hatalı.':error.message};}
+    }catch(error){return {success:false,message:error.code?.startsWith('auth/')?'Kullanıcı adı veya şifre hatalı.':error.message};}
     finally{busy=false;}
   }
   async function applySession(result) {
@@ -121,8 +131,10 @@
     forceDefaultLandingAfterLogin('auth-login');
     switchTab('dashboard',{skipPersistPrevious:true,skipViewportRestore:true});
     saveState();updateLoginOverlay();applyRolePermissions();
+    localStorage.removeItem(BACKGROUND_ENTERED_AT_STORAGE_KEY);markUserActivityForIdleLogout();
     ensureFirebaseRealtimeBridge();startPoll();
-    await hydrateFromFirebaseRealtime('login-auth');startPresenceTracking();renderAll();
+    const loaded=await runSessionHydrationWithFastOverlay();startPresenceTracking();renderAll();
+    if(!loaded)await showAlert('Giriş yapıldı ancak veriler yüklenemedi. Bağlantıyı kontrol edip Firebase Güncelle ile yeniden deneyin.');
   }
   async function googleLogin() {
     if(busy)return;busy=true;
@@ -132,28 +144,35 @@
       await auth().signInWithPopup(provider);
       await auth().currentUser.getIdToken(true);
       const result=await request('session');
-      if(result.user.rol!=='admin')throw new Error('Bu Google hesabına admin yetkisi tanımlanmamış.');
+      if(result.user.rol!=='admin'){await signOut();throw new Error('Bu Google hesabına admin yetkisi tanımlanmamış.');}
       await applySession(result);
-    }catch(error){await signOut();setLoginFeedback('error',error.code==='auth/popup-blocked'?'Google giriş penceresine izin verin.':error.message||'Google girişi tamamlanamadı.');}
+    }catch(error){if(session){await showAlert(error.message||'Veriler yüklenemedi.');return;}setLoginFeedback('error',error.code==='auth/popup-blocked'?'Google giriş penceresine izin verin.':error.message||'Google girişi tamamlanamadı.');}
     finally{busy=false;if(button)button.disabled=false;}
   }
   async function signOut(){
     session=null;stopPoll();if(signingOut)return;signingOut=true;
     try{await auth().signOut();}finally{signingOut=false;}
   }
-  function stopPoll(){clearTimeout(pollTimer);pollTimer=null;previousPredictions=null;}
+  function stopPoll(){pollGeneration++;clearTimeout(pollTimer);pollTimer=null;previousPredictions=null;}
+  let pollGeneration=0;
   function startPoll(){
     stopPoll();
     if(!session || session.user.rol==='admin')return;
+    const generation=pollGeneration;
     const tick=async()=>{
-      if(!session)return;
+      if(!session || generation!==pollGeneration)return;
       try{
         if(document.visibilityState!=='hidden'){
+          const revision=predictionSyncRevision;
           const data=await request('getPredictions'),serialized=JSON.stringify(data.predictions);
-          if(serialized!==previousPredictions){previousPredictions=serialized;scheduleFirebaseRealtimeHydration('secure-predictions');}
+          if(generation!==pollGeneration)return;
+          if(serialized!==previousPredictions){
+            const applied=await syncOnlinePredictions({seasonId:null,weekId:null,seasonLabel:'',weekNumber:'',response:data,revision,silent:true});
+            if(applied){previousPredictions=serialized;debounceFirebaseRealtimeRender();}
+          }
         }
       }catch(error){console.warn('Tahmin eşitlemesi bekliyor.');}
-      if(session)pollTimer=setTimeout(tick,3000);
+      if(session && generation===pollGeneration)pollTimer=setTimeout(tick,3000);
     };
     pollTimer=setTimeout(tick,3000);
   }
@@ -198,5 +217,5 @@
   }
   function bind(){document.getElementById('googleAdminLoginBtn')?.addEventListener('click',googleLogin);startPoll();}
   wipeOldCache();
-  window.SkorxAuth={init,login,request,manage,changeOwn,passwordPrompt,signOut,bind,startPoll,scrub,get session(){return session;},get ready(){return !!session && !!auth().currentUser;},get admin(){return !!session && session.user.rol==='admin' && !!auth().currentUser;}};
+  window.SkorxAuth={init,login,request,manage,changeOwn,passwordPrompt,signOut,bind,startPoll,scrub,get session(){return session;},get ready(){return !!session && !!auth().currentUser && session.user.authUid===auth().currentUser.uid;},get admin(){return this.ready && session.user.rol==='admin';}};
 })();

@@ -253,7 +253,7 @@ async function firebaseRead(path) {
   if (safePath === "settings" && !window.SkorxAuth.admin) {
     return (await window.SkorxAuth.request("getSettings")).settings;
   }
-  if (safePath === "predictions" && !window.SkorxAuth.admin) {
+  if (safePath === "predictions") {
     const result = await window.SkorxAuth.request("getPredictions");
     return Object.fromEntries(result.predictions.map(row => [row.id, row]));
   }
@@ -1054,20 +1054,22 @@ async function hydrateFromFirebaseRealtime(source = "manual") {
   firebaseRealtimeHydrationPromise = (async () => {
     try {
       await ensureFirebaseDefaults();
-      await syncSeasonRegistryFromFirebase();
+      const remoteMatches = (await firebaseRead("matches")) || {};
+      await syncSeasonRegistryFromFirebase({remoteMatches});
       await syncUsersFromSheet({ silent: true });
-      await syncOnlineMatchesFromSheet({
+      if (!await syncOnlineMatchesFromSheet({
         silent: true,
         seasonLabel: "",
         replaceRemoteScope: true,
-      });
-      await syncOnlinePredictions({
+        remoteMatches,
+      })) throw new Error("Maç verileri yüklenemedi.");
+      if (!await syncOnlinePredictions({
         silent: true,
         seasonId: null,
         weekId: null,
         seasonLabel: "",
         weekNumber: "",
-      });
+      })) throw new Error("Tahminler yüklenemedi.");
       validateFreshActiveSelection({
         forceNewestPublished: /login|startup|session-restore/.test(
           String(source),
@@ -1106,9 +1108,9 @@ function scheduleFirebaseRealtimeHydration(source = "realtime") {
       );
       return;
     }
-    if (firebaseRealtimeHydrationPromise) {
+    if (firebaseRealtimeHydrationPromise || currentHydrationPromise) {
       // A change arriving during hydration must not be swallowed.
-      firebaseRealtimeHydrationPromise.finally(() => {
+      (firebaseRealtimeHydrationPromise || currentHydrationPromise).finally(() => {
         scheduleFirebaseRealtimeHydration(source);
       });
       return;
@@ -1145,7 +1147,13 @@ function ensureFirebaseRealtimeBridge() {
   if (!db) return;
 
   (window.SkorxAuth.admin ? ["users", "matches", "predictions", "settings"] : ["users", "matches", "settings/weeksMeta", "settings/seasonsMeta", "settings/welcomeCard", "settings/teamSceneSlugs"]).forEach((path) => {
+    let previousSnapshot;
+    let firstSnapshot = true;
     db.ref(path).on("value", (snapshot) => {
+      const fingerprint = JSON.stringify(snapshot.val());
+      if (fingerprint === previousSnapshot) return;
+      previousSnapshot = fingerprint;
+      if (firstSnapshot) { firstSnapshot = false; return; }
       if (path === "matches") {
         firebaseMatchSnapshotRevision += 1;
         firebaseLatestMatchSnapshot = snapshot.val() || {};
@@ -1168,9 +1176,6 @@ function ensureFirebaseRealtimeBridge() {
     // Presence heartbeat 25 saniyede bir değişiyor.
     // Bunu renderAll() ile yeniden çizmek, tahminler dışındaki sayfalarda scroll'u üste atıyordu.
     // Online/offline bilgisi bir sonraki normal çizimde güncellenir; sayfa artık zıplamaz.
-    if ((state.settings.currentTab || "dashboard") === "predictions") {
-      debounceFirebaseRealtimeRender();
-    }
   });
 
   firebaseRealtimeBindingsInitialized = true;
@@ -1766,6 +1771,10 @@ async function flushPendingPredictionQueue(options = {}) {
   const failedItems = [];
 
   for (const item of queue) {
+    if (predictionPendingWrites.has(getPredictionUiKey(item.matchId, item.playerId)) || getPredictionDraft(item.matchId, item.playerId)) {
+      failedItems.push(item);
+      continue;
+    }
     const queuedPlayer = getPlayerById(item.playerId);
     const queuedMatch = state.matches.find(
       (match) => String(match.id) === String(item.matchId),
@@ -1795,6 +1804,7 @@ async function flushPendingPredictionQueue(options = {}) {
         continue;
       }
 
+      setPredictionUiState(item.matchId, item.playerId, "saving");
       const result = await saveOnlinePrediction(item);
       if (!result?.success)
         throw new Error(result?.message || "Kuyruktaki kayıt yazılamadı.");
@@ -1832,12 +1842,16 @@ async function flushPendingPredictionQueue(options = {}) {
         const uiButton = document.getElementById(
           `pred_btn_${item.matchId}_${item.playerId}`,
         );
-        if (uiButton)
-          setPredictionUiState(item.matchId, item.playerId, "saved");
+        if (uiButton) {
+          const draft = getPredictionDraft(item.matchId, item.playerId);
+          const newer = draft && (draft.homePred !== parseNumberOrEmpty(item.homePred) || draft.awayPred !== parseNumberOrEmpty(item.awayPred));
+          setPredictionUiState(item.matchId, item.playerId, newer ? "dirty" : "saved");
+        }
       }
     } catch (error) {
       failed += 1;
       failedItems.push(item);
+      setPredictionUiState(item.matchId, item.playerId, "error", {message: error.message});
       console.warn("Bekleyen tahmin tekrar gönderilemedi:", error);
     }
   }
@@ -2489,7 +2503,7 @@ async function syncOnlineMatchesFromSheet(options = {}) {
     let rows;
     if (isFirebaseReady()) {
       const revisionAtRead = firebaseMatchSnapshotRevision;
-      const fetchedMap = (await firebaseRead("matches")) || {};
+      const fetchedMap = (options.remoteMatches ?? await firebaseRead("matches")) || {};
       // Prefer a newer value event if deletion happened while this read ran.
       const remoteMap = firebaseMatchSnapshotRevision !== revisionAtRead &&
         firebaseLatestMatchSnapshot !== null
@@ -2691,11 +2705,11 @@ async function saveOnlinePrediction(payload) {
     };
   }
 
-  return await apiPost("savePrediction", payload);
+  return await runPredictionWrite(payload, "savePrediction");
 }
 
 async function deleteOnlinePrediction(payload) {
-  return await apiPost("deletePrediction", payload);
+  return await runPredictionWrite(payload, "deletePrediction");
 }
 
 async function addOnlineMatches(matches) {
@@ -2756,7 +2770,7 @@ function normalizeWeekRegistryItem(item) {
   };
 }
 
-async function syncSeasonRegistryFromFirebase() {
+async function syncSeasonRegistryFromFirebase(options = {}) {
   if (!isFirebaseReady()) return [];
   const settings = (await firebaseRead("settings")) || {};
   const rawList = Array.isArray(settings.seasonsMeta)
@@ -2791,7 +2805,7 @@ async function syncSeasonRegistryFromFirebase() {
   // üretmez; yalnızca kendi veritabanımızdaki sahipsiz maçların hafta kaydını
   // geri kurar.
   const storedMatches = firebaseSnapshotToArray(
-    (await firebaseRead("matches").catch(() => null)) || {},
+    (options.remoteMatches ?? await firebaseRead("matches")) || {},
   );
   const seasonByName = new Map(
     seasonList.map((season) => [normalizeText(season.name), season]),
@@ -3558,6 +3572,25 @@ function getUnsyncedPredictionDraftsForScope(seasonId, weekId = null) {
     .map((pred) => ({ ...pred }));
 }
 
+// Increment at both boundaries: a read started before/during a write is stale.
+let predictionSyncRevision = 0;
+const predictionPendingWrites = new Set();
+async function runPredictionWrite(payload, action) {
+  const key = getPredictionUiKey(payload.matchId, payload.playerId);
+  if (predictionPendingWrites.has(key)) throw new Error('Bu tahminin önceki işlemi devam ediyor.');
+  const owner = window.SkorxAuth.session;
+  predictionPendingWrites.add(key);
+  predictionSyncRevision++;
+  try {
+    const result = await apiPost(action, payload);
+    if (window.SkorxAuth.session !== owner) throw new Error('Oturum değişti.');
+    return result;
+  } finally {
+    predictionPendingWrites.delete(key);
+    predictionSyncRevision++;
+  }
+}
+
 async function syncOnlinePredictions(options = {}) {
   if (!useOnlineMode || !isAuthenticated()) return false;
 
@@ -3579,17 +3612,22 @@ async function syncOnlinePredictions(options = {}) {
       ? getWeekNumberById(weekId)
       : "";
 
+  const revision = options.revision ?? predictionSyncRevision;
+  const owner = window.SkorxAuth.session;
   try {
-    const response = await fetchOnlinePredictions(
+    const response = options.response || await fetchOnlinePredictions(
       seasonLabel || "",
       weekNumber || "",
     );
+    if (owner !== window.SkorxAuth.session || !isAuthenticated() || revision !== predictionSyncRevision) return false;
     const rows = dedupeOnlinePredictionRows(
       normalizeOnlinePredictionRows(response),
     );
-    const localDrafts = seasonId
-      ? getUnsyncedPredictionDraftsForScope(seasonId, weekId || null)
-      : [];
+    const protectedKeys = new Set(state.predictions.filter(pred =>
+      predictionPendingWrites.has(getPredictionUiKey(pred.matchId, pred.playerId)) ||
+      !!getPredictionDraft(pred.matchId, pred.playerId)
+    ).map(pred => getPredictionUiKey(pred.matchId, pred.playerId)));
+    const localDrafts = state.predictions.filter(pred => protectedKeys.has(getPredictionUiKey(pred.matchId, pred.playerId))).map(pred => ({...pred}));
 
     if (seasonId) {
       clearOnlinePredictionsForScope(seasonId, weekId || null);
@@ -3601,6 +3639,7 @@ async function syncOnlinePredictions(options = {}) {
       const matchId = resolveMatchIdFromOnlineRow(row);
       const playerId = resolvePlayerIdFromOnlineRow(row);
       if (!matchId || !playerId) return;
+      if (protectedKeys.has(getPredictionUiKey(matchId, playerId))) return;
 
       const match = state.matches.find((item) => item.id === matchId);
       const homePred = parseNumberOrEmpty(
@@ -3661,12 +3700,10 @@ async function syncOnlinePredictions(options = {}) {
 
 async function hydrateOnlineStateForSession(options = {}) {
   if (!useOnlineMode || !isAuthenticated()) return false;
-
+  const updateLoadingUi = !options.suppressLoadingOverlay;
   try {
-    const normalizedOptions = { ...options, silent: true };
+    const normalizedOptions = { ...options, silent: true, seasonId: null, weekId: null, seasonLabel: "", weekNumber: "", replaceRemoteScope: true };
     const isSessionRestore = !!normalizedOptions.sessionRestore;
-    const suppressLoadingOverlay = !!normalizedOptions.suppressLoadingOverlay;
-    const updateLoadingUi = !suppressLoadingOverlay;
 
     if (updateLoadingUi) {
       setAppLoading(true, {
@@ -3690,6 +3727,9 @@ async function hydrateOnlineStateForSession(options = {}) {
       setAppLoadingCheck("users", "active", "Kullanıcılar kontrol ediliyor...");
     }
 
+    const remoteMatches = (await firebaseRead("matches")) || {};
+    await syncSeasonRegistryFromFirebase({remoteMatches});
+    normalizedOptions.remoteMatches = remoteMatches;
     const [userSyncResult, matchSyncResult] = await Promise.allSettled([
       syncUsersFromSheet({ silent: true }),
       syncOnlineMatchesFromSheet(normalizedOptions),
@@ -3745,7 +3785,8 @@ async function hydrateOnlineStateForSession(options = {}) {
       setAppLoadingCheck("predictions", "active", "Tahminler yükleniyor...");
     }
 
-    await syncOnlinePredictions(normalizedOptions);
+    if (!await syncOnlinePredictions(normalizedOptions)) throw new Error("Tahminler yüklenemedi. Firebase Güncelle ile tekrar deneyin.");
+    validateFreshActiveSelection({ forceNewestPublished: true });
 
     if (updateLoadingUi) {
       setAppLoading(true, {
@@ -4304,6 +4345,12 @@ function closeLoginOverlay() {
 function logoutUser() {
   window.SkorxAuth.signOut().catch(() => {});
   state.predictions = [];
+  predictionSyncRevision++;
+  for (const key of Object.keys(predictionInputDrafts)) delete predictionInputDrafts[key];
+  for (const key of Object.keys(predictionUiState)) delete predictionUiState[key];
+  for (const timer of Object.values(predictionUiResetTimers)) clearTimeout(timer);
+  clearTimeout(firebaseRealtimeHydrationTimer);
+  clearTimeout(firebaseRealtimeRenderTimer);
   const db = getFirebaseDb();
   for (const path of ["users", "matches", "predictions", "settings", "settings/weeksMeta", "settings/seasonsMeta", "settings/welcomeCard", "settings/teamSceneSlugs", "presence"]) db?.ref(path).off();
   firebaseRealtimeBindingsInitialized = false;
@@ -4420,7 +4467,8 @@ async function loginUser() {
     closeLoginOverlay();
     applyRolePermissions();
     startPresenceTracking();
-    if (typeof resetIdleLogoutTimer === "function") resetIdleLogoutTimer();
+    localStorage.removeItem(BACKGROUND_ENTERED_AT_STORAGE_KEY);
+    markUserActivityForIdleLogout();
     console.log("[START] Session Hydration başladı");
     const sessionHydrationOk = await runSessionHydrationWithFastOverlay({
       loadingMessage: "Kayıtlı veriler açılıyor, güncel bilgiler yükleniyor...",
@@ -4430,10 +4478,8 @@ async function loginUser() {
       sessionHydrationOk,
     );
 
-    // Manuel Firebase Güncelle butonunun yaptığı tam eşitlemeyi girişten sonra
-    // otomatik olarak bir kez daha çalıştır. Böylece adminin eklediği yeni hafta,
-    // kullanıcı ilk girişinde butona basmadan kesin olarak alınır.
-    const fullHydrationOk = await hydrateFromFirebaseRealtime("login-auto");
+    // Session hydration already loads the complete registry, matches and predictions.
+    const fullHydrationOk = sessionHydrationOk;
     validateFreshActiveSelection({ forceNewestPublished: true });
     saveState(true);
     console.log(
@@ -4446,7 +4492,6 @@ async function loginUser() {
         predictions: state.predictions?.length || 0,
       },
     );
-    renderAll();
 
     if (typeof window.refreshFiksturFcmTokenOwner === "function") {
       window.refreshFiksturFcmTokenOwner().catch((error) => {
@@ -4463,8 +4508,8 @@ async function loginUser() {
     switchTab("dashboard", {
       skipPersistPrevious: true,
       skipViewportRestore: true,
+      deferRender: true,
     });
-    renderAll();
 
     if (window.FiksturLoginScene) {
       await penaltyResult;
@@ -12331,7 +12376,7 @@ function updatePredictionDeleteButton(matchId, playerId, forceVisible = null) {
       : hasPredictionValue(matchId, playerId);
   button.classList.toggle("is-hidden", !shouldShow);
   button.disabled =
-    predictionUiState[getPredictionUiKey(matchId, playerId)] === "deleting";
+    ["saving", "deleting"].includes(predictionUiState[getPredictionUiKey(matchId, playerId)]);
   button.setAttribute("aria-hidden", shouldShow ? "false" : "true");
 }
 
@@ -12545,6 +12590,10 @@ function blurPredictionInputAndCloseKeyboard(input) {
 function setPredictionUiState(matchId, playerId, uiState, options = {}) {
   const key = getPredictionUiKey(matchId, playerId);
   predictionUiState[key] = uiState;
+  const {homeInput, awayInput} = getPredictionInputElements(matchId, playerId);
+  for (const input of [homeInput, awayInput]) {
+    if (input && !input.dataset.predLocked) input.readOnly = uiState === "deleting";
+  }
 
   if (predictionUiResetTimers[key]) {
     clearTimeout(predictionUiResetTimers[key]);
@@ -12719,6 +12768,7 @@ window.queuePredictionSave = function (
   immediate = false,
   viewportSnapshot = null,
 ) {
+  if (predictionUiState[getPredictionUiKey(matchId, playerId)] === "deleting") return;
   const blockReason = getLockedPredictionBlockReason(matchId, playerId);
   if (blockReason) {
     clearPredictionDraft(matchId, playerId);
@@ -12742,12 +12792,13 @@ window.queuePredictionSave = function (
 
   const { homePred, awayPred } = getPredictionInputSnapshot(matchId, playerId);
   setPredictionDraft(matchId, playerId, { homePred, awayPred });
-  setPredictionUiState(matchId, playerId, "dirty");
+  if (!predictionPendingWrites.has(key)) setPredictionUiState(matchId, playerId, "dirty");
   updatePredictionDeleteButton(matchId, playerId, true);
   schedulePredictionViewportRestore(snapshot);
 };
 
 window.deletePredictionEntry = async function (matchId, playerId) {
+  const operationSession = window.SkorxAuth.session;
   const viewportSnapshot = capturePredictionViewport({ matchId, playerId });
   const blockReason = getLockedPredictionBlockReason(matchId, playerId);
   if (blockReason) {
@@ -12762,7 +12813,7 @@ window.deletePredictionEntry = async function (matchId, playerId) {
   if (!btn) return;
 
   const pred = getPrediction(matchId, playerId);
-  if (!pred) return;
+  if (!pred || predictionPendingWrites.has(key)) return;
 
   const confirmed = await showConfirm(
     "Bu tahmini silmek istediğinizden emin misiniz?",
@@ -12779,6 +12830,7 @@ window.deletePredictionEntry = async function (matchId, playerId) {
     return;
   }
 
+  if (predictionPendingWrites.has(key)) return;
   btn.innerText = "Siliniyor...";
   btn.disabled = true;
   clearTimeout(predictionTimers[key]);
@@ -12792,12 +12844,14 @@ window.deletePredictionEntry = async function (matchId, playerId) {
       playerId: playerId,
       kullaniciAdi: getCurrentUsername(),
       predictionId: pred.remoteId || pred.id || "",
+      sheetMatchId: state.matches.find(item => item.id === matchId)?.sheetMatchId || "",
       recordKey: `${matchId}_${playerId}`,
       sezon: getActiveSeasonLabel(),
       haftaNo: getWeekNumberById(state.settings.activeWeekId),
     };
 
     const result = await deleteOnlinePrediction(payload);
+    if (operationSession !== window.SkorxAuth.session) return;
 
     btn.innerText = "Sil";
     btn.disabled = false;
@@ -12815,16 +12869,17 @@ window.deletePredictionEntry = async function (matchId, playerId) {
     } else {
       console.warn("Sheet silme başarısız:", result?.message);
       setPredictionUiState(matchId, playerId, "deleteError", {
-        message: "Silme hatası",
+        message: result?.message || "Tahmin silinemedi. Tekrar deneyin.",
       });
       renderAll();
     }
   } catch (err) {
+    if (operationSession !== window.SkorxAuth.session) return;
     console.error("Silme hatası:", err);
     btn.innerText = "Sil";
     btn.disabled = false;
     setPredictionUiState(matchId, playerId, "deleteError", {
-      message: "Silme hatası",
+      message: err.message || "Tahmin silinemedi. Tekrar deneyin.",
     });
   } finally {
     schedulePredictionViewportRestore(viewportSnapshot);
@@ -12834,6 +12889,7 @@ if (typeof window.renderMissingPredictions !== "function") {
   window.renderMissingPredictions = function () {};
 }
 window.savePrediction = async function (matchId, playerId, options = {}) {
+  const operationSession = window.SkorxAuth.session;
   const viewportSnapshot =
     options.viewportSnapshot ||
     capturePredictionViewport({ matchId, playerId });
@@ -12850,7 +12906,7 @@ window.savePrediction = async function (matchId, playerId, options = {}) {
   const key = getPredictionUiKey(matchId, playerId);
   const wasUpdate = hasStoredPredictionRecord(matchId, playerId);
 
-  if (predictionUiState[key] === "saving") {
+  if (predictionPendingWrites.has(key) || ["saving", "deleting"].includes(predictionUiState[key])) {
     return;
   }
 
@@ -12887,8 +12943,8 @@ window.savePrediction = async function (matchId, playerId, options = {}) {
   }
 
   if (!useOnlineMode || !isAuthenticated()) {
-    setPredictionUiState(matchId, playerId, "saved", {
-      message: wasUpdate ? "Güncellendi" : "Kaydedildi",
+    setPredictionUiState(matchId, playerId, "error", {
+      message: "Tahmin sunucuya kaydedilmedi. Girişinizi ve bağlantınızı kontrol edin.",
     });
     updatePredictionDeleteButton(matchId, playerId, true);
     schedulePredictionViewportRestore(viewportSnapshot);
@@ -12977,6 +13033,7 @@ window.savePrediction = async function (matchId, playerId, options = {}) {
     }
 
     const result = await saveOnlinePrediction(payload);
+    if (operationSession !== window.SkorxAuth.session) return;
 
     clearTimeout(predictionTimers[key]);
 
@@ -13017,12 +13074,15 @@ window.savePrediction = async function (matchId, playerId, options = {}) {
       compactLocalPredictionRecords();
     }
     saveState(true);
-    setPredictionUiState(matchId, playerId, "saved", {
+    const latestDraft = getPredictionDraft(matchId, playerId);
+    const hasNewerDraft = latestDraft && (latestDraft.homePred !== homePred || latestDraft.awayPred !== awayPred);
+    setPredictionUiState(matchId, playerId, hasNewerDraft ? "dirty" : "saved", {
       message: wasUpdate ? "Güncellendi" : "Kaydedildi",
     });
     renderPredictions();
     schedulePredictionViewportRestore(viewportSnapshot);
   } catch (error) {
+    if (operationSession !== window.SkorxAuth.session) return;
     clearTimeout(predictionTimers[key]);
 
     if (onlineSaveCompleted) {
@@ -13031,7 +13091,9 @@ window.savePrediction = async function (matchId, playerId, options = {}) {
         error,
       );
       saveState(true);
-      setPredictionUiState(matchId, playerId, "saved", {
+      const draft = getPredictionDraft(matchId, playerId);
+      const newer = draft && (draft.homePred !== homePred || draft.awayPred !== awayPred);
+      setPredictionUiState(matchId, playerId, newer ? "dirty" : "saved", {
         message: wasUpdate ? "Güncellendi" : "Kaydedildi",
       });
       try {
@@ -13045,48 +13107,10 @@ window.savePrediction = async function (matchId, playerId, options = {}) {
 
     console.error("Online tahmin kaydı hatası:", error);
 
-    const timeoutError = String(error?.message || "").includes(
-      "zaman aşımına uğradı",
-    );
-
-    if (timeoutError) {
-      setPredictionUiState(matchId, playerId, "saving", {
-        message: "Bağlantı bekleniyor...",
-      });
-
-      enqueuePredictionRetry(payload);
-      setPredictionUiState(matchId, playerId, "queued", {
-        message: "Bağlantı bekleniyor",
-      });
-      recordAdminSyncActivity({
-        lastAction: `${getPlayerById(playerId)?.name || "Kullanıcı"} tahmini sıraya alındı.`,
-      });
-      showAlert(
-        "Veritabanı yanıtı geç geldi. Tahmin yerelde korundu ve sıraya alındı. Bağlantı uygun olduğunda otomatik tekrar gönderilecek.",
-        {
-          title: "Geciken Yanıt",
-          type: "info",
-        },
-      );
-      schedulePredictionViewportRestore(viewportSnapshot);
-      return;
-    }
-
-    enqueuePredictionRetry(payload);
-    setPredictionUiState(matchId, playerId, "queued", {
-      message: "Bağlantı bekleniyor",
+    setPredictionUiState(matchId, playerId, "error", {
+      message: error.message || "Sunucu kaydı doğrulanamadı. Tekrar deneyin.",
     });
-    recordAdminSyncActivity({
-      lastAction: `${getPlayerById(playerId)?.name || "Kullanıcı"} tahmini çevrimdışı sıraya alındı.`,
-      lastError: error?.message || "Bağlantı gecikmesi",
-    });
-    showAlert(
-      "Veri bağlantısında hata oluştu. Tahmin kaybolmadı; sıraya alındı ve bağlantı geldiğinde otomatik tekrar gönderilecek.",
-      {
-        title: "Bağlantı Hatası",
-        type: "warning",
-      },
-    );
+    showAlert("Tahminin sunucuya kaydedildiği doğrulanamadı. Yazdığınız değerler korundu. Bağlantıyı kontrol edip tekrar kaydedin.", {title:"Kayıt doğrulanamadı",type:"warning"});
     schedulePredictionViewportRestore(viewportSnapshot);
   }
 };
@@ -15991,7 +16015,7 @@ function switchTab(tabName, options = {}) {
       panel.classList.toggle("active", panel.id === `tab-${tabName}`),
     );
 
-  renderCurrentTabOnly(tabName);
+  if (!options.deferRender) renderCurrentTabOnly(tabName);
 
   const activePanel = document.getElementById(`tab-${tabName}`);
   if (activePanel && !options.skipViewportRestore) {
@@ -18351,7 +18375,7 @@ async function runAppResumeRefresh(reason = "visible") {
         });
       }
 
-      renderAll();
+      clearTimeout(firebaseRealtimeRenderTimer);
       logAppResumeRefresh("renderAll:done", {
         currentTab: state.settings?.currentTab || "dashboard",
       });
@@ -18463,9 +18487,10 @@ async function bootstrapApplication() {
       console.error("Uygulama Firebase olmadan başlatılmadı:", error);
       appBootstrapInProgress = false;
       updateLoginOverlay();
-      if (isAuthenticated()) {
+      if (window.firebase?.auth?.().currentUser) {
+        document.getElementById("loginOverlay")?.classList.add("hidden");
         setAppLoading(true, {
-          title: "Bağlantı kurulamadı",
+          title: "Oturum doğrulanamadı",
           message: "Bağlantıyı kontrol edip sayfayı yenileyin.",
           stepLabel: "Başlangıç tamamlanamadı.",
           showSuccess: false,
@@ -18529,8 +18554,7 @@ async function bootstrapApplication() {
             );
             console.log("[START] Session Hydration bitti:", sessionHydrationOk);
 
-            const fullHydrationOk =
-              await hydrateFromFirebaseRealtime("startup-auto");
+            const fullHydrationOk = sessionHydrationOk;
             startupSyncOk = sessionHydrationOk && fullHydrationOk;
             validateFreshActiveSelection({ forceNewestPublished: true });
             ensureActiveSelections();
