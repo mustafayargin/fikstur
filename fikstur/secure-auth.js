@@ -164,7 +164,7 @@
       try{
         if(document.visibilityState!=='hidden'){
           const revision=predictionSyncRevision;
-          const data=await request('getPredictions'),serialized=JSON.stringify(data.predictions);
+          const data=await request('getPredictions'),serialized=predictionResponseFingerprint(data.predictions);
           if(generation!==pollGeneration)return;
           if(serialized!==previousPredictions){
             const applied=await syncOnlinePredictions({seasonId:null,weekId:null,seasonLabel:'',weekNumber:'',response:data,revision,silent:true});
