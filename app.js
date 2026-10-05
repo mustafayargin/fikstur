@@ -316,9 +316,8 @@ async function firebaseApiGet(action, params = {}) {
     case "getPredictions": {
       const sezon = String(params.sezon || "").trim();
       const haftaNo = String(params.haftaNo || "").trim();
-      let predictions = firebaseSnapshotToArray(
-        await firebaseRead("predictions"),
-      );
+      const response = await window.SkorxAuth.request("getPredictions");
+      let predictions = response.predictions;
       if (sezon) {
         predictions = predictions.filter(
           (item) => String(item.season || item.sezon || "").trim() === sezon,
@@ -331,7 +330,7 @@ async function firebaseApiGet(action, params = {}) {
         );
       }
       predictions = dedupeFirebasePredictionRows(predictions);
-      return { success: true, predictions };
+      return { success: true, predictions, submissions: response.submissions || [] };
     }
     case "getStandings":
       return { success: true, rows: [] };
@@ -3572,6 +3571,22 @@ function getUnsyncedPredictionDraftsForScope(seasonId, weekId = null) {
     .map((pred) => ({ ...pred }));
 }
 
+// Public participation is separate from private score records.
+let predictionSubmissionPresence = new Set();
+function hasSubmittedPrediction(matchId, playerId) {
+  const pred = getPrediction(matchId, playerId);
+  return !!(pred && pred.homePred !== "" && pred.awayPred !== "") || predictionSubmissionPresence.has(getPredictionUiKey(matchId, playerId));
+}
+function applyPredictionSubmissionPresence(submissions) {
+  const next = new Set();
+  for (const row of submissions) {
+    const matchId = resolveMatchIdFromOnlineRow(row);
+    const playerId = resolvePlayerIdFromOnlineRow(row);
+    if (matchId && playerId) next.add(getPredictionUiKey(matchId, playerId));
+  }
+  predictionSubmissionPresence = next;
+}
+
 // API row/property order is not a data change.
 function predictionResponseFingerprint(rows) {
   const canonical = value => {
@@ -3630,6 +3645,7 @@ async function syncOnlinePredictions(options = {}) {
       weekNumber || "",
     );
     if (owner !== window.SkorxAuth.session || !isAuthenticated() || revision !== predictionSyncRevision) return false;
+    if (Array.isArray(response.submissions)) applyPredictionSubmissionPresence(response.submissions);
     const rows = dedupeOnlinePredictionRows(
       normalizeOnlinePredictionRows(response),
     );
@@ -4356,6 +4372,7 @@ function logoutUser() {
   window.SkorxAuth.signOut().catch(() => {});
   state.predictions = [];
   predictionSyncRevision++;
+  predictionSubmissionPresence.clear();
   for (const key of Object.keys(predictionInputDrafts)) delete predictionInputDrafts[key];
   for (const key of Object.keys(predictionUiState)) delete predictionUiState[key];
   for (const timer of Object.values(predictionUiResetTimers)) clearTimeout(timer);
@@ -5460,7 +5477,7 @@ function renderDashboardMatchCards(container, matches) {
         pred: getPrediction(match.id, player.id),
       }));
       const filled = predictions.filter(
-        ({ pred }) => pred && pred.homePred !== "" && pred.awayPred !== "",
+        ({ player }) => hasSubmittedPrediction(match.id, player.id),
       );
       const exact = predictions.filter(
         ({ pred }) => pred && Number(pred.points || 0) >= 3,
@@ -5487,7 +5504,8 @@ function renderDashboardMatchCards(container, matches) {
 
       const avatars = predictions
         .map(({ player, pred }) => {
-          const tone = getDashboardPredictionTone(pred, match);
+          const tone = !pred && hasSubmittedPrediction(match.id, player.id)
+            ? "is-filled" : getDashboardPredictionTone(pred, match);
           return `
             <button
               type="button"
@@ -5573,10 +5591,7 @@ function buildDashboardMatchModalBody(match) {
           ? `${pred.homePred !== "" ? pred.homePred : "-"} - ${pred.awayPred !== "" ? pred.awayPred : "-"}`
           : "--";
       const revealPrediction = canRevealPredictionForViewer(match, player.id);
-      const hasPrediction = !!(
-        pred &&
-        (pred.homePred !== "" || pred.awayPred !== "")
-      );
+      const hasPrediction = hasSubmittedPrediction(match.id, player.id);
       return {
         player,
         pred,
@@ -5632,11 +5647,7 @@ function buildDashboardPlayerWeekModalBody(match, player) {
 
   const weekRows = weekMatches.map((weekMatch) => {
     const pred = getPrediction(weekMatch.id, player.id);
-    const hasPrediction = !!(
-      pred &&
-      pred.homePred !== "" &&
-      pred.awayPred !== ""
-    );
+    const hasPrediction = hasSubmittedPrediction(weekMatch.id, player.id);
     const revealPrediction = canRevealPredictionForViewer(weekMatch, player.id);
     const tone = getDashboardPredictionTone(pred, weekMatch);
     const label = getDashboardPredictionLabel(pred, weekMatch);
@@ -12906,6 +12917,7 @@ window.deletePredictionEntry = async function (matchId, playerId) {
     if (result?.success) {
       clearPredictionDraft(matchId, playerId);
       clearLocalPredictionRecord(matchId, playerId);
+      predictionSubmissionPresence.delete(getPredictionUiKey(matchId, playerId));
       if (typeof dequeuePredictionRetry === "function") {
         dequeuePredictionRetry(payload);
       }

@@ -12,12 +12,12 @@ function predictionFixture(){
   const drafts={},ui={},owner={user:{id:'u'}};
   const state={settings:{activeWeekId:'w'},matches:[{id:'m',seasonId:'s',weekId:'w',played:false}],predictions:[{matchId:'m',playerId:'u',homePred:1,awayPred:0,remoteId:'r'}]};
   const context={console,state,useOnlineMode:true,window:{SkorxAuth:{session:owner}},isAuthenticated:()=>true,getActiveSeasonId:()=> 's',getSeasonById:()=>({name:'S'}),getWeekNumberById:()=>1,
-    getPredictionUiKey:(m,p)=>m+'_'+p,getPredictionDraft:(m,p)=>drafts[m+'_'+p],dedupeOnlinePredictionRows:r=>r,normalizeOnlinePredictionRows:r=>r.predictions,
+    getPrediction:(m,p)=>state.predictions.find(row=>row.matchId===m&&row.playerId===p),getPredictionUiKey:(m,p)=>m+'_'+p,getPredictionDraft:(m,p)=>drafts[m+'_'+p],dedupeOnlinePredictionRows:r=>r,normalizeOnlinePredictionRows:r=>r.predictions,
     resolveMatchIdFromOnlineRow:r=>r.matchId,resolvePlayerIdFromOnlineRow:r=>r.playerId,parseNumberOrEmpty:v=>v===''?'':Number(v),calcPoints:()=>0,
     clearOnlinePredictionsForScope:()=>{state.predictions=[]},upsertLocalPredictionRecord:r=>{state.predictions=state.predictions.filter(p=>p.matchId!==r.matchId||p.playerId!==r.playerId);state.predictions.push({...r})},compactLocalPredictionRecords:()=>{},recalculateAllPoints:()=>{},saveState:()=>{},updateLastSyncLabel:()=>{},renderAll:()=>{},
     fetchOnlinePredictions:async()=>({predictions:[]}),apiPost:async()=>({success:true})};
   vm.createContext(context);
-  vm.runInContext(section('// Increment at both boundaries:','async function hydrateOnlineStateForSession('),context);
+  vm.runInContext(section('// Public participation is separate','async function hydrateOnlineStateForSession('),context);
   return {context,state,drafts,ui};
 }
 const row=(homePred=1,awayPred=0)=>({id:'r',matchId:'m',playerId:'u',homePred,awayPred});
@@ -239,4 +239,35 @@ test('banner countdown changes text without replacing controls',()=>{
   vm.createContext(c);vm.runInContext(section('function setPredictionBannerMarkup(','function renderPredictionLockBanner('),c);
   for(let i=9;i>=0;i--)c.setPredictionBannerMarkup(banner,`<strong>${i} saniye</strong><button>Bildirim</button>`);
   assert.equal(banner.childNodes[0],strong);assert.equal(banner.childNodes[1],button);assert.equal(strong.childNodes[0].nodeValue,'0 saniye');assert.ok(button.boundHandler);
+});
+test('participation endpoint exposes status without exposing future scores or raw fields',async()=>{
+  const {execute}=require('../server/service.cjs');
+  const root={matches:{remote:{id:'remote',seasonId:'s',weekId:'w',date:new Date(Date.now()+86400000).toISOString()}},settings:{weeksMeta:[{id:'w',seasonId:'s',number:1,status:'yayinlandi'}]},predictions:{own:{playerId:'u',sheetMatchId:'remote',homePred:1,awayPred:0},secret:{playerId:'v',sheetMatchId:'remote',homePred:4,awayPred:2,points:3,actorName:'SECRET',updatedAt:'SECRET'},duplicate:{playerId:'v',sheetMatchId:'remote',homePred:4,awayPred:2},partial:{playerId:'x',sheetMatchId:'remote',homePred:'',awayPred:1},orphan:{playerId:'y',sheetMatchId:'missing',homePred:2,awayPred:1}}};
+  const service={db:{ref:path=>({get:async()=>({val:()=>root[path]})})}};
+  const actor={playerId:'u',admin:false,access:{}};
+  const result=await execute(service,actor,'getPredictions');
+  assert.deepEqual(result.predictions.map(row=>row.id),['own']);
+  assert.deepEqual(result.submissions,[{sheetMatchId:'remote',playerId:'u'},{sheetMatchId:'remote',playerId:'v'}]);
+  assert.equal(JSON.stringify(result.submissions).includes('SECRET'),false);
+  root.predictions={};assert.deepEqual((await execute(service,actor,'getPredictions')).submissions,[]);
+  root.predictions={secret:{playerId:'v',sheetMatchId:'remote',homePred:4,awayPred:2}};
+  root.settings.weeksMeta[0].status='hazirlaniyor';assert.deepEqual((await execute(service,actor,'getPredictions')).submissions,[]);
+  root.settings.weeksMeta[0].status='yayinlandi';root.matches.remote.played=true;
+  assert.equal((await execute(service,actor,'getPredictions')).predictions[0].homePred,4);
+});
+test('public participation lights avatars without creating score records and disappears after deletion',()=>{
+  const f=predictionFixture();
+  f.context.applyPredictionSubmissionPresence([{matchId:'m',playerId:'v'}]);
+  assert.equal(f.context.hasSubmittedPrediction('m','v'),true);
+  assert.equal(f.state.predictions.some(row=>row.playerId==='v'),false);
+  f.context.applyPredictionSubmissionPresence([]);assert.equal(f.context.hasSubmittedPrediction('m','v'),false);
+});
+test('another user submission change refreshes participation even when visible scores stay identical',async()=>{
+  const f=authFixture();await f.context.window.SkorxAuth.init();let submissions=[],applied=0;
+  f.context.fetch=async()=>({status:200,ok:true,json:async()=>({success:true,predictions:[],submissions})});
+  f.context.syncOnlinePredictions=async options=>{assert.ok(options.response);applied++;return true};
+  f.context.window.SkorxAuth.startPoll();const tick=[...f.timers.values()][0];await tick();
+  submissions=[{sheetMatchId:'remote',playerId:'v'}];await tick();assert.equal(applied,2);
+  await tick();assert.equal(applied,2);
+  submissions=[];await tick();assert.equal(applied,3);
 });
