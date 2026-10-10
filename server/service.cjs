@@ -17,6 +17,7 @@ async function execute({auth,db},actor,action,payload={}) {
   if (action === 'session') return {success:true,user:{...p.clean(actor.profile),id:actor.playerId,playerId:actor.playerId,rol:actor.admin?'admin':'user',panelAdmin:actor.admin,authUid:actor.uid},mustChangePassword:actor.access.mustChangePassword === true};
   if (actor.access.mustChangePassword === true && action !== 'changePassword') throw new p.Fault(403,'Önce geçici şifrenizi değiştirin.');
   if (action === 'syncScores') return require('./scores.cjs').syncScores(db,actor,payload);
+  if (action === 'scoreSyncStatus') return require('./scores.cjs').scoreSyncStatus(db,actor,payload);
   if (action === 'getSettings') {
     const settings = p.clean(await read(db,'settings') || {});
     for (const key of ['dataManagementTrash','auditLogs','connectionTest']) delete settings[key];

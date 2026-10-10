@@ -4,6 +4,20 @@ const {contextualMatch,parseDate,normalizeName,key,Fault}=require('./policy.cjs'
 const valid=(a,b)=>[a,b].every(v=>v!==null&&v!==undefined&&v!==''&&Number.isInteger(Number(v))&&Number(v)>=0);
 const yes=v=>v===true||v===1||v==='1'||v==='true';
 const finalStatus=s=>/^(ft|aet|pen|finished|match finished|full time|full-time|after extra time|after penalties|bitti)$/i.test(s);
+const lockActive=(record,now)=>!!record?.owner&&now-Number(record.startedAt)<90000;
+async function scoreScope(db,actor,payload){
+  const weekId=key(payload.weekId),seasonId=key(payload.seasonId);
+  const settings=(await db.ref('settings').get()).val()||{};
+  const week=Object.values(settings.weeksMeta||{}).find(w=>String(w.id)===weekId&&String(w.seasonId)===seasonId);
+  if(!week)throw new Fault(404,'Seçili hafta bulunamadı.');
+  if(!actor.admin&&!['aktif','yayinlandi','tamamlandi'].includes(week.status))throw new Fault(403,'Bu hafta henüz yayınlanmadı.');
+  return {weekId,seasonId,settings,week};
+}
+async function scoreSyncStatus(db,actor,payload={}, {now=Date.now()}={}){
+  const {weekId}=await scoreScope(db,actor,payload);
+  const record=(await db.ref(`serverPrivate/scoreSync/${weekId}`).get()).val()||{};
+  return {success:true,checked:false,pending:lockActive(record,now),finishedAt:Number(record.lastSuccessAt||0),startedAt:Number(record.startedAt||0),retryAfterMs:Math.max(0,10*60000-(now-Number(record.lastSuccessAt||0)))};
+}
 // Only provider fields change. No user, prediction, identity, week or manual result writes.
 function scorePatch(match,event,now=Date.now()) {
   if(yes(match.manualScoreLocked ?? match.manualScoreLock ?? match.manuelSkorKilitli))return null;
@@ -25,21 +39,17 @@ function scorePatch(match,event,now=Date.now()) {
   return changed?patch:null;
 }
 async function syncScores(db,actor,payload={}, {fetchImpl=fetch,now=Date.now()}={}) {
-  const weekId=key(payload.weekId),seasonId=key(payload.seasonId);
-  const settings=(await db.ref('settings').get()).val()||{};
-  const week=Object.values(settings.weeksMeta||{}).find(w=>String(w.id)===weekId&&String(w.seasonId)===seasonId);
-  if(!week)throw new Fault(404,'Seçili hafta bulunamadı.');
-  if(!actor.admin&&!['aktif','yayinlandi','tamamlandi'].includes(week.status))throw new Fault(403,'Bu hafta henüz yayınlanmadı.');
+  const {weekId,seasonId,settings,week}=await scoreScope(db,actor,payload);
   const force=actor.admin&&payload.force===true;
   const lock=db.ref(`serverPrivate/scoreSync/${weekId}`),owner=randomUUID();
   const claim=await lock.transaction(old=>{
-    if(old?.owner&&now-Number(old.startedAt)<90000)return;
+    if(lockActive(old,now))return;
     if(!force&&now-Number(old?.lastSuccessAt||0)<10*60000)return;
     return {...old,owner,startedAt:now,lastAttemptAt:now};
   });
   if(!claim.committed){
     const previous=claim.snapshot.val()||{};
-    if(previous.owner)throw new Fault(409,'Skor kontrolü başka bir cihazda devam ediyor. Biraz sonra yeniden deneyin.');
+    if(lockActive(previous,now))return {success:true,checked:false,pending:true,startedAt:Number(previous.startedAt),finishedAt:Number(previous.lastSuccessAt||0)};
     return {success:true,checked:false,finishedAt:Number(previous.lastSuccessAt||0),checkedCount:0,updatedCount:0,retryAfterMs:Math.max(0,10*60000-(now-Number(previous.lastSuccessAt||0)))};
   }
   try{
@@ -93,4 +103,4 @@ async function syncScores(db,actor,payload={}, {fetchImpl=fetch,now=Date.now()}=
     throw error;
   }
 }
-module.exports={scorePatch,syncScores};
+module.exports={scorePatch,syncScores,scoreSyncStatus};
