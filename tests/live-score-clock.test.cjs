@@ -8,7 +8,7 @@ function fixture(minutes=52){
  const c={console,Date:class extends Date {static now(){return now}},parseMatchDateTimestamp:v=>Date.parse(v),isMatchLocked:()=>false,
  uid:()=> 'new',getActiveSeasonId:()=> 's',formatPredictionLockCountdown:()=> 'countdown'};
  vm.createContext(c);
- vm.runInContext(section('function hasValidMatchScore(','function comparePredictionStandings(')+section('function applyApiEventToMatch(','function relocateMatchToApiWeek(')+section('function getPremiumMatchState(','function startDashboardClockRefresh('),c);
+ vm.runInContext(section('function calcOutcome(','function getWeekPredictionLockTimestamp(')+section('function hasValidMatchScore(','function comparePredictionStandings(')+section('function applyApiEventToMatch(','function relocateMatchToApiWeek(')+section('function getPremiumMatchState(','function startDashboardClockRefresh('),c);
  return {c,setTime:minutes=>{now=kickoff+minutes*60000},match:{id:'m',date:new Date(kickoff).toISOString(),seasonId:'s',weekId:'w',played:false,homeScore:null,awayScore:null}};
 }
 const event=(statusText,homeScore,awayScore)=>({apiId:'event',homeTeam:'A',awayTeam:'B',statusText,homeScore,awayScore,postponed:false});
@@ -21,10 +21,10 @@ test('verified API halftime and second-half status override an incompatible esti
  const f=fixture(52);f.match.statusText='2h';assert.equal(f.c.getPremiumMatchState(f.match).kicker,'2. YARI');
  f.setTime(75);f.match.statusText='ht';assert.equal(f.c.getPremiumMatchState(f.match).kicker,'DEVRE ARASI');
 });
-test('API live 0-0 is retained for display without final score, played, or points',()=>{
+test('API live 0-0 awards provisional points without marking the match final',()=>{
  const f=fixture(20);f.c.applyApiEventToMatch(f.match,event('1h',0,0));
  assert.equal(f.match.played,false);assert.equal(f.match.homeScore,null);assert.equal(f.match.liveHomeScore,0);assert.equal(f.c.getMatchDisplayScore(f.match).home,0);
- f.c.state={matches:[f.match],predictions:[{matchId:'m',homePred:0,awayPred:0,points:3}]};f.c.calcPoints=()=>{throw Error('must not score live match')};f.c.recalculateAllPoints();assert.equal(f.c.state.predictions[0].points,0);
+ f.c.state={matches:[f.match],predictions:[{matchId:'m',homePred:0,awayPred:0,points:3}]};f.c.recalculateAllPoints();assert.equal(f.c.state.predictions[0].points,3);assert.equal(f.c.state.predictions[0].provisionalPoints,true);
 });
 test('halftime and second-half score changes remain live; FT transfers score to final result',()=>{
  const f=fixture(52);f.c.applyApiEventToMatch(f.match,event('ht',1,0));assert.equal(f.match.played,false);assert.equal(f.c.getMatchDisplayScore(f.match).home,1);
@@ -53,7 +53,7 @@ test('live score and halftime survive Firebase transport into a second device wi
  vm.runInContext(section('async function sendMatchesToSheet(','async function syncWeekMatchesToSheet('),c);
  await c.sendMatchesToSheet([f.match],{force:true});assert.equal(payload[0].liveHomeScore,1);assert.equal(payload[0].statusText,'ht');assert.equal(payload[0].played,false);assert.equal(payload[0].homeScore,'');
  const receiver=fixture(52),r=receiver.c;r.state={matches:[],teams:[],predictions:[],settings:{activeSeasonId:'s',activeWeekId:'w'}};
- Object.assign(r,{useOnlineMode:true,isFirebaseReady:()=>true,getSeasonById:()=>({name:'S'}),getActiveSeasonLabel:()=> 'S',firebaseMatchSnapshotRevision:0,firebaseLatestMatchSnapshot:null,
+ Object.assign(r,{useOnlineMode:true,isFirebaseReady:()=>true,getSeasonById:()=>({name:'S'}),getActiveSeasonLabel:()=> 'S',firebasePendingMatchWrites:new Set(),sanitizeFirebaseKey:v=>v,firebaseMatchSnapshotRevision:0,firebaseLatestMatchSnapshot:null,
  firebaseSnapshotToArray:map=>Object.entries(map).map(([id,row])=>({...row,id})),reconcileLocalMatchesWithFirebase:()=>{},ensureSeasonFromOnlineLabel:()=>({id:'s'}),getRegisteredWeekForSeason:()=>({id:'w'}),getWeekNumberById:()=>1,
  parseBooleanish:v=>v===true||v===1,parseNumberOrEmpty:v=>v===null||v===undefined||v===''?'':Number(v),normalizeStoredDate:v=>v,normalizeText:v=>String(v).toLowerCase(),getTeamsBySeasonId:()=>[{name:'A'},{name:'B'}],applyMatchSceneOverridesToTeams:()=>{},syncWeekStatus:()=>{},saveState:()=>{},renderAll:()=>{}});
  vm.runInContext(section('async function syncOnlineMatchesFromSheet(','async function fetchOnlineStandings('),r);
@@ -67,4 +67,21 @@ test('match centre renders actual live 0-0, missing score message, and VS only b
  c.applyApiEventToMatch(f.match,event('live',0,0));c.renderDashboardMatchCards(container,[f.match]);assert.ok(container.innerHTML.includes('0 <span>-</span> 0'));assert.ok(!container.innerHTML.includes('>VS</span>'));
  f.match.liveHomeScore=null;f.match.liveAwayScore=null;c.renderDashboardMatchCards(container,[f.match]);assert.ok(container.innerHTML.includes('Skor verisi bekleniyor'));
  f.setTime(-10);f.match.statusText='';c.renderDashboardMatchCards(container,[f.match]);assert.ok(container.innerHTML.includes('>VS</span>'));
+});
+test('match centre exact/near counters follow live scoring and manual source remains visible',()=>{
+ const f=fixture(20),c=f.c,container={innerHTML:''};Object.assign(f.match,{homeTeam:'A',awayTeam:'B'});
+ const players=[{id:'u1',name:'One'},{id:'u2',name:'Two'},{id:'u3',name:'Three'}];
+ c.state={matches:[f.match],predictions:[{matchId:'m',playerId:'u1',homePred:0,awayPred:0},{matchId:'m',playerId:'u2',homePred:1,awayPred:1},{matchId:'m',playerId:'u3',homePred:1,awayPred:0}]};
+ Object.assign(c,{getVisiblePlayersOrdered:()=>players,formatMatchCountdown:()=> 'time',formatDate:()=> 'date',getMatchSceneUrl:()=> '',MATCH_SCENE_DEFAULT:'',teamLogoHtml:()=> '',escapeHtml:v=>v,formatTime:()=> '20:00',getPrediction:(_,id)=>c.state.predictions.find(p=>p.playerId===id),hasSubmittedPrediction:()=>true,createGenericAvatarMarkup:()=>'',getPlayerById:()=>null,hydrateTeamLogosIn:()=>{},formatShortDateTime:()=>'',startDashboardClockRefresh:()=>{}});
+ vm.runInContext(section('function getDashboardPredictionTone(','function getDashboardMatchInsight(')+section('function renderDashboardMatchCards(','function buildDashboardMatchModalBody('),c);
+ c.applyApiEventToMatch(f.match,event('1h',0,0));c.recalculateAllPoints();c.renderDashboardMatchCards(container,[f.match]);
+ assert.ok(container.innerHTML.includes('<b>1</b><em>tam</em>'));assert.ok(container.innerHTML.includes('<b>1</b><em>yakın</em>'));assert.ok(container.innerHTML.includes('Canlı skor • puanlar geçici'));
+ Object.assign(f.match,{played:true,manualScoreLocked:true,homeScore:1,awayScore:0});c.recalculateAllPoints();c.renderDashboardMatchCards(container,[f.match]);
+ assert.ok(container.innerHTML.includes('Admin manuel girdi'));assert.ok(container.innerHTML.includes('<b>0</b><em>yakın</em>'));assert.equal(c.state.predictions[2].points,3);
+});
+test('a stale second-half flag no longer claims a live match forever or manufactures full time',()=>{
+ const f=fixture(180);f.match.statusText='2h';f.match.liveHomeScore=2;f.match.liveAwayScore=2;
+ assert.equal(f.c.getMatchVisualState(f.match),'finished-time');assert.equal(f.c.getPremiumMatchState(f.match).label,'SONUÇ BEKLİYOR');assert.equal(f.match.played,false);
+ f.c.applyApiEventToMatch(f.match,event('',2,2));assert.equal(f.match.played,false);
+ f.c.applyApiEventToMatch(f.match,event('FT',2,2));assert.equal(f.match.played,true);assert.equal(f.c.getPremiumMatchState(f.match).label,'BİTTİ');
 });

@@ -316,9 +316,8 @@ async function firebaseApiGet(action, params = {}) {
     case "getPredictions": {
       const sezon = String(params.sezon || "").trim();
       const haftaNo = String(params.haftaNo || "").trim();
-      let predictions = firebaseSnapshotToArray(
-        await firebaseRead("predictions"),
-      );
+      const response = await window.SkorxAuth.request("getPredictions");
+      let predictions = response.predictions;
       if (sezon) {
         predictions = predictions.filter(
           (item) => String(item.season || item.sezon || "").trim() === sezon,
@@ -331,7 +330,7 @@ async function firebaseApiGet(action, params = {}) {
         );
       }
       predictions = dedupeFirebasePredictionRows(predictions);
-      return { success: true, predictions };
+      return { success: true, predictions, submissions: response.submissions || [] };
     }
     case "getStandings":
       return { success: true, rows: [] };
@@ -610,7 +609,7 @@ async function firebaseApiPost(action, payload = {}) {
           match.haftaNo ||
           getWeekNumberById(match.weekId) ||
           "";
-        await firebaseWrite(`matches/${id}`, {
+        const record = {
           ...match,
           id,
           season: seasonLabel,
@@ -618,7 +617,15 @@ async function firebaseApiPost(action, payload = {}) {
           weekNo,
           haftaNo: weekNo,
           updatedAt: new Date().toISOString(),
-        });
+        };
+        if (payload.preserveManualScores) {
+          await getFirebaseDb().ref(`matches/${id}`).transaction(current => {
+            if (parseBooleanish(current?.manualScoreLocked ?? current?.manualScoreLock ?? current?.manuelSkorKilitli)) return current;
+            return record;
+          });
+        } else {
+          await firebaseWrite(`matches/${id}`, record);
+        }
       }
       return { success: true };
     }
@@ -1150,7 +1157,15 @@ function ensureFirebaseRealtimeBridge() {
     let previousSnapshot;
     let firstSnapshot = true;
     db.ref(path).on("value", (snapshot) => {
-      const fingerprint = JSON.stringify(snapshot.val());
+      const value = snapshot.val();
+      let comparable = value;
+      if (path === "settings") {
+        state.settings.resultsLastAutoSyncAt = Number(value?.resultsLastAutoSyncAt || 0);
+        comparable = {...value};
+        for (const key of ["resultsLastAutoSyncAt", "manualScoreLastSuccessAt", "manualScoreLastSuccessBy", "resultsAutoSyncInProgressAt", "resultsAutoSyncRequestedBy", "updatedAt"]) delete comparable[key];
+        renderDashboardAutoSyncStatus();
+      }
+      const fingerprint = JSON.stringify(comparable);
       if (fingerprint === previousSnapshot) return;
       previousSnapshot = fingerprint;
       if (firstSnapshot) { firstSnapshot = false; return; }
@@ -1163,12 +1178,27 @@ function ensureFirebaseRealtimeBridge() {
           saveState();
           debounceFirebaseRealtimeRender();
         }
+        if (!appBootstrapInProgress && !firebaseRealtimeHydrationPromise && !currentHydrationPromise) {
+          const before = matchScoreViewFingerprint();
+          syncOnlineMatchesFromSheet({remoteMatches: firebaseLatestMatchSnapshot, silent: true}).then(ok => {
+            if (ok && (result.removed || before !== matchScoreViewFingerprint())) debounceFirebaseRealtimeRender();
+            if (!ok) scheduleFirebaseRealtimeHydration(path);
+          });
+          return;
+        }
       }
       scheduleFirebaseRealtimeHydration(path);
     }, (error) => {
       console.error(`Firebase canlı ${path} okuma hatası:`, error);
     });
   });
+
+  if (!window.SkorxAuth.admin) {
+    db.ref("settings/resultsLastAutoSyncAt").on("value", (snapshot) => {
+      state.settings.resultsLastAutoSyncAt = Number(snapshot.val() || 0);
+      renderDashboardAutoSyncStatus();
+    }, (error) => console.warn("Son skor kontrol zamanı alınamadı:", error.message));
+  }
 
   db.ref("presence").on("value", (snapshot) => {
     firebasePresenceCache = snapshot.exists() ? snapshot.val() || {} : {};
@@ -2533,6 +2563,7 @@ async function syncOnlineMatchesFromSheet(options = {}) {
     let lastSeasonId = requestedSeasonId || null;
 
     rows.forEach((row) => {
+      if (firebasePendingMatchWrites.has(sanitizeFirebaseKey(row.id || row.sheetMatchId || row.macId || ""))) return;
       const rowSeasonLabel =
         row.season ||
         row.sezon ||
@@ -2634,6 +2665,13 @@ async function syncOnlineMatchesFromSheet(options = {}) {
         existing.manualScoreLocked = manualScoreLocked;
       }
 
+      existing.statusText = String(row.statusText || "");
+      existing.liveHomeScore = hasValidMatchScore(row.liveHomeScore, row.liveAwayScore) ? Number(row.liveHomeScore) : null;
+      existing.liveAwayScore = hasValidMatchScore(row.liveHomeScore, row.liveAwayScore) ? Number(row.liveAwayScore) : null;
+      existing.liveScoreUpdatedAt = String(row.liveScoreUpdatedAt || "");
+      if (row.postponed !== undefined) existing.postponed = parseBooleanish(row.postponed);
+      if (row.wasPostponed !== undefined) existing.wasPostponed = parseBooleanish(row.wasPostponed);
+
       if (
         !getTeamsBySeasonId(seasonId).some(
           (t) => normalizeText(t.name) === normalizeText(homeTeam),
@@ -2712,9 +2750,9 @@ async function deleteOnlinePrediction(payload) {
   return await runPredictionWrite(payload, "deletePrediction");
 }
 
-async function addOnlineMatches(matches) {
+async function addOnlineMatches(matches, options = {}) {
   const serializedMatches = JSON.stringify(matches || []);
-  return await apiPost("addMatches", { matches: serializedMatches });
+  return await apiPost("addMatches", { matches: serializedMatches, preserveManualScores: !!options.preserveManualScores });
 }
 
 async function fetchOnlineUsers(includeInactive = false) {
@@ -3052,6 +3090,12 @@ async function sendMatchesToSheet(matches, options = {}) {
       date: match.date || "",
       tarih: match.date || "",
       apiId: match.apiId || "",
+      statusText: match.statusText || "",
+      liveHomeScore: match.liveHomeScore ?? "",
+      liveAwayScore: match.liveAwayScore ?? "",
+      liveScoreUpdatedAt: match.liveScoreUpdatedAt || "",
+      postponed: !!match.postponed,
+      wasPostponed: !!match.wasPostponed,
       played: !!match.played,
       oynandiMi: match.played ? 1 : 0,
       homeScore: match.homeScore ?? "",
@@ -3070,7 +3114,7 @@ async function sendMatchesToSheet(matches, options = {}) {
   const writeKeys = payloadMatches.map((item) => sanitizeFirebaseKey(item.id));
   writeKeys.forEach((key) => firebasePendingMatchWrites.add(key));
   try {
-    const result = await addOnlineMatches(payloadMatches);
+    const result = await addOnlineMatches(payloadMatches, options);
     if (!result?.success) {
       throw new Error(result?.message || "Maçlar buluta kaydedilemedi.");
     }
@@ -3094,16 +3138,16 @@ async function sendMatchesToSheet(matches, options = {}) {
   }
 }
 
-async function syncWeekMatchesToSheet(weekId) {
+async function syncWeekMatchesToSheet(weekId, options = {}) {
   const matches = getMatchesByWeekId(weekId);
   if (!matches.length) return null;
-  return await sendMatchesToSheet(matches, { force: true });
+  return await sendMatchesToSheet(matches, { ...options, force: true });
 }
 
-async function syncSeasonMatchesToSheet(seasonId) {
+async function syncSeasonMatchesToSheet(seasonId, options = {}) {
   const matches = getMatchesBySeasonId(seasonId);
   if (!matches.length) return null;
-  return await sendMatchesToSheet(matches, { force: true });
+  return await sendMatchesToSheet(matches, { ...options, force: true });
 }
 
 function isMobileView() {
@@ -3174,7 +3218,7 @@ function canEditPrediction(playerId, seasonId = getActiveSeasonId()) {
 function getPredictionOutcomeClass(pred, match) {
   const hasPrediction = pred.homePred !== "" && pred.awayPred !== "";
   if (!hasPrediction) return "prediction-empty";
-  if (!match?.played) return "prediction-pending";
+  if (!getMatchDisplayScore(match)) return "prediction-pending";
   if ((pred.points || 0) === 3) return "prediction-exact";
   if ((pred.points || 0) === 1) return "prediction-close";
   return "prediction-miss";
@@ -3572,6 +3616,22 @@ function getUnsyncedPredictionDraftsForScope(seasonId, weekId = null) {
     .map((pred) => ({ ...pred }));
 }
 
+// Public participation is separate from private score records.
+let predictionSubmissionPresence = new Set();
+function hasSubmittedPrediction(matchId, playerId) {
+  const pred = getPrediction(matchId, playerId);
+  return !!(pred && pred.homePred !== "" && pred.awayPred !== "") || predictionSubmissionPresence.has(getPredictionUiKey(matchId, playerId));
+}
+function applyPredictionSubmissionPresence(submissions) {
+  const next = new Set();
+  for (const row of submissions) {
+    const matchId = resolveMatchIdFromOnlineRow(row);
+    const playerId = resolvePlayerIdFromOnlineRow(row);
+    if (matchId && playerId) next.add(getPredictionUiKey(matchId, playerId));
+  }
+  predictionSubmissionPresence = next;
+}
+
 // API row/property order is not a data change.
 function predictionResponseFingerprint(rows) {
   const canonical = value => {
@@ -3630,6 +3690,7 @@ async function syncOnlinePredictions(options = {}) {
       weekNumber || "",
     );
     if (owner !== window.SkorxAuth.session || !isAuthenticated() || revision !== predictionSyncRevision) return false;
+    if (Array.isArray(response.submissions)) applyPredictionSubmissionPresence(response.submissions);
     const rows = dedupeOnlinePredictionRows(
       normalizeOnlinePredictionRows(response),
     );
@@ -4356,6 +4417,7 @@ function logoutUser() {
   window.SkorxAuth.signOut().catch(() => {});
   state.predictions = [];
   predictionSyncRevision++;
+  predictionSubmissionPresence.clear();
   for (const key of Object.keys(predictionInputDrafts)) delete predictionInputDrafts[key];
   for (const key of Object.keys(predictionUiState)) delete predictionUiState[key];
   for (const timer of Object.values(predictionUiResetTimers)) clearTimeout(timer);
@@ -5022,8 +5084,8 @@ function applyRolePermissions() {
 }
 
 function mobileMatchScore(match) {
-  if (!match.played) return "Skor bekleniyor";
-  return `${match.homeScore} - ${match.awayScore}`;
+  const score = getMatchDisplayScore(match);
+  return score ? `${score.home} - ${score.away}` : "Skor bekleniyor";
 }
 
 function renderMobileDashboardMatches(container, matches) {
@@ -5101,7 +5163,7 @@ function getDashboardPredictionTone(pred, match) {
   if (!pred || pred.homePred === "" || pred.awayPred === "")
     return "is-missing";
   const points = Number(pred.points || 0);
-  if (!match.played) return "is-filled";
+  if (!getMatchDisplayScore(match)) return "is-filled";
   if (points >= 3) return "is-exact";
   if (points >= 1) return "is-close";
   return "is-miss";
@@ -5110,7 +5172,7 @@ function getDashboardPredictionTone(pred, match) {
 function getDashboardPredictionLabel(pred, match) {
   if (!pred || pred.homePred === "" || pred.awayPred === "")
     return "Tahmin yok";
-  if (!match.played) return "Tahmin girildi";
+  if (!getMatchDisplayScore(match)) return "Tahmin girildi";
   const points = Number(pred.points || 0);
   if (points >= 3) return "Tam skor";
   if (points >= 1) return "Sonucu bildi";
@@ -5404,8 +5466,8 @@ function renderDashboardMatchCards(container, matches) {
     if (visual === "finished-time") {
       return {
         icon: "⏱",
-        label: "BİTTİ",
-        sub: "Skor girilmesi bekleniyor",
+        label: "SONUÇ BEKLİYOR",
+        sub: "Bitiş bilgisi doğrulanması bekleniyor",
         kicker: "SONUÇ BEKLİYOR",
         progress: 100,
         timeText,
@@ -5413,13 +5475,7 @@ function renderDashboardMatchCards(container, matches) {
     }
 
     if (visual === "live") {
-      const liveMinute = runtime.halftime
-        ? "DEVRE ARASI"
-        : runtime.minute
-          ? `${runtime.minute}'`
-          : String(match.statusText || "Canlı")
-              .replace(/live|in play/gi, "")
-              .trim() || "Canlı";
+      const liveMinute = getMatchClockLabel(match, runtime);
       return {
         icon: "●",
         label: "CANLI",
@@ -5455,12 +5511,13 @@ function renderDashboardMatchCards(container, matches) {
     .map((match) => {
       const badge = getMatchBadge(match);
       const visual = getMatchVisualState(match);
+      const displayScore = getMatchDisplayScore(match);
       const predictions = players.map((player) => ({
         player,
         pred: getPrediction(match.id, player.id),
       }));
       const filled = predictions.filter(
-        ({ pred }) => pred && pred.homePred !== "" && pred.awayPred !== "",
+        ({ player }) => hasSubmittedPrediction(match.id, player.id),
       );
       const exact = predictions.filter(
         ({ pred }) => pred && Number(pred.points || 0) >= 3,
@@ -5487,7 +5544,8 @@ function renderDashboardMatchCards(container, matches) {
 
       const avatars = predictions
         .map(({ player, pred }) => {
-          const tone = getDashboardPredictionTone(pred, match);
+          const tone = !pred && hasSubmittedPrediction(match.id, player.id)
+            ? "is-filled" : getDashboardPredictionTone(pred, match);
           return `
             <button
               type="button"
@@ -5528,9 +5586,9 @@ function renderDashboardMatchCards(container, matches) {
             </div>
 
             <div class="dashboard-score-core premium-score-core">
-              <div class="dashboard-score-core__label">${match.played ? "SKOR" : visual === "finished-time" ? "BİTTİ" : visual === "live" ? "CANLI" : "MAÇ"}</div>
-              <div class="dashboard-score-core__value premium-score-value">${match.played ? `${match.homeScore} <span>-</span> ${match.awayScore}` : '<span class="dashboard-score-core__pending premium-vs-capsule">VS</span>'}</div>
-              <div class="dashboard-score-core__sub">${match.played ? "Sonuç işlendi" : visual === "finished-time" ? "Skor bekleniyor" : "Detay için dokun"}</div>
+              <div class="dashboard-score-core__label">${match.played ? "SKOR" : visual === "finished-time" ? "SONUÇ BEKLİYOR" : visual === "live" ? "CANLI" : "MAÇ"}</div>
+              <div class="dashboard-score-core__value premium-score-value">${displayScore ? `${displayScore.home} <span>-</span> ${displayScore.away}` : visual === "live" || visual === "finished-time" ? '<span class="dashboard-score-core__pending premium-vs-capsule">—</span>' : '<span class="dashboard-score-core__pending premium-vs-capsule">VS</span>'}</div>
+              <div class="dashboard-score-core__sub">${match.manualScoreLocked ? "🔒 Admin manuel girdi" : match.played ? "Sonuç işlendi" : displayScore ? "Canlı skor • puanlar geçici" : visual === "live" || visual === "finished-time" ? "Skor verisi bekleniyor" : "Detay için dokun"}</div>
             </div>
 
             <div class="dashboard-team premium-team dashboard-team--away">
@@ -5573,10 +5631,7 @@ function buildDashboardMatchModalBody(match) {
           ? `${pred.homePred !== "" ? pred.homePred : "-"} - ${pred.awayPred !== "" ? pred.awayPred : "-"}`
           : "--";
       const revealPrediction = canRevealPredictionForViewer(match, player.id);
-      const hasPrediction = !!(
-        pred &&
-        (pred.homePred !== "" || pred.awayPred !== "")
-      );
+      const hasPrediction = hasSubmittedPrediction(match.id, player.id);
       return {
         player,
         pred,
@@ -5632,11 +5687,7 @@ function buildDashboardPlayerWeekModalBody(match, player) {
 
   const weekRows = weekMatches.map((weekMatch) => {
     const pred = getPrediction(weekMatch.id, player.id);
-    const hasPrediction = !!(
-      pred &&
-      pred.homePred !== "" &&
-      pred.awayPred !== ""
-    );
+    const hasPrediction = hasSubmittedPrediction(weekMatch.id, player.id);
     const revealPrediction = canRevealPredictionForViewer(weekMatch, player.id);
     const tone = getDashboardPredictionTone(pred, weekMatch);
     const label = getDashboardPredictionLabel(pred, weekMatch);
@@ -5654,19 +5705,19 @@ function buildDashboardPlayerWeekModalBody(match, player) {
   const predictedCount = weekRows.filter((row) => row.hasPrediction).length;
   const missingCount = Math.max(weekRows.length - predictedCount, 0);
   const exactCount = weekRows.filter(
-    (row) => row.match.played && Number(row.pred?.points || 0) >= 3,
+    (row) => getMatchDisplayScore(row.match) && Number(row.pred?.points || 0) >= 3,
   ).length;
   const closeCount = weekRows.filter(
-    (row) => row.match.played && Number(row.pred?.points || 0) === 1,
+    (row) => getMatchDisplayScore(row.match) && Number(row.pred?.points || 0) === 1,
   ).length;
   const missCount = weekRows.filter(
     (row) =>
-      row.match.played &&
+      getMatchDisplayScore(row.match) &&
       row.hasPrediction &&
       Number(row.pred?.points || 0) === 0,
   ).length;
   const weeklyPoint = weekRows.reduce(
-    (sum, row) => sum + Number(row.match.played ? row.pred?.points || 0 : 0),
+    (sum, row) => sum + Number(getMatchDisplayScore(row.match) ? row.pred?.points || 0 : 0),
     0,
   );
 
@@ -5707,7 +5758,7 @@ function buildDashboardPlayerWeekModalBody(match, player) {
                   : "Tahmin yok";
 
             const pointText =
-              row.hasPrediction && row.revealPrediction && row.match.played
+              row.hasPrediction && row.revealPrediction && getMatchDisplayScore(row.match)
                 ? `${Number(row.pred.points || 0)}p`
                 : row.hasPrediction && !row.revealPrediction
                   ? "🔒"
@@ -7136,6 +7187,28 @@ function isPostponedStatus(statusText = "") {
   );
 }
 
+// Live scores award provisional points; only a verified final/manual score sets played.
+function hasValidMatchScore(home, away) {
+  return [home, away].every(value => value !== null && value !== undefined && value !== "" && Number.isInteger(Number(value)) && Number(value) >= 0);
+}
+function getMatchDisplayScore(match) {
+  if (match?.played && hasValidMatchScore(match.homeScore, match.awayScore)) {
+    return {home: Number(match.homeScore), away: Number(match.awayScore), final: true};
+  }
+  if (!match?.played && !match?.postponed && hasValidMatchScore(match?.liveHomeScore, match?.liveAwayScore)) {
+    return {home: Number(match.liveHomeScore), away: Number(match.liveAwayScore), final: false};
+  }
+  return null;
+}
+function getMatchClockLabel(match, runtime) {
+  const status = String(match?.statusText || "").trim().toLowerCase();
+  if (/^(ht|halftime|half time|half-time)$/.test(status)) return "DEVRE ARASI";
+  if (/^(2h|second half)$/.test(status) && (!runtime.minute || runtime.minute <= 45)) return "2. YARI";
+  if (/^(1h|first half)$/.test(status) && (runtime.halftime || runtime.minute > 45)) return "1. YARI";
+  if (runtime.halftime) return "DEVRE ARASI";
+  return runtime.minute ? `${runtime.minute}'` : status.replace(/live|in play/gi, "").trim() || "Canlı";
+}
+
 const MATCH_FIRST_HALF_MINUTES = 45;
 const MATCH_HALFTIME_MINUTES = 15;
 const MATCH_SECOND_HALF_MINUTES = 45;
@@ -7224,21 +7297,19 @@ function getMatchVisualState(match) {
 
   const statusText = String(match.statusText || "").toLowerCase();
   if (
+    /^(ft|aet|pen)$/.test(statusText) ||
     statusText.includes("finished") ||
     statusText.includes("full time") ||
     statusText.includes("bitti")
   ) {
     return "finished-time";
   }
-  if (
-    statusText.includes("live") ||
-    statusText.includes("in play") ||
-    statusText.includes("canlı")
-  ) {
+  const runtime = getMatchRuntimeInfo(match);
+  if (runtime.elapsedMs > 150 * 60000) return "finished-time";
+  if (/live|in play|in progress|canlı|^(ht|1h|2h|halftime|half time|half-time|first half|second half)$/.test(statusText)) {
     return "live";
   }
 
-  const runtime = getMatchRuntimeInfo(match);
   if (runtime.phase === "live" || runtime.phase === "halftime") return "live";
   if (runtime.phase === "finished-time") return "finished-time";
   if (isMatchLocked(match)) return "locked";
@@ -7261,17 +7332,9 @@ function getMatchBadge(match) {
 function recalculateAllPoints() {
   const matchMap = new Map(state.matches.map((match) => [match.id, match]));
   state.predictions.forEach((pred) => {
-    const match = matchMap.get(pred.matchId);
-    const nextPoints =
-      match && match.played
-        ? calcPoints(
-            pred.homePred,
-            pred.awayPred,
-            match.homeScore,
-            match.awayScore,
-          )
-        : 0;
-    if (pred.points !== nextPoints) pred.points = nextPoints;
+    const score = getMatchDisplayScore(matchMap.get(pred.matchId));
+    pred.points = score ? calcPoints(pred.homePred, pred.awayPred, score.home, score.away) : 0;
+    pred.provisionalPoints = !!score && !score.final;
   });
 }
 
@@ -7340,18 +7403,7 @@ function getGeneralStandings(seasonId = getActiveSeasonId()) {
 }
 
 function isMatchResolvedForScoring(match) {
-  if (!match) return false;
-  if (match.played) return true;
-
-  const hasHomeScore =
-    match.homeScore !== "" &&
-    match.homeScore !== null &&
-    match.homeScore !== undefined;
-  const hasAwayScore =
-    match.awayScore !== "" &&
-    match.awayScore !== null &&
-    match.awayScore !== undefined;
-  return hasHomeScore && hasAwayScore;
+  return !!getMatchDisplayScore(match);
 }
 
 function getResolvedWeekMatches(weekId) {
@@ -7613,9 +7665,11 @@ function getManualScoreLastSuccessAt() {
 }
 
 function getManualScoreCooldownRemaining(now = Date.now()) {
+  if (window.SkorxAuth.admin) return 0;
+  const lastSuccess = sharedScoreSyncTimes.get(`${getActiveSeasonId()}:${state.settings.activeWeekId}`) || 0;
   return Math.max(
     0,
-    MANUAL_SCORE_UPDATE_COOLDOWN_MS - (now - getManualScoreLastSuccessAt()),
+    MANUAL_SCORE_UPDATE_COOLDOWN_MS - (now - lastSuccess),
   );
 }
 
@@ -7722,7 +7776,7 @@ function startDashboardApiProgress() {
     let nextValue = current + (current < 40 ? 14 : current < 65 ? 9 : 4);
     let nextLabel = "Seçili hafta kontrol ediliyor...";
     if (nextValue >= 35) nextLabel = "Maç skorları karşılaştırılıyor...";
-    if (nextValue >= 65) nextLabel = "Yerel veriler güncelleniyor...";
+    if (nextValue >= 65) nextLabel = "Ortak skorlar güncelleniyor...";
     setDashboardApiProgress(nextValue, nextLabel, "loading");
   }, 420);
 }
@@ -7979,86 +8033,35 @@ async function runDashboardWeekScoreUpdate(buttonOrEvent) {
   const actionButton = getActionButtonFromArg(buttonOrEvent);
   const season = getSeasonById(getActiveSeasonId());
   const week = getWeekById(state.settings.activeWeekId);
-  if (!season || !week) {
-    return showAlert("Önce aktif sezon ve aktif hafta seçmelisin.", {
-      title: "Eksik seçim",
-      type: "warning",
-    });
-  }
-
+  if (!season || !week) return showAlert("Önce aktif sezon ve aktif hafta seçmelisin.", { title: "Eksik seçim", type: "warning" });
   dashboardScoreUpdatePromise = (async () => {
     try {
-      if (isFirebaseReady()) {
-        const remoteSettings = (await firebaseRead("settings")) || {};
-        const remoteLastSuccess = Number(
-          remoteSettings.manualScoreLastSuccessAt ||
-            remoteSettings.resultsLastAutoSyncAt ||
-            0,
-        );
-        if (remoteLastSuccess > getManualScoreLastSuccessAt()) {
-          state.settings.manualScoreLastSuccessAt = remoteLastSuccess;
-          saveState(true);
-        }
-      }
-
-      const remaining = getManualScoreCooldownRemaining();
-      if (remaining > 0) {
-        renderManualScoreCooldown();
-        return showAlert(
-          `API kısa süre önce başarıyla kontrol edildi. Tekrar denemek için ${formatManualScoreCooldown(remaining)} beklemelisin.`,
-          { title: "Skorlar güncel", type: "info" },
-        );
-      }
-
-      setAsyncButtonState(actionButton, "loading", {
-        loading: "API'ye bağlanılıyor...",
-      });
+      setAsyncButtonState(actionButton, "loading", { loading: "API'ye bağlanılıyor..." });
       startDashboardApiProgress();
-      const status = document.getElementById("dashboardSyncStatus");
-      if (status) {
-        status.textContent = `${season.name} / ${week.number}. hafta için skor API'sine bağlanılıyor...`;
+      const result = await syncSharedWeekScores({seasonId: season.id, weekId: week.id, force: window.SkorxAuth.admin});
+      if (!result.checked) {
+        const message = `Bu hafta kısa süre önce kontrol edildi. Yeni API isteği yapılmadı; ortak kayıtlar alındı. Tekrar kontrol: ${formatManualScoreCooldown(result.retryAfterMs || 0)}.`;
+        finishDashboardApiProgress(true, message);
+        setAsyncButtonState(actionButton, "idle");
+        await showAlert(message, {title: "Ortak skorlar alındı", type: "info"});
+        return result;
       }
-
-      const result = await syncSelectedWeekFromApi({ manualUserRequest: true });
-      const finishedAt = Number(result?.finishedAt || Date.now());
-      state.settings.manualScoreLastSuccessAt = finishedAt;
-      saveState();
-      if (isFirebaseReady()) {
-        try {
-          await firebaseUpdate("settings", {
-            manualScoreLastSuccessAt: finishedAt,
-            manualScoreLastSuccessBy: getAutoSyncActorLabel(),
-            updatedAt: new Date().toISOString(),
-          });
-        } catch (cooldownError) {
-          console.warn("Ortak skor kontrol süresi kaydedilemedi:", cooldownError);
-        }
-      }
-
-      const changedCount = Number(result?.updatedCount || 0) + Number(result?.createdCount || 0);
-      const message = changedCount
-        ? `✓ API kontrol edildi: ${result.checkedCount} maç incelendi, ${changedCount} maç güncellendi.`
-        : `✓ API kontrol edildi: ${result?.checkedCount || 0} maç incelendi, yeni skor bulunamadı.`;
+      const message = result.checkedCount
+        ? `✓ API kontrol edildi: ${result.checkedCount} maç incelendi, ${result.updatedCount} maç Firebase'de güncellendi.`
+        : "Bu haftada API kontrolüne açık maç yok. Manuel skorlar korundu.";
       finishDashboardApiProgress(true, message);
-      setAsyncButtonState(actionButton, "success", {
-        success: "API kontrol edildi ✓",
-      });
-      showAlert(message, { title: "Skor kontrolü tamamlandı", type: "success" });
-      setTimeout(renderManualScoreCooldown, 1250);
+      setAsyncButtonState(actionButton, "success", {success: "Kontrol tamamlandı ✓"});
+      await showAlert(message, {title: "Skor kontrolü tamamlandı", type: "success"});
       return result;
     } catch (error) {
-      finishDashboardApiProgress(
-        false,
-        `⚠ ${error?.message || "API işlemi başarısız oldu."} 10 dakikalık bekleme başlatılmadı.`,
-      );
-      setAsyncButtonState(actionButton, "error", { error: "Tekrar dene" });
+      finishDashboardApiProgress(false, `⚠ ${error.message || "Skor kontrolü tamamlanamadı."} Başarılı güncelleme olarak kaydedilmedi.`);
+      setAsyncButtonState(actionButton, "error", {error: "Tekrar dene"});
       return null;
     } finally {
       dashboardScoreUpdatePromise = null;
       setTimeout(renderManualScoreCooldown, 1700);
     }
   })();
-
   return dashboardScoreUpdatePromise;
 }
 
@@ -11752,11 +11755,12 @@ function desktopPredictionMatchCell(match) {
   const visual = getMatchVisualState(match);
   const locked = isMatchLocked(match);
   const badge = getMatchBadge(match);
-  const scoreText = match.played
-    ? `${match.homeScore} <span>-</span> ${match.awayScore}`
+  const displayScore = getMatchDisplayScore(match);
+  const scoreText = displayScore
+    ? `${displayScore.home} <span>-</span> ${displayScore.away}`
     : "VS";
-  const centerLabel = match.played
-    ? "Skor"
+  const centerLabel = displayScore
+    ? displayScore.final ? "Skor" : "Canlı skor"
     : locked
       ? "Kilitli"
       : "Tahmin açık";
@@ -12131,7 +12135,7 @@ function renderPredictions() {
 
           const pointValue = Number(pred.points || 0);
           const showPointBadge = hasPrediction;
-          const badgeText = locked && !match.played ? "🔒" : `${pointValue}P`;
+          const badgeText = locked && !getMatchDisplayScore(match) ? "🔒" : `${pointValue}P${pred.provisionalPoints ? "*" : ""}`;
           const badgeBg =
             locked && !match.played
               ? "linear-gradient(135deg,#64748b,#475569)"
@@ -12906,6 +12910,7 @@ window.deletePredictionEntry = async function (matchId, playerId) {
     if (result?.success) {
       clearPredictionDraft(matchId, playerId);
       clearLocalPredictionRecord(matchId, playerId);
+      predictionSubmissionPresence.delete(getPredictionUiKey(matchId, playerId));
       if (typeof dequeuePredictionRetry === "function") {
         dequeuePredictionRetry(payload);
       }
@@ -13841,15 +13846,19 @@ function renderStandings() {
     weeklyDeltaMap[row.id] = generalRank ? generalRank - weeklyRank : 0;
   });
 
+  const liveSeasonPoints = getMatchesBySeasonId(seasonId).some(m => getMatchDisplayScore(m)?.final === false);
+  const liveWeekPoints = getMatchesByWeekId(weekId).some(m => getMatchDisplayScore(m)?.final === false);
   if (generalLeaderBadge) {
     generalLeaderBadge.textContent = generalLeader
       ? `${generalLeaders.length > 1 ? "Ortak sezon liderleri" : "Sezon lideri"} • ${generalLeader.name}`
       : "Sezon lideri bekleniyor";
+    if (liveSeasonPoints) generalLeaderBadge.textContent += " • Canlı puanlar geçici";
   }
   if (weeklyLeaderBadge) {
     weeklyLeaderBadge.textContent = weeklyLeader
       ? `${weeklyLeaders.length > 1 ? "Ortak hafta liderleri" : "Hafta lideri"} • ${weeklyLeader.name}`
       : "Hafta lideri bekleniyor";
+    if (liveWeekPoints) weeklyLeaderBadge.textContent += " • Canlı puanlar geçici";
   }
 
   renderStandingsSummary(summary, generalLeader, weeklyLeader);
@@ -17096,6 +17105,8 @@ function findExistingMatchForApiEvent(seasonId, weekId, event) {
 
 function applyApiEventToMatch(match, event, allowCreateIfMissing = false) {
   if (!match && !allowCreateIfMissing) return null;
+  if (match?.manualScoreLocked) return match;
+  if (match?.played && !/^(ft|aet|pen|finished|match finished|full time|full-time|after extra time|after penalties|bitti)$/i.test(String(event.statusText || "").trim())) return match;
   const target = match || {
     id: uid("match"),
     seasonId: getActiveSeasonId(),
@@ -17111,7 +17122,7 @@ function applyApiEventToMatch(match, event, allowCreateIfMissing = false) {
   target.awayTeam = event.awayTeam;
   target.statusText = event.statusText || "";
   if (event.date) target.date = event.date;
-  const hasScore = event.homeScore !== null && event.awayScore !== null;
+  const hasScore = hasValidMatchScore(event.homeScore, event.awayScore);
   const manualScoreLocked = !!target.manualScoreLocked;
   if (event.postponed) {
     target.postponed = true;
@@ -17136,18 +17147,38 @@ const apiStillRunning =
 const runtime = getMatchRuntimeInfo(target);
 
 const canAcceptFinalScore =
-  apiFinished ||
-  (!apiStatus && runtime.phase === "finished-time");
+  apiFinished;
 
-if (
-  hasScore &&
-  !manualScoreLocked &&
-  !apiStillRunning &&
-  canAcceptFinalScore
-) {
-    target.homeScore = event.homeScore;
-    target.awayScore = event.awayScore;
+  if (!manualScoreLocked && !target.played && !event.postponed) {
+    const started = apiStillRunning || runtime.phase === "live" || runtime.phase === "halftime" || runtime.phase === "finished-time";
+    if (hasScore && started) {
+      target.liveHomeScore = Number(event.homeScore);
+      target.liveAwayScore = Number(event.awayScore);
+      target.liveScoreUpdatedAt = new Date().toISOString();
+    } else if (!hasScore) {
+      // An absent provider score is not zero. Retain a previously verified live score.
+      if (!hasValidMatchScore(target.liveHomeScore, target.liveAwayScore)) {
+        target.liveHomeScore = null;
+        target.liveAwayScore = null;
+      }
+    } else if (runtime.phase === "waiting") {
+      target.liveHomeScore = null;
+      target.liveAwayScore = null;
+      target.liveScoreUpdatedAt = "";
+    }
+  }
+  if (event.postponed && !manualScoreLocked && !target.played) {
+    target.liveHomeScore = null;
+    target.liveAwayScore = null;
+    target.liveScoreUpdatedAt = "";
+  }
+  if (hasScore && !manualScoreLocked && !apiStillRunning && canAcceptFinalScore) {
+    target.homeScore = Number(event.homeScore);
+    target.awayScore = Number(event.awayScore);
     target.played = true;
+    target.liveHomeScore = null;
+    target.liveAwayScore = null;
+    target.liveScoreUpdatedAt = "";
     if (target.wasPostponed || event.postponed) target.wasPostponed = true;
     target.postponed = false;
   } else if (!hasScore && !target.played && !manualScoreLocked) {
@@ -17179,7 +17210,7 @@ function relocateMatchToApiWeek(match, seasonId, apiWeekNumber) {
   return nextWeek;
 }
 
-const AUTO_RESULTS_SYNC_INTERVAL = 30 * 60 * 1000;
+const AUTO_RESULTS_SYNC_INTERVAL = 10 * 60 * 1000;
 const AUTO_RESULTS_SYNC_LOCK_TTL = 90 * 1000;
 let autoResultsSyncPromise = null;
 
@@ -17194,159 +17225,58 @@ function getAutoSyncActorLabel() {
   ).trim();
 }
 
-async function maybeAutoSyncResults(options = {}) {
-  const { force = false } = options;
-  if (typeof logAutoSyncDebug === "function") {
-    logAutoSyncDebug("maybeAutoSyncResults:entered", { force });
-  }
-  if (!isAuthenticated() || !isFirebaseReady()) return false;
-  if (!force && (state.settings.currentTab || "dashboard") !== "dashboard")
-    return false;
-  if (autoResultsSyncPromise) return autoResultsSyncPromise;
-
-  const seasonId = getActiveSeasonId();
-  const weekId = state.settings.activeWeekId;
-  const week = getWeekById(weekId);
-  if (!seasonId || !weekId || !week) return false;
-
-  autoResultsSyncPromise = (async () => {
-    const now = Date.now();
-    let remoteSettings = {};
-
-    try {
-      remoteSettings = (await firebaseRead("settings")) || {};
-      if (typeof logAutoSyncDebug === "function") {
-        logAutoSyncDebug("maybeAutoSyncResults:remoteSettingsRead", {
-          remoteLastSyncAt: Number(remoteSettings.resultsLastAutoSyncAt || 0),
-          remoteLockAt: Number(remoteSettings.resultsAutoSyncInProgressAt || 0),
-        });
-      }
-    } catch (error) {
-      console.warn("Otomatik sync ayarları okunamadı:", error);
+const sharedScoreSyncTimes = new Map();
+const sharedScoreSyncRequests = new Map();
+const lastServerScoreRequestTimes = new Map();
+function matchScoreViewFingerprint() {
+  return JSON.stringify(state.matches.map(m => [m.id, m.seasonId, m.weekId, m.apiId, m.homeTeam, m.awayTeam, m.date, m.played, m.homeScore, m.awayScore, m.liveHomeScore, m.liveAwayScore, m.statusText, m.manualScoreLocked, m.postponed, m.wasPostponed]));
+}
+async function syncSharedWeekScores({seasonId = getActiveSeasonId(), weekId = state.settings.activeWeekId, force = false} = {}) {
+  const scope = `${seasonId}:${weekId}`;
+  if (sharedScoreSyncRequests.has(scope)) return sharedScoreSyncRequests.get(scope);
+  const operation = (async () => {
+    const result = await window.SkorxAuth.request("syncScores", {seasonId, weekId, force});
+    // An acknowledged shared write comes first. No client-provided score is trusted by the server.
+    const remoteMatches = await firebaseRead("matches");
+    const before = matchScoreViewFingerprint();
+    if (!await syncOnlineMatchesFromSheet({seasonId, seasonLabel: getSeasonById(seasonId)?.name || "", remoteMatches, silent: true})) {
+      throw new Error("Ortak skor kaydı kontrol edildi fakat bu cihazda alınamadı. Bağlantıyı kontrol edip yeniden deneyin.");
     }
-
-    const remoteLastSyncAt = Number(remoteSettings.resultsLastAutoSyncAt || 0);
-    const remoteLockAt = Number(
-      remoteSettings.resultsAutoSyncInProgressAt || 0,
-    );
-
-    state.settings.resultsLastAutoSyncAt = remoteLastSyncAt;
-    state.settings.resultsAutoSyncInProgressAt = remoteLockAt;
+    sharedScoreSyncTimes.set(scope, Number(result.finishedAt || 0));
+    state.settings.resultsLastAutoSyncAt = Number(result.finishedAt || state.settings.resultsLastAutoSyncAt || 0);
     saveState(true);
+    if (before !== matchScoreViewFingerprint()) debounceFirebaseRealtimeRender();
+    renderManualScoreCooldown();
     renderDashboardAutoSyncStatus();
-    renderDashboardSyncCard();
-
-    if (
-      !force &&
-      remoteLastSyncAt &&
-      now - remoteLastSyncAt < AUTO_RESULTS_SYNC_INTERVAL
-    ) {
-      if (typeof logAutoSyncDebug === "function") {
-        logAutoSyncDebug("maybeAutoSyncResults:skippedByInterval", {
-          remoteLastSyncAt,
-          now,
-          interval: AUTO_RESULTS_SYNC_INTERVAL,
-        });
-      }
-      return false;
-    }
-
-    if (remoteLockAt && now - remoteLockAt < AUTO_RESULTS_SYNC_LOCK_TTL) {
-      if (typeof logAutoSyncDebug === "function") {
-        logAutoSyncDebug("maybeAutoSyncResults:skippedByLock", {
-          remoteLockAt,
-          now,
-          ttl: AUTO_RESULTS_SYNC_LOCK_TTL,
-        });
-      }
-      renderDashboardAutoSyncStatus(
-        "⏳ Başka bir cihaz şu anda sonuçları kontrol ediyor",
-      );
-      return false;
-    }
-
-    const lockStamp = Date.now();
-    state.settings.resultsAutoSyncInProgressAt = lockStamp;
-    saveState(true);
-    renderDashboardAutoSyncStatus();
-
-    try {
-      await firebaseUpdate("settings", {
-        resultsAutoSyncInProgressAt: lockStamp,
-        resultsAutoSyncRequestedBy: getAutoSyncActorLabel(),
-        updatedAt: new Date().toISOString(),
-      });
-
-      renderDashboardAutoSyncStatus("⏳ Sonuçlar otomatik kontrol ediliyor");
-      await syncSelectedWeekFromApi({ silentAuto: true });
-
-      if (typeof logAutoSyncDebug === "function") {
-        logAutoSyncDebug("maybeAutoSyncResults:syncSelectedWeekFromApi:done");
-      }
-
-      const finishedAt = Date.now();
-      state.settings.resultsLastAutoSyncAt = finishedAt;
-      state.settings.resultsAutoSyncInProgressAt = 0;
-      saveState();
-
-      await firebaseUpdate("settings", {
-        resultsLastAutoSyncAt: finishedAt,
-        resultsAutoSyncInProgressAt: 0,
-        resultsAutoSyncRequestedBy: getAutoSyncActorLabel(),
-        updatedAt: new Date().toISOString(),
-      });
-
-      if (typeof logAutoSyncDebug === "function") {
-        logAutoSyncDebug("maybeAutoSyncResults:firebaseUpdateDone", {
-          finishedAt,
-          finishedText: formatDashboardAutoSyncTime(finishedAt),
-        });
-      }
-
-      renderDashboardSyncCard();
-      renderDashboardAutoSyncStatus(
-        "✅ Sonuçlar gerektiği için otomatik güncellendi",
-        finishedAt,
-      );
-
-      setTimeout(() => {
-        renderDashboardSyncCard();
-        renderDashboardAutoSyncStatus("", finishedAt);
-      }, 150);
-
-      if (typeof logAutoSyncDebug === "function") {
-        logAutoSyncDebug("maybeAutoSyncResults:success:returningTrue", {
-          stateLastSyncAt: Number(state.settings.resultsLastAutoSyncAt || 0),
-        });
-      }
-      return true;
-    } catch (error) {
-      state.settings.resultsAutoSyncInProgressAt = 0;
-      saveState(true);
-      try {
-        await firebaseUpdate("settings", {
-          resultsAutoSyncInProgressAt: 0,
-          updatedAt: new Date().toISOString(),
-        });
-      } catch {}
-      console.warn("Otomatik sonuç güncelleme uyarısı:", error);
-      renderDashboardAutoSyncStatus(
-        "⚠️ Otomatik kontrol denendi ama bu tur güncellenemedi",
-      );
-      return false;
-    } finally {
-      if (typeof logAutoSyncDebug === "function") {
-        logAutoSyncDebug("maybeAutoSyncResults:finally", {
-          stateLastSyncAt: Number(state.settings.resultsLastAutoSyncAt || 0),
-          stateLockAt: Number(state.settings.resultsAutoSyncInProgressAt || 0),
-        });
-      }
-      autoResultsSyncPromise = null;
-    }
+    return result;
   })();
-
+  sharedScoreSyncRequests.set(scope, operation);
+  try { return await operation; } finally { sharedScoreSyncRequests.delete(scope); }
+}
+async function maybeAutoSyncResults(options = {}) {
+  if (!isAuthenticated() || !isFirebaseReady() || !window.SkorxAuth?.ready) return false;
+  const seasonId = getActiveSeasonId(), weekId = state.settings.activeWeekId;
+  if (!seasonId || !weekId || !shouldPublishMatchChanges(weekId)) return false;
+  if (autoResultsSyncPromise) return autoResultsSyncPromise;
+  const scope = `${seasonId}:${weekId}`;
+  if (!options.force && Date.now() - (lastServerScoreRequestTimes.get(scope) || 0) < 10 * 60000) return false;
+  lastServerScoreRequestTimes.set(scope, Date.now());
+  autoResultsSyncPromise = (async () => {
+    try { return !!(await syncSharedWeekScores({seasonId, weekId, force: !!options.force && window.SkorxAuth.admin})).checked; }
+    catch (error) {
+      // Failure is retryable on the next existing trigger, never a successful sync.
+      lastServerScoreRequestTimes.delete(scope);
+      console.warn("Skor kontrolü tamamlanamadı:", error.message);
+      renderDashboardAutoSyncStatus("⚠️ Skor kaynağı doğrulanamadı; son alınan veriler gösteriliyor");
+      return false;
+    } finally { autoResultsSyncPromise = null; }
+  })();
   return autoResultsSyncPromise;
 }
+// Preserve the ten-minute cadence, independent of the current page.
+setInterval(() => {
+  if (document.visibilityState !== "hidden") maybeAutoSyncResults();
+}, 10 * 60000);
 
 async function syncSelectedWeekFromApi(options = {}) {
   const seasonId = getActiveSeasonId();
@@ -17373,6 +17303,14 @@ async function syncSelectedWeekFromApi(options = {}) {
     });
   }
 
+  if (!window.SkorxAuth.admin && isFirebaseReady() && shouldPublishMatchChanges(week.id)) {
+    try {
+      const result = await syncSharedWeekScores({seasonId, weekId, force: window.SkorxAuth.admin});
+      setWeekApiStatus(result.checked ? `${result.checkedCount} maç kontrol edildi; ${result.updatedCount} maç ortak kayıtta güncellendi.` : "Ortak skorlar alındı; 10 dakikalık kontrol süresi henüz dolmadı.");
+      return {...result, createdCount: 0, movedCount: 0, sheetSyncSuccess: true};
+    } catch (error) { setWeekApiStatus(error.message); throw error; }
+  }
+  if (!window.SkorxAuth.admin) throw new Error("Bu hafta henüz yayınlanmadı.");
   setWeekApiStatus(`${week.number}. hafta API'den kontrol ediliyor...`);
 
   try {
@@ -17452,7 +17390,7 @@ async function syncSelectedWeekFromApi(options = {}) {
 
       const beforeDate = existing.date || "";
       const beforePlayed = !!existing.played;
-      const beforeScore = `${existing.homeScore ?? ""}-${existing.awayScore ?? ""}`;
+      const beforeScore = JSON.stringify([existing.homeScore, existing.awayScore, existing.liveHomeScore, existing.liveAwayScore, existing.statusText]);
       const beforeWeek = existing.weekId;
       const beforePostponed = !!existing.postponed;
 
@@ -17461,8 +17399,7 @@ async function syncSelectedWeekFromApi(options = {}) {
       if (
         beforeDate !== (existing.date || "") ||
         beforePlayed !== existing.played ||
-        beforeScore !==
-          `${existing.homeScore ?? ""}-${existing.awayScore ?? ""}` ||
+        beforeScore !== JSON.stringify([existing.homeScore, existing.awayScore, existing.liveHomeScore, existing.liveAwayScore, existing.statusText]) ||
         beforeWeek !== existing.weekId ||
         beforePostponed !== existing.postponed
       ) {
@@ -17482,10 +17419,11 @@ async function syncSelectedWeekFromApi(options = {}) {
 
     if (shouldPublishMatchChanges(week.id)) {
       try {
-        sheetSyncResult = await syncWeekMatchesToSheet(week.id);
-      } catch (sheetError) {
-        console.warn("Hafta Firebase senkron uyarısı:", sheetError);
-      }
+        sheetSyncResult = await syncWeekMatchesToSheet(week.id, {preserveManualScores: true});
+      } catch (sheetError) { throw sheetError; }
+      if (!sheetSyncResult?.success) throw new Error("Hafta ortak Firebase kaydına yazılamadı.");
+      if (!await syncOnlineMatchesFromSheet({seasonId, silent: true})) throw new Error("Ortak maç kaydı yeniden alınamadı.");
+      debounceFirebaseRealtimeRender();
     }
 
     const finishedAt = Date.now();
@@ -17680,10 +17618,13 @@ async function importFixturesFromApi(updateResultsOnly = false) {
     renderAll();
     let sheetSyncResult = null;
     try {
-      sheetSyncResult = await syncSeasonMatchesToSheet(seasonId);
+      sheetSyncResult = await syncSeasonMatchesToSheet(seasonId, {preserveManualScores: true});
     } catch (sheetError) {
-      console.warn("Sezon Sheets senkron uyarısı:", sheetError);
+      throw sheetError;
     }
+    if (!sheetSyncResult?.success) throw new Error("Sezon skorları Firebase'e yazılamadı.");
+    if (!await syncOnlineMatchesFromSheet({seasonId, silent: true})) throw new Error("Ortak maç kaydı yeniden alınamadı.");
+    debounceFirebaseRealtimeRender();
     status.textContent = updateResultsOnly
       ? `Sezondaki tarih/saat ve skor verileri güncellendi${movedCount ? `, ${movedCount} ertelenen maç taşındı` : ""}${sheetSyncResult?.success ? `, Sheets senkronu tamamlandı` : ", Sheets yanıtı gecikti ama yerel güncelleme tamamlandı"}.`
       : `API'den yalnızca takım listesi işlendi.`;
@@ -18622,7 +18563,7 @@ async function bootstrapApplication() {
             );
 
             if ((state.settings.currentTab || "dashboard") === "dashboard") {
-              await maybeAutoSyncResults();
+              maybeAutoSyncResults();
               renderDashboardSyncCard();
               renderDashboardAutoSyncStatus();
             }
@@ -18723,15 +18664,11 @@ function getPremiumMatchState(match) {
   }
 
   if (visual === "finished-time") {
-    return { phase: visual, label: "BİTTİ", kicker: "SONUÇ BEKLİYOR" };
+    return { phase: visual, label: "SONUÇ BEKLİYOR", kicker: "SONUÇ BEKLİYOR" };
   }
 
   if (visual === "live") {
-    const liveMinute = runtime.minute
-      ? `${runtime.minute}'`
-      : String(match?.statusText || "Canlı")
-          .replace(/live|in play/gi, "")
-          .trim() || "Canlı";
+    const liveMinute = getMatchClockLabel(match, runtime);
     return { phase: visual, label: "CANLI", kicker: liveMinute };
   }
 
