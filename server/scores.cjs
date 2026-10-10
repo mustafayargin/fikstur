@@ -7,6 +7,10 @@ const USER_MANUAL_SCORE_TEST_MODE=true;
 const yes=v=>v===true||v===1||v==='1'||v==='true';
 const finalStatus=s=>/^(ft|aet|pen|finished|match finished|full time|full-time|after extra time|after penalties|bitti)$/i.test(s);
 const lockActive=(record,now)=>!!record?.owner&&now-Number(record.startedAt)<90000;
+function scoreSignature(row){
+  const n=v=>v===null||v===undefined||v===''?null:Number(v);
+  return JSON.stringify([yes(row.played??row.oynandiMi),n(row.homeScore??row.evGol),n(row.awayScore??row.depGol),n(row.liveHomeScore),n(row.liveAwayScore),String(row.statusText||'').trim().toLowerCase(),yes(row.manualScoreLocked??row.manualScoreLock??row.manuelSkorKilitli)]);
+}
 async function scoreScope(db,actor,payload){
   const weekId=key(payload.weekId),seasonId=key(payload.seasonId);
   const settings=(await db.ref('settings').get()).val()||{};
@@ -18,7 +22,7 @@ async function scoreScope(db,actor,payload){
 async function scoreSyncStatus(db,actor,payload={}, {now=Date.now()}={}){
   const {weekId}=await scoreScope(db,actor,payload);
   const record=(await db.ref(`serverPrivate/scoreSync/${weekId}`).get()).val()||{};
-  return {success:true,checked:false,pending:lockActive(record,now),finishedAt:Number(record.lastSuccessAt||0),startedAt:Number(record.startedAt||0),retryAfterMs:Math.max(0,10*60000-(now-Number(record.lastSuccessAt||0)))};
+  return {success:true,checked:false,pending:lockActive(record,now),verifiedScores:record.verifiedScores||[],verifiedMatchIds:record.verifiedMatchIds||[],finishedAt:Number(record.lastSuccessAt||0),startedAt:Number(record.startedAt||0),retryAfterMs:Math.max(0,10*60000-(now-Number(record.lastSuccessAt||0)))};
 }
 // Only provider fields change. No user, prediction, identity, week or manual result writes.
 function scorePatch(match,event,now=Date.now()) {
@@ -52,7 +56,7 @@ async function syncScores(db,actor,payload={}, {fetchImpl=fetch,now=Date.now()}=
   if(!claim.committed){
     const previous=claim.snapshot.val()||{};
     if(lockActive(previous,now))return {success:true,checked:false,pending:true,startedAt:Number(previous.startedAt),finishedAt:Number(previous.lastSuccessAt||0)};
-    return {success:true,checked:false,finishedAt:Number(previous.lastSuccessAt||0),checkedCount:0,updatedCount:0,retryAfterMs:Math.max(0,10*60000-(now-Number(previous.lastSuccessAt||0)))};
+    return {success:true,checked:false,finishedAt:Number(previous.lastSuccessAt||0),checkedCount:0,updatedCount:0,verifiedScores:previous.verifiedScores||[],verifiedMatchIds:previous.verifiedMatchIds||[],retryAfterMs:Math.max(0,10*60000-(now-Number(previous.lastSuccessAt||0)))};
   }
   try{
     const matches=(await db.ref('matches').get()).val()||{};
@@ -64,6 +68,7 @@ async function syncScores(db,actor,payload={}, {fetchImpl=fetch,now=Date.now()}=
     const candidates=scopedMatches.filter(([,row])=>!yes(row.manualScoreLocked ?? row.manualScoreLock ?? row.manuelSkorKilitli));
     if(candidates.length>24)throw new Fault(400,'Hafta maç sayısı beklenen sınırı aşıyor.');
     let updated=0,failures=0,checked=0;
+    const verifiedMatchIds=[],verifiedScores=[];
     const requestDeadline=Date.now()+45000;
     const needsFinalCheck=(event,row)=>!finalStatus(String(event?.strStatus||'').trim())&&parseDate(row.date||row.tarih)+105*60000<=now&&!/postponed|delayed|deferred|suspended|abandoned|cancelled/i.test(String(event?.strStatus||''));
     const apiKey=process.env.SPORTSDB_API_KEY||'123';
@@ -104,7 +109,11 @@ async function syncScores(db,actor,payload={}, {fetchImpl=fetch,now=Date.now()}=
             if(!patch)return;
             return {...current,...patch};
           });
+          const readback=(await db.ref(`matches/${id}`).get()).val();
+          if(!readback||String(readback.apiId||'')!==String(original.apiId||'')||contextualMatch(readback,settings).weekId!==weekId||scorePatch(readback,event,now))throw Error('Shared score verification failed');
           if(result.committed)updated++;
+          verifiedMatchIds.push(id);
+          verifiedScores.push({id,signature:scoreSignature(readback)});
           checked++;
         }catch{failures++;}
       }));
@@ -112,8 +121,8 @@ async function syncScores(db,actor,payload={}, {fetchImpl=fetch,now=Date.now()}=
     if(failures)throw new Fault(502,'Bazı maçlarda API kontrolü veya Firebase kaydı tamamlanamadı. Başarılı kayıtlar korundu; yeniden deneyin.');
     const finishedAt=Date.now();
     await db.ref('settings').update({resultsLastAutoSyncAt:finishedAt,manualScoreLastSuccessAt:finishedAt});
-    await lock.transaction(old=>old?.owner===owner?{...old,owner:null,lastSuccessAt:finishedAt}:undefined);
-    return {success:true,checked:true,updatedCount:updated,checkedCount:checked,finishedAt,retryAfterMs:10*60000};
+    await lock.transaction(old=>old?.owner===owner?{...old,owner:null,lastSuccessAt:finishedAt,verifiedMatchIds,verifiedScores}:undefined);
+    return {success:true,checked:true,updatedCount:updated,checkedCount:checked,verifiedMatchIds,verifiedScores,finishedAt,retryAfterMs:10*60000};
   }catch(error){
     await lock.transaction(old=>old?.owner===owner?{...old,owner:null}:undefined);
     throw error;
