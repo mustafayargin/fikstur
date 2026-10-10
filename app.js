@@ -8040,7 +8040,7 @@ async function runDashboardWeekScoreUpdate(buttonOrEvent) {
     try {
       setAsyncButtonState(actionButton, "loading", { loading: "API'ye bağlanılıyor..." });
       startDashboardApiProgress();
-      const result = await syncSharedWeekScores({seasonId: season.id, weekId: week.id, force: window.SkorxAuth.admin});
+      const result = await syncSelectedWeekFromApi({scoreOnly: true});
       if (!result.checked) {
         const message = result.completedByOther
           ? "Devam eden skor kontrolü tamamlandı. Ortak skorlar Firebase'den alındı."
@@ -17281,7 +17281,7 @@ async function maybeAutoSyncResults(options = {}) {
   lastServerScoreRequestTimes.set(scope, Date.now());
   autoResultsSyncScope = scope;
   autoResultsSyncPromise = (async () => {
-    try { return !!(await syncSharedWeekScores({seasonId, weekId, force: !!options.force && window.SkorxAuth.admin})).checked; }
+    try { return !!(await syncSelectedWeekFromApi({scoreOnly: true, force: !!options.force && window.SkorxAuth.admin})).checked; }
     catch (error) {
       // Failure is retryable on the next existing trigger, never a successful sync.
       lastServerScoreRequestTimes.delete(scope);
@@ -17322,9 +17322,9 @@ async function syncSelectedWeekFromApi(options = {}) {
     });
   }
 
-  if (!window.SkorxAuth.admin && isFirebaseReady() && shouldPublishMatchChanges(week.id)) {
+  if (isFirebaseReady() && shouldPublishMatchChanges(week.id)) {
     try {
-      const result = await syncSharedWeekScores({seasonId, weekId, force: window.SkorxAuth.admin});
+      const result = await syncSharedWeekScores({seasonId, weekId, force: options.force === undefined ? window.SkorxAuth.admin : !!options.force && window.SkorxAuth.admin});
       setWeekApiStatus(result.checked ? `${result.checkedCount} maç kontrol edildi; ${result.updatedCount} maç ortak kayıtta güncellendi.` : "Ortak skorlar alındı; 10 dakikalık kontrol süresi henüz dolmadı.");
       return {...result, createdCount: 0, movedCount: 0, sheetSyncSuccess: true};
     } catch (error) { setWeekApiStatus(error.message); throw error; }
