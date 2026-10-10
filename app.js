@@ -626,6 +626,14 @@ async function firebaseApiPost(action, payload = {}) {
         } else {
           await firebaseWrite(`matches/${id}`, record);
         }
+        const readback = (await getFirebaseDb().ref(`matches/${id}`).get()).val();
+        if (!readback) throw new Error("Yazılan maç Firebase'den geri okunamadı.");
+        if (!payload.preserveManualScores || !parseBooleanish(readback.manualScoreLocked ?? readback.manualScoreLock ?? readback.manuelSkorKilitli)) {
+          for (const field of ['apiId','played','homeScore','awayScore','liveHomeScore','liveAwayScore','statusText']) {
+            if (String(readback[field] ?? '') !== String(record[field] ?? '')) throw new Error("Maç skoru Firebase'de doğrulanamadı. Başarılı kaydedilmedi.");
+          }
+        }
+
       }
       return { success: true };
     }
@@ -2543,7 +2551,7 @@ async function syncOnlineMatchesFromSheet(options = {}) {
       rows = firebaseSnapshotToArray(remoteMap);
       if (requestedSeasonLabel) {
         rows = rows.filter((row) =>
-          String(row.season || row.sezon || "").trim() === requestedSeasonLabel
+          String(row.seasonId || "") === String(requestedSeasonId) || String(row.season || row.sezon || "").trim() === requestedSeasonLabel
         );
       }
     } else {
@@ -2553,6 +2561,7 @@ async function syncOnlineMatchesFromSheet(options = {}) {
     }
 
     if (!rows.length) {
+      if (options.expectedMatchIds?.length) throw new Error("Doğrulanmış maç kaydı bu cihazda okunamadı.");
       recalculateAllPoints();
       saveState(true);
       if (!options.silent) renderAll();
@@ -2560,6 +2569,7 @@ async function syncOnlineMatchesFromSheet(options = {}) {
     }
 
     const touchedWeekIds = new Set();
+    const importedMatchIds = new Set();
     let lastSeasonId = requestedSeasonId || null;
 
     rows.forEach((row) => {
@@ -2571,22 +2581,23 @@ async function syncOnlineMatchesFromSheet(options = {}) {
         row.sezonAdi ||
         requestedSeasonLabel ||
         "";
-      const season = ensureSeasonFromOnlineLabel(
+      const season = getSeasonById(row.seasonId) || ensureSeasonFromOnlineLabel(
         rowSeasonLabel,
         row.leagueName || row.ligAdi || "",
       );
-      const seasonId = season?.id || requestedSeasonId;
+      const seasonId = season?.id || row.seasonId || requestedSeasonId;
       if (!seasonId) return;
       lastSeasonId = seasonId;
 
       const weekNo = Number(
         row.weekNo || row.haftaNo || row.week || row.hafta || 0,
       );
-      if (!weekNo) return;
+      if (!weekNo && !row.weekId) return;
 
       // Maç senkronu hafta oluşturamaz. Yalnızca admin tarafından daha önce
       // kaydedilmiş haftalara ait maçlar içeri alınır.
-      const week = getRegisteredWeekForSeason(seasonId, weekNo);
+      const registered = getWeekById(row.weekId);
+      const week = registered && String(registered.seasonId) === String(seasonId) ? registered : getRegisteredWeekForSeason(seasonId, weekNo);
       if (!week) {
         console.warn(
           `[HAFTA KORUMASI] ${weekNo}. hafta admin tarafından oluşturulmadığı için uzak maç kaydı atlandı.`,
@@ -2595,6 +2606,7 @@ async function syncOnlineMatchesFromSheet(options = {}) {
       }
 
       touchedWeekIds.add(week.id);
+      const resolvedWeekNo = Number(week.number) || weekNo;
 
       const homeTeam = row.homeTeam || row.evSahibi || "";
       const awayTeam = row.awayTeam || row.deplasman || "";
@@ -2606,7 +2618,7 @@ async function syncOnlineMatchesFromSheet(options = {}) {
           (String(
             match.sheetMatchId || match.remoteMatchId || match.macId || match.id || "",
           ) === String(row.id || row.sheetMatchId || row.macId || "") ||
-            (Number(getWeekNumberById(match.weekId)) === weekNo &&
+            (Number(getWeekNumberById(match.weekId)) === resolvedWeekNo &&
               normalizeText(match.homeTeam) === normalizeText(homeTeam) &&
               normalizeText(match.awayTeam) === normalizeText(awayTeam))),
       );
@@ -2665,6 +2677,7 @@ async function syncOnlineMatchesFromSheet(options = {}) {
         existing.manualScoreLocked = manualScoreLocked;
       }
 
+      importedMatchIds.add(String(row.id || row.sheetMatchId || row.macId || ""));
       existing.statusText = String(row.statusText || "");
       existing.liveHomeScore = hasValidMatchScore(row.liveHomeScore, row.liveAwayScore) ? Number(row.liveHomeScore) : null;
       existing.liveAwayScore = hasValidMatchScore(row.liveHomeScore, row.liveAwayScore) ? Number(row.liveAwayScore) : null;
@@ -2711,6 +2724,7 @@ async function syncOnlineMatchesFromSheet(options = {}) {
         getWeeksBySeasonId(state.settings.activeSeasonId)[0]?.id || null;
     }
 
+    if ((options.expectedMatchIds || []).some(id => !importedMatchIds.has(String(id)))) throw new Error("Firebase kaydı alındı fakat beklenen maç uygulamaya aktarılamadı.");
     touchedWeekIds.forEach((weekId) => syncWeekStatus(weekId));
     recalculateAllPoints();
     saveState(true);
@@ -17235,6 +17249,11 @@ const sharedScoreSyncTimes = new Map();
 const sharedScoreSyncRequests = new Map();
 const lastServerScoreRequestTimes = new Map();
 let autoResultsSyncScope = null;
+function scoreReadbackSignature(row) {
+  const n = value => value === null || value === undefined || value === "" ? null : Number(value);
+  const yes = value => value === true || value === 1 || value === "1" || value === "true";
+  return JSON.stringify([yes(row.played ?? row.oynandiMi), n(row.homeScore ?? row.evGol), n(row.awayScore ?? row.depGol), n(row.liveHomeScore), n(row.liveAwayScore), String(row.statusText || "").trim().toLowerCase(), yes(row.manualScoreLocked ?? row.manualScoreLock ?? row.manuelSkorKilitli)]);
+}
 function matchScoreViewFingerprint() {
   return JSON.stringify(state.matches.map(m => [m.id, m.seasonId, m.weekId, m.apiId, m.homeTeam, m.awayTeam, m.date, m.played, m.homeScore, m.awayScore, m.liveHomeScore, m.liveAwayScore, m.statusText, m.manualScoreLocked, m.postponed, m.wasPostponed]));
 }
@@ -17258,8 +17277,12 @@ async function syncSharedWeekScores({seasonId = getActiveSeasonId(), weekId = st
     }
     // An acknowledged shared write comes first. No client-provided score is trusted by the server.
     const remoteMatches = await firebaseRead("matches");
+    for (const verified of result.verifiedScores || []) {
+      const row = remoteMatches?.[verified.id];
+      if (!row || scoreReadbackSignature(row) !== verified.signature) throw new Error("Firebase geri okumasındaki skor doğrulanmış kayıtla eşleşmedi. Başarılı güncelleme gösterilmedi; yeniden kontrol edin.");
+    }
     const before = matchScoreViewFingerprint();
-    if (!await syncOnlineMatchesFromSheet({seasonId, seasonLabel: getSeasonById(seasonId)?.name || "", remoteMatches, silent: true})) {
+    if (!await syncOnlineMatchesFromSheet({seasonId, seasonLabel: getSeasonById(seasonId)?.name || "", remoteMatches, expectedMatchIds: result.verifiedMatchIds || [], silent: true})) {
       throw new Error("Ortak skor kaydı kontrol edildi fakat bu cihazda alınamadı. Bağlantıyı kontrol edip yeniden deneyin.");
     }
     sharedScoreSyncTimes.set(scope, Number(result.finishedAt || 0));
@@ -17441,10 +17464,6 @@ async function syncSelectedWeekFromApi(options = {}) {
 
     getWeeksBySeasonId(seasonId).forEach((item) => syncWeekStatus(item.id));
 
-    recalculateAllPoints();
-    saveState();
-    renderAll();
-
     let sheetSyncResult = null;
 
     if (shouldPublishMatchChanges(week.id)) {
@@ -17452,10 +17471,13 @@ async function syncSelectedWeekFromApi(options = {}) {
         sheetSyncResult = await syncWeekMatchesToSheet(week.id, {preserveManualScores: true});
       } catch (sheetError) { throw sheetError; }
       if (!sheetSyncResult?.success) throw new Error("Hafta ortak Firebase kaydına yazılamadı.");
-      if (!await syncOnlineMatchesFromSheet({seasonId, silent: true})) throw new Error("Ortak maç kaydı yeniden alınamadı.");
+      if (!await syncOnlineMatchesFromSheet({seasonId, expectedMatchIds: getMatchesByWeekId(week.id).map(match => String(match.sheetMatchId || match.remoteMatchId || match.macId || match.id)), silent: true})) throw new Error("Ortak maç kaydı yeniden alınamadı veya maçlar uygulamaya aktarılamadı.");
       debounceFirebaseRealtimeRender();
     }
 
+    recalculateAllPoints();
+    saveState();
+    renderAll();
     const finishedAt = Date.now();
 
     if (typeof logAutoSyncDebug === "function") {
