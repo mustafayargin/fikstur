@@ -3911,6 +3911,8 @@ async function hydrateOnlineStateForSession(options = {}) {
         },
       );
     }
+    // The published week is known now; login must not rely on the pre-hydration selection.
+    if (typeof maybeAutoSyncResults === "function") maybeAutoSyncResults();
     return true;
   } catch (error) {
     console.error("Oturum verileri yüklenemedi:", error);
@@ -8040,7 +8042,9 @@ async function runDashboardWeekScoreUpdate(buttonOrEvent) {
       startDashboardApiProgress();
       const result = await syncSharedWeekScores({seasonId: season.id, weekId: week.id, force: window.SkorxAuth.admin});
       if (!result.checked) {
-        const message = `Bu hafta kısa süre önce kontrol edildi. Yeni API isteği yapılmadı; ortak kayıtlar alındı. Tekrar kontrol: ${formatManualScoreCooldown(result.retryAfterMs || 0)}.`;
+        const message = result.completedByOther
+          ? "Devam eden skor kontrolü tamamlandı. Ortak skorlar Firebase'den alındı."
+          : `Bu hafta kısa süre önce kontrol edildi. Yeni API isteği yapılmadı; ortak kayıtlar alındı. Tekrar kontrol: ${formatManualScoreCooldown(result.retryAfterMs || 0)}.`;
         finishDashboardApiProgress(true, message);
         setAsyncButtonState(actionButton, "idle");
         await showAlert(message, {title: "Ortak skorlar alındı", type: "info"});
@@ -17228,6 +17232,7 @@ function getAutoSyncActorLabel() {
 const sharedScoreSyncTimes = new Map();
 const sharedScoreSyncRequests = new Map();
 const lastServerScoreRequestTimes = new Map();
+let autoResultsSyncScope = null;
 function matchScoreViewFingerprint() {
   return JSON.stringify(state.matches.map(m => [m.id, m.seasonId, m.weekId, m.apiId, m.homeTeam, m.awayTeam, m.date, m.played, m.homeScore, m.awayScore, m.liveHomeScore, m.liveAwayScore, m.statusText, m.manualScoreLocked, m.postponed, m.wasPostponed]));
 }
@@ -17235,7 +17240,20 @@ async function syncSharedWeekScores({seasonId = getActiveSeasonId(), weekId = st
   const scope = `${seasonId}:${weekId}`;
   if (sharedScoreSyncRequests.has(scope)) return sharedScoreSyncRequests.get(scope);
   const operation = (async () => {
-    const result = await window.SkorxAuth.request("syncScores", {seasonId, weekId, force});
+    let result = await window.SkorxAuth.request("syncScores", {seasonId, weekId, force});
+    if (result.pending) {
+      const startedAt = Number(result.startedAt || 0);
+      const deadline = Date.now() + 90000;
+      renderDashboardAutoSyncStatus("⏳ Skor kontrolü sürüyor; ortak sonuç bekleniyor");
+      while (result.pending) {
+        if (Date.now() >= deadline) throw new Error("Devam eden skor kontrolü zamanında tamamlanmadı. Son alınan skorlar korundu; yeniden deneyin.");
+        // Read only the server-owned status. Do not start another provider fetch.
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        result = await window.SkorxAuth.request("scoreSyncStatus", {seasonId, weekId});
+      }
+      if (Number(result.finishedAt || 0) < startedAt) throw new Error("Önceki skor kontrolü tamamlanamadı. Son alınan skorlar korundu; yeniden deneyin.");
+      result.completedByOther = true;
+    }
     // An acknowledged shared write comes first. No client-provided score is trusted by the server.
     const remoteMatches = await firebaseRead("matches");
     const before = matchScoreViewFingerprint();
@@ -17257,10 +17275,11 @@ async function maybeAutoSyncResults(options = {}) {
   if (!isAuthenticated() || !isFirebaseReady() || !window.SkorxAuth?.ready) return false;
   const seasonId = getActiveSeasonId(), weekId = state.settings.activeWeekId;
   if (!seasonId || !weekId || !shouldPublishMatchChanges(weekId)) return false;
-  if (autoResultsSyncPromise) return autoResultsSyncPromise;
   const scope = `${seasonId}:${weekId}`;
+  if (autoResultsSyncPromise && autoResultsSyncScope === scope) return autoResultsSyncPromise;
   if (!options.force && Date.now() - (lastServerScoreRequestTimes.get(scope) || 0) < 10 * 60000) return false;
   lastServerScoreRequestTimes.set(scope, Date.now());
+  autoResultsSyncScope = scope;
   autoResultsSyncPromise = (async () => {
     try { return !!(await syncSharedWeekScores({seasonId, weekId, force: !!options.force && window.SkorxAuth.admin})).checked; }
     catch (error) {
@@ -17269,7 +17288,7 @@ async function maybeAutoSyncResults(options = {}) {
       console.warn("Skor kontrolü tamamlanamadı:", error.message);
       renderDashboardAutoSyncStatus("⚠️ Skor kaynağı doğrulanamadı; son alınan veriler gösteriliyor");
       return false;
-    } finally { autoResultsSyncPromise = null; }
+    } finally { if (autoResultsSyncScope === scope) autoResultsSyncPromise = null; }
   })();
   return autoResultsSyncPromise;
 }
@@ -18562,8 +18581,8 @@ async function bootstrapApplication() {
               },
             );
 
+            maybeAutoSyncResults();
             if ((state.settings.currentTab || "dashboard") === "dashboard") {
-              maybeAutoSyncResults();
               renderDashboardSyncCard();
               renderDashboardAutoSyncStatus();
             }
