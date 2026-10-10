@@ -7654,6 +7654,8 @@ const dashboardApiProgressState = {
   timer: null,
 };
 
+// Temporary test mode: only manual score buttons bypass the user cooldown.
+const USER_MANUAL_SCORE_TEST_MODE = true;
 const MANUAL_SCORE_UPDATE_COOLDOWN_MS = 10 * 60 * 1000;
 let dashboardScoreCooldownTimer = null;
 let dashboardScoreUpdatePromise = null;
@@ -7667,7 +7669,7 @@ function getManualScoreLastSuccessAt() {
 }
 
 function getManualScoreCooldownRemaining(now = Date.now()) {
-  if (window.SkorxAuth.admin) return 0;
+  if (window.SkorxAuth.admin || USER_MANUAL_SCORE_TEST_MODE) return 0;
   const lastSuccess = sharedScoreSyncTimes.get(`${getActiveSeasonId()}:${state.settings.activeWeekId}`) || 0;
   return Math.max(
     0,
@@ -8040,7 +8042,7 @@ async function runDashboardWeekScoreUpdate(buttonOrEvent) {
     try {
       setAsyncButtonState(actionButton, "loading", { loading: "API'ye bağlanılıyor..." });
       startDashboardApiProgress();
-      const result = await syncSelectedWeekFromApi({scoreOnly: true});
+      const result = await syncSelectedWeekFromApi();
       if (!result.checked) {
         const message = result.completedByOther
           ? "Devam eden skor kontrolü tamamlandı. Ortak skorlar Firebase'den alındı."
@@ -17322,12 +17324,16 @@ async function syncSelectedWeekFromApi(options = {}) {
     });
   }
 
-  if (isFirebaseReady() && shouldPublishMatchChanges(week.id)) {
+  if ((!window.SkorxAuth.admin || options.scoreOnly === true) && isFirebaseReady() && shouldPublishMatchChanges(week.id)) {
     try {
-      const result = await syncSharedWeekScores({seasonId, weekId, force: options.force === undefined ? window.SkorxAuth.admin : !!options.force && window.SkorxAuth.admin});
+      const result = await syncSharedWeekScores({seasonId, weekId, force: options.force === undefined ? (window.SkorxAuth.admin || USER_MANUAL_SCORE_TEST_MODE) : options.force === true});
       setWeekApiStatus(result.checked ? `${result.checkedCount} maç kontrol edildi; ${result.updatedCount} maç ortak kayıtta güncellendi.` : "Ortak skorlar alındı; 10 dakikalık kontrol süresi henüz dolmadı.");
       return {...result, createdCount: 0, movedCount: 0, sheetSyncSuccess: true};
-    } catch (error) { setWeekApiStatus(error.message); throw error; }
+    } catch (error) {
+      setWeekApiStatus(error.message);
+      if (!options.scoreOnly) await showAlert(error.message, {title: "Skor güncelleme başarısız", type: "warning"});
+      throw error;
+    }
   }
   if (!window.SkorxAuth.admin) throw new Error("Bu hafta henüz yayınlanmadı.");
   setWeekApiStatus(`${week.number}. hafta API'den kontrol ediliyor...`);
@@ -17343,7 +17349,12 @@ async function syncSelectedWeekFromApi(options = {}) {
     const fallbackWeekEvents = seasonEvents.filter(
       (event) => Number(event.weekNumber) === Number(week.number),
     );
-    const weekEvents = roundEvents.length ? roundEvents : fallbackWeekEvents;
+    const weekEvents = (roundEvents.length ? roundEvents : fallbackWeekEvents).map(event => {
+      const seasonMatches = seasonEvents.filter(item => String(item.apiId) === String(event.apiId));
+      const newer = seasonMatches.length === 1 ? seasonMatches[0] : null;
+      const isFinal = item => /^(ft|aet|pen|finished|match finished|full time|full-time|after extra time|after penalties|bitti)$/i.test(String(item?.statusText || "").trim());
+      return !isFinal(event) && isFinal(newer) && hasValidMatchScore(newer.homeScore, newer.awayScore) ? newer : event;
+    });
 
     const selectedWeekMatches = getMatchesByWeekId(weekId);
     let movedCount = 0;
@@ -17496,6 +17507,7 @@ async function syncSelectedWeekFromApi(options = {}) {
     return {
       success: true,
       finishedAt,
+      checked: true,
       checkedCount: weekEvents.length,
       updatedCount,
       scoreCount,
@@ -17966,7 +17978,7 @@ function bindEvents() {
   on("apiImportTeamsBtn", "click", (event) =>
     importSeasonTeamsFromApi(event.currentTarget),
   );
-  on("apiSyncWeekBtn", "click", syncSelectedWeekFromApi);
+  on("apiSyncWeekBtn", "click", () => syncSelectedWeekFromApi().catch(() => {}));
   on("dashboardSyncWeekBtn", "click", syncDashboardWeek);
   on("dashboardSyncSeasonBtn", "click", syncDashboardSeason);
   on("dashboardWeekScoreUpdateBtn", "click", runDashboardWeekScoreUpdate);
