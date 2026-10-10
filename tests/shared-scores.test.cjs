@@ -1,6 +1,6 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict');
-const {scorePatch,syncScores}=require('../server/scores.cjs');
+const {scorePatch,syncScores,scoreSyncStatus}=require('../server/scores.cjs');
 const {execute}=require('../server/service.cjs');
 const vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 const code=fs.readFileSync(path.join(__dirname,'../app.js'),'utf8');
@@ -83,8 +83,22 @@ test('concurrent devices perform one provider request; in-progress response is n
   const db=database();let release,calls=0;const wait=new Promise(r=>release=r);
   const first=syncScores(db,user,payload,{now,fetchImpl:async()=>{calls++;await wait;return {ok:true,json:async()=>({events:[event()]})}}});
   await new Promise(r=>setImmediate(r));
-  await assert.rejects(syncScores(db,admin,{...payload,force:true},{now,fetchImpl:provider(event())}),e=>e.status===409);
+  const pending=await syncScores(db,user,payload,{now,fetchImpl:provider(event())});assert.equal(pending.pending,true);assert.equal(pending.checked,false);
   release();await first;assert.equal(calls,1);
+});
+test('expired owner during successful cooldown is cached data, never a false busy error',async()=>{
+  const db=database();db.data.serverPrivate={scoreSync:{w:{owner:'expired',startedAt:now-120000,lastSuccessAt:now-180000}}};
+  const result=await syncScores(db,user,payload,{now,fetchImpl:()=>{throw Error('must not fetch')}});
+  assert.equal(result.checked,false);assert.equal(result.pending,undefined);assert.ok(result.retryAfterMs>0);
+  assert.equal((await scoreSyncStatus(db,user,payload,{now})).pending,false);
+});
+test('expired interrupted request without a recent success allows a new shared check',async()=>{
+  const db=database();db.data.serverPrivate={scoreSync:{w:{owner:'expired',startedAt:now-120000}}};
+  const result=await syncScores(db,user,payload,{now,fetchImpl:provider(event())});assert.equal(result.checked,true);assert.equal(db.data.matches.m.liveHomeScore,1);
+});
+test('status polling is read-only and exposes neither owner nor provider credentials',async()=>{
+  const db=database();db.data.serverPrivate={scoreSync:{w:{owner:'private-id',startedAt:now,lastSuccessAt:now-700000}}};
+  const result=await scoreSyncStatus(db,user,payload,{now});assert.equal(result.pending,true);assert.equal(db.writes.length,0);assert.equal(result.owner,undefined);
 });
 test('unpublished or wrong-season weeks are rejected before requesting provider data',async()=>{
   const db=database();db.data.settings.weeksMeta[0].status='hazirlaniyor';let calls=0;const fetchImpl=async()=>{calls++;throw Error('must not fetch')};
@@ -154,7 +168,7 @@ test('two user devices receive shared score snapshots and compute identical live
     assert.equal(device.c.state.predictions[0].provisionalPoints,true);assert.equal(device.stats().hydrations,0);assert.equal(device.stats().renders,1);
     device.bindings.get('matches')(device.snapshot(db.data.matches));assert.equal(device.stats().renders,1);
   }
-  await syncScores(db,admin,{...payload,force:true},{now,fetchImpl:provider(event('FT',2,0))});
+  await syncScores(db,user,payload,{now:db.data.serverPrivate.scoreSync.w.lastSuccessAt+600001,fetchImpl:provider(event('FT',2,0))});
   for(const device of [first,second])device.bindings.get('matches')(device.snapshot(db.data.matches));
   await new Promise(r=>setImmediate(r));
   for(const device of [first,second]){
@@ -209,4 +223,27 @@ test('existing admin fixture API writer preserves a concurrent manual result whi
   const apiMatch=match({played:true,homeScore:2,awayScore:2,manualScoreLocked:false});
   await c.firebaseApiPost('addMatches',{matches:[apiMatch],preserveManualScores:true});assert.equal(db.data.matches.m.homeScore,3);assert.equal(db.data.matches.m.manualScoreLocked,true);
   await c.firebaseApiPost('addMatches',{matches:[{...apiMatch,homeScore:4,manualScoreLocked:true}]});assert.equal(db.data.matches.m.homeScore,4);
+});
+test('a user waits for another user check with read-only status polling, then loads shared scores',async()=>{
+  const f=requestDevice();let statuses=0;const startedAt=Date.now();
+  f.c.setTimeout=fn=>fn();f.c.window.SkorxAuth.request=async(action,payload)=>{
+    f.calls.push({action,payload});
+    if(action==='syncScores')return {success:true,pending:true,checked:false,startedAt};
+    statuses++;return statuses===1?{success:true,pending:true,checked:false,startedAt}:{success:true,pending:false,checked:false,startedAt,finishedAt:startedAt+1};
+  };
+  const result=await f.c.runDashboardWeekScoreUpdate();assert.equal(result.completedByOther,true);assert.equal(f.stats().reads,1);
+  assert.deepEqual(f.calls.map(v=>v.action),['syncScores','scoreSyncStatus','scoreSyncStatus']);assert.ok(f.messages[0].message.includes('kontrolü tamamlandı'));assert.equal(f.messages[0].ok,true);
+});
+test('a failed concurrent check is not reported as successful and does not load stale data as a new update',async()=>{
+  const f=requestDevice();f.c.setTimeout=fn=>fn();const startedAt=Date.now();
+  f.c.window.SkorxAuth.request=async action=>action==='syncScores'?{success:true,pending:true,startedAt}:{success:true,pending:false,finishedAt:startedAt-1000};
+  assert.equal(await f.c.runDashboardWeekScoreUpdate(),null);assert.equal(f.messages[0].ok,false);assert.equal(f.stats().reads,0);
+});
+test('login starts user score refresh after the published week is known, without awaiting slow provider',async()=>{
+  const f=requestDevice();f.c.useOnlineMode=true;let ready=false,requests=0;
+  f.c.window.SkorxAuth.request=async action=>{assert.equal(action,'syncScores');assert.equal(ready,true);requests++;return new Promise(()=>{});};
+  Object.assign(f.c,{setAppLoading:()=>{},setAppLoadingCheck:()=>{},syncSeasonRegistryFromFirebase:async()=>{},syncUsersFromSheet:async()=>[],syncOnlinePredictions:async()=>true,
+    validateFreshActiveSelection:()=>{ready=true},flushPendingPredictionQueue:async()=>({flushed:0}),updateLastSyncLabel:()=>{},recordAdminSyncActivity:()=>{},renderAll:()=>{}});
+  f.c.window.setTimeout=()=>{};vm.runInContext(section('async function hydrateOnlineStateForSession(','let welcomeOverlayTimer'),f.c);
+  assert.equal(await f.c.hydrateOnlineStateForSession({suppressLoadingOverlay:true}),true);assert.equal(requests,1);assert.equal(f.c.window.SkorxAuth.admin,false);
 });
