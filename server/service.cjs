@@ -46,22 +46,7 @@ async function execute({auth,db},actor,action,payload={}) {
   if (action === 'getPredictions') {
     const [predictions,matches,settings] = await Promise.all([read(db,'predictions'),read(db,'matches'),read(db,'settings')]);
     const visible = Object.entries(predictions || {}).filter(([,v])=>p.canReveal(actor,v,matches||{},settings||{})).map(([id,v])=>({...p.clean(v),id}));
-    // Publish participation only; never a score, points, timestamp or raw record.
-    const submissions = new Map();
-    for (const row of Object.values(predictions || {})) {
-      const home = row.homePred ?? row.tahminEv;
-      const away = row.awayPred ?? row.tahminDep;
-      if ([home,away].some(v => v === '' || v === null || v === undefined || !Number.isInteger(Number(v)) || Number(v)<0 || Number(v)>99)) continue;
-      try {
-        const [sheetMatchId,rawMatch] = p.resolveMatch(row,matches || {});
-        const match = p.contextualMatch(rawMatch,settings || {});
-        const week = Object.values(settings?.weeksMeta || {}).find(w => String(w.id)===match.weekId);
-        if (!actor.admin && (!week || !['aktif','yayinlandi','tamamlandi'].includes(week.status))) continue;
-        const playerId = String(row.playerId || row.kullaniciId || '');
-        if (playerId) submissions.set(JSON.stringify([sheetMatchId,playerId]),{sheetMatchId,playerId});
-      } catch { /* Orphan records cannot claim participation in a match. */ }
-    }
-    return {success:true,predictions:visible,submissions:[...submissions.values()]};
+    return {success:true,predictions:visible};
   }
   if (action === 'savePrediction' || action === 'deletePrediction') {
     const [matches,settings,preds,users] = await Promise.all([read(db,'matches'),read(db,'settings'),read(db,'predictions'),read(db,'users')]);

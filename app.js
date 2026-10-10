@@ -316,8 +316,9 @@ async function firebaseApiGet(action, params = {}) {
     case "getPredictions": {
       const sezon = String(params.sezon || "").trim();
       const haftaNo = String(params.haftaNo || "").trim();
-      const response = await window.SkorxAuth.request("getPredictions");
-      let predictions = response.predictions;
+      let predictions = firebaseSnapshotToArray(
+        await firebaseRead("predictions"),
+      );
       if (sezon) {
         predictions = predictions.filter(
           (item) => String(item.season || item.sezon || "").trim() === sezon,
@@ -330,7 +331,7 @@ async function firebaseApiGet(action, params = {}) {
         );
       }
       predictions = dedupeFirebasePredictionRows(predictions);
-      return { success: true, predictions, submissions: response.submissions || [] };
+      return { success: true, predictions };
     }
     case "getStandings":
       return { success: true, rows: [] };
@@ -2633,13 +2634,6 @@ async function syncOnlineMatchesFromSheet(options = {}) {
         existing.manualScoreLocked = manualScoreLocked;
       }
 
-      existing.statusText = String(row.statusText || "");
-      existing.liveHomeScore = hasValidMatchScore(row.liveHomeScore, row.liveAwayScore) ? Number(row.liveHomeScore) : null;
-      existing.liveAwayScore = hasValidMatchScore(row.liveHomeScore, row.liveAwayScore) ? Number(row.liveAwayScore) : null;
-      existing.liveScoreUpdatedAt = String(row.liveScoreUpdatedAt || "");
-      if (row.postponed !== undefined) existing.postponed = parseBooleanish(row.postponed);
-      if (row.wasPostponed !== undefined) existing.wasPostponed = parseBooleanish(row.wasPostponed);
-
       if (
         !getTeamsBySeasonId(seasonId).some(
           (t) => normalizeText(t.name) === normalizeText(homeTeam),
@@ -3058,12 +3052,6 @@ async function sendMatchesToSheet(matches, options = {}) {
       date: match.date || "",
       tarih: match.date || "",
       apiId: match.apiId || "",
-      statusText: match.statusText || "",
-      liveHomeScore: match.liveHomeScore ?? "",
-      liveAwayScore: match.liveAwayScore ?? "",
-      liveScoreUpdatedAt: match.liveScoreUpdatedAt || "",
-      postponed: !!match.postponed,
-      wasPostponed: !!match.wasPostponed,
       played: !!match.played,
       oynandiMi: match.played ? 1 : 0,
       homeScore: match.homeScore ?? "",
@@ -3584,22 +3572,6 @@ function getUnsyncedPredictionDraftsForScope(seasonId, weekId = null) {
     .map((pred) => ({ ...pred }));
 }
 
-// Public participation is separate from private score records.
-let predictionSubmissionPresence = new Set();
-function hasSubmittedPrediction(matchId, playerId) {
-  const pred = getPrediction(matchId, playerId);
-  return !!(pred && pred.homePred !== "" && pred.awayPred !== "") || predictionSubmissionPresence.has(getPredictionUiKey(matchId, playerId));
-}
-function applyPredictionSubmissionPresence(submissions) {
-  const next = new Set();
-  for (const row of submissions) {
-    const matchId = resolveMatchIdFromOnlineRow(row);
-    const playerId = resolvePlayerIdFromOnlineRow(row);
-    if (matchId && playerId) next.add(getPredictionUiKey(matchId, playerId));
-  }
-  predictionSubmissionPresence = next;
-}
-
 // API row/property order is not a data change.
 function predictionResponseFingerprint(rows) {
   const canonical = value => {
@@ -3658,7 +3630,6 @@ async function syncOnlinePredictions(options = {}) {
       weekNumber || "",
     );
     if (owner !== window.SkorxAuth.session || !isAuthenticated() || revision !== predictionSyncRevision) return false;
-    if (Array.isArray(response.submissions)) applyPredictionSubmissionPresence(response.submissions);
     const rows = dedupeOnlinePredictionRows(
       normalizeOnlinePredictionRows(response),
     );
@@ -4385,7 +4356,6 @@ function logoutUser() {
   window.SkorxAuth.signOut().catch(() => {});
   state.predictions = [];
   predictionSyncRevision++;
-  predictionSubmissionPresence.clear();
   for (const key of Object.keys(predictionInputDrafts)) delete predictionInputDrafts[key];
   for (const key of Object.keys(predictionUiState)) delete predictionUiState[key];
   for (const timer of Object.values(predictionUiResetTimers)) clearTimeout(timer);
@@ -5443,7 +5413,13 @@ function renderDashboardMatchCards(container, matches) {
     }
 
     if (visual === "live") {
-      const liveMinute = getMatchClockLabel(match, runtime);
+      const liveMinute = runtime.halftime
+        ? "DEVRE ARASI"
+        : runtime.minute
+          ? `${runtime.minute}'`
+          : String(match.statusText || "Canlı")
+              .replace(/live|in play/gi, "")
+              .trim() || "Canlı";
       return {
         icon: "●",
         label: "CANLI",
@@ -5479,13 +5455,12 @@ function renderDashboardMatchCards(container, matches) {
     .map((match) => {
       const badge = getMatchBadge(match);
       const visual = getMatchVisualState(match);
-      const displayScore = getMatchDisplayScore(match);
       const predictions = players.map((player) => ({
         player,
         pred: getPrediction(match.id, player.id),
       }));
       const filled = predictions.filter(
-        ({ player }) => hasSubmittedPrediction(match.id, player.id),
+        ({ pred }) => pred && pred.homePred !== "" && pred.awayPred !== "",
       );
       const exact = predictions.filter(
         ({ pred }) => pred && Number(pred.points || 0) >= 3,
@@ -5512,8 +5487,7 @@ function renderDashboardMatchCards(container, matches) {
 
       const avatars = predictions
         .map(({ player, pred }) => {
-          const tone = !pred && hasSubmittedPrediction(match.id, player.id)
-            ? "is-filled" : getDashboardPredictionTone(pred, match);
+          const tone = getDashboardPredictionTone(pred, match);
           return `
             <button
               type="button"
@@ -5555,8 +5529,8 @@ function renderDashboardMatchCards(container, matches) {
 
             <div class="dashboard-score-core premium-score-core">
               <div class="dashboard-score-core__label">${match.played ? "SKOR" : visual === "finished-time" ? "BİTTİ" : visual === "live" ? "CANLI" : "MAÇ"}</div>
-              <div class="dashboard-score-core__value premium-score-value">${displayScore ? `${displayScore.home} <span>-</span> ${displayScore.away}` : visual === "live" || visual === "finished-time" ? '<span class="dashboard-score-core__pending premium-vs-capsule">—</span>' : '<span class="dashboard-score-core__pending premium-vs-capsule">VS</span>'}</div>
-              <div class="dashboard-score-core__sub">${match.played ? "Sonuç işlendi" : displayScore ? "Son alınan canlı skor" : visual === "live" || visual === "finished-time" ? "Skor verisi bekleniyor" : "Detay için dokun"}</div>
+              <div class="dashboard-score-core__value premium-score-value">${match.played ? `${match.homeScore} <span>-</span> ${match.awayScore}` : '<span class="dashboard-score-core__pending premium-vs-capsule">VS</span>'}</div>
+              <div class="dashboard-score-core__sub">${match.played ? "Sonuç işlendi" : visual === "finished-time" ? "Skor bekleniyor" : "Detay için dokun"}</div>
             </div>
 
             <div class="dashboard-team premium-team dashboard-team--away">
@@ -5599,7 +5573,10 @@ function buildDashboardMatchModalBody(match) {
           ? `${pred.homePred !== "" ? pred.homePred : "-"} - ${pred.awayPred !== "" ? pred.awayPred : "-"}`
           : "--";
       const revealPrediction = canRevealPredictionForViewer(match, player.id);
-      const hasPrediction = hasSubmittedPrediction(match.id, player.id);
+      const hasPrediction = !!(
+        pred &&
+        (pred.homePred !== "" || pred.awayPred !== "")
+      );
       return {
         player,
         pred,
@@ -5655,7 +5632,11 @@ function buildDashboardPlayerWeekModalBody(match, player) {
 
   const weekRows = weekMatches.map((weekMatch) => {
     const pred = getPrediction(weekMatch.id, player.id);
-    const hasPrediction = hasSubmittedPrediction(weekMatch.id, player.id);
+    const hasPrediction = !!(
+      pred &&
+      pred.homePred !== "" &&
+      pred.awayPred !== ""
+    );
     const revealPrediction = canRevealPredictionForViewer(weekMatch, player.id);
     const tone = getDashboardPredictionTone(pred, weekMatch);
     const label = getDashboardPredictionLabel(pred, weekMatch);
@@ -7155,28 +7136,6 @@ function isPostponedStatus(statusText = "") {
   );
 }
 
-// A live score is display data; only final/manual scores may set played or award points.
-function hasValidMatchScore(home, away) {
-  return [home, away].every(value => value !== null && value !== undefined && value !== "" && Number.isInteger(Number(value)) && Number(value) >= 0);
-}
-function getMatchDisplayScore(match) {
-  if (match?.played && hasValidMatchScore(match.homeScore, match.awayScore)) {
-    return {home: Number(match.homeScore), away: Number(match.awayScore), final: true};
-  }
-  if (!match?.played && !match?.postponed && hasValidMatchScore(match?.liveHomeScore, match?.liveAwayScore)) {
-    return {home: Number(match.liveHomeScore), away: Number(match.liveAwayScore), final: false};
-  }
-  return null;
-}
-function getMatchClockLabel(match, runtime) {
-  const status = String(match?.statusText || "").trim().toLowerCase();
-  if (/^(ht|halftime|half time|half-time)$/.test(status)) return "DEVRE ARASI";
-  if (/^(2h|second half)$/.test(status) && (!runtime.minute || runtime.minute <= 45)) return "2. YARI";
-  if (/^(1h|first half)$/.test(status) && (runtime.halftime || runtime.minute > 45)) return "1. YARI";
-  if (runtime.halftime) return "DEVRE ARASI";
-  return runtime.minute ? `${runtime.minute}'` : status.replace(/live|in play/gi, "").trim() || "Canlı";
-}
-
 const MATCH_FIRST_HALF_MINUTES = 45;
 const MATCH_HALFTIME_MINUTES = 15;
 const MATCH_SECOND_HALF_MINUTES = 45;
@@ -7265,14 +7224,17 @@ function getMatchVisualState(match) {
 
   const statusText = String(match.statusText || "").toLowerCase();
   if (
-    /^(ft|aet|pen)$/.test(statusText) ||
     statusText.includes("finished") ||
     statusText.includes("full time") ||
     statusText.includes("bitti")
   ) {
     return "finished-time";
   }
-  if (/live|in play|in progress|canlı|^(ht|1h|2h|halftime|half time|half-time|first half|second half)$/.test(statusText)) {
+  if (
+    statusText.includes("live") ||
+    statusText.includes("in play") ||
+    statusText.includes("canlı")
+  ) {
     return "live";
   }
 
@@ -12944,7 +12906,6 @@ window.deletePredictionEntry = async function (matchId, playerId) {
     if (result?.success) {
       clearPredictionDraft(matchId, playerId);
       clearLocalPredictionRecord(matchId, playerId);
-      predictionSubmissionPresence.delete(getPredictionUiKey(matchId, playerId));
       if (typeof dequeuePredictionRetry === "function") {
         dequeuePredictionRetry(payload);
       }
@@ -17150,7 +17111,7 @@ function applyApiEventToMatch(match, event, allowCreateIfMissing = false) {
   target.awayTeam = event.awayTeam;
   target.statusText = event.statusText || "";
   if (event.date) target.date = event.date;
-  const hasScore = hasValidMatchScore(event.homeScore, event.awayScore);
+  const hasScore = event.homeScore !== null && event.awayScore !== null;
   const manualScoreLocked = !!target.manualScoreLocked;
   if (event.postponed) {
     target.postponed = true;
@@ -17175,38 +17136,18 @@ const apiStillRunning =
 const runtime = getMatchRuntimeInfo(target);
 
 const canAcceptFinalScore =
-  apiFinished || (!apiStatus && runtime.phase === "finished-time");
+  apiFinished ||
+  (!apiStatus && runtime.phase === "finished-time");
 
-  if (!manualScoreLocked && !target.played && !event.postponed) {
-    const started = apiStillRunning || runtime.phase === "live" || runtime.phase === "halftime" || runtime.phase === "finished-time";
-    if (hasScore && started) {
-      target.liveHomeScore = Number(event.homeScore);
-      target.liveAwayScore = Number(event.awayScore);
-      target.liveScoreUpdatedAt = new Date().toISOString();
-    } else if (!hasScore) {
-      // An absent provider score is not zero. Retain a previously verified live score.
-      if (!hasValidMatchScore(target.liveHomeScore, target.liveAwayScore)) {
-        target.liveHomeScore = null;
-        target.liveAwayScore = null;
-      }
-    } else if (runtime.phase === "waiting") {
-      target.liveHomeScore = null;
-      target.liveAwayScore = null;
-      target.liveScoreUpdatedAt = "";
-    }
-  }
-  if (event.postponed && !manualScoreLocked && !target.played) {
-    target.liveHomeScore = null;
-    target.liveAwayScore = null;
-    target.liveScoreUpdatedAt = "";
-  }
-  if (hasScore && !manualScoreLocked && !apiStillRunning && canAcceptFinalScore) {
-    target.homeScore = Number(event.homeScore);
-    target.awayScore = Number(event.awayScore);
+if (
+  hasScore &&
+  !manualScoreLocked &&
+  !apiStillRunning &&
+  canAcceptFinalScore
+) {
+    target.homeScore = event.homeScore;
+    target.awayScore = event.awayScore;
     target.played = true;
-    target.liveHomeScore = null;
-    target.liveAwayScore = null;
-    target.liveScoreUpdatedAt = "";
     if (target.wasPostponed || event.postponed) target.wasPostponed = true;
     target.postponed = false;
   } else if (!hasScore && !target.played && !manualScoreLocked) {
@@ -17511,7 +17452,7 @@ async function syncSelectedWeekFromApi(options = {}) {
 
       const beforeDate = existing.date || "";
       const beforePlayed = !!existing.played;
-      const beforeScore = JSON.stringify([existing.homeScore, existing.awayScore, existing.liveHomeScore, existing.liveAwayScore, existing.statusText]);
+      const beforeScore = `${existing.homeScore ?? ""}-${existing.awayScore ?? ""}`;
       const beforeWeek = existing.weekId;
       const beforePostponed = !!existing.postponed;
 
@@ -17520,7 +17461,8 @@ async function syncSelectedWeekFromApi(options = {}) {
       if (
         beforeDate !== (existing.date || "") ||
         beforePlayed !== existing.played ||
-        beforeScore !== JSON.stringify([existing.homeScore, existing.awayScore, existing.liveHomeScore, existing.liveAwayScore, existing.statusText]) ||
+        beforeScore !==
+          `${existing.homeScore ?? ""}-${existing.awayScore ?? ""}` ||
         beforeWeek !== existing.weekId ||
         beforePostponed !== existing.postponed
       ) {
@@ -18785,7 +18727,11 @@ function getPremiumMatchState(match) {
   }
 
   if (visual === "live") {
-    const liveMinute = getMatchClockLabel(match, runtime);
+    const liveMinute = runtime.minute
+      ? `${runtime.minute}'`
+      : String(match?.statusText || "Canlı")
+          .replace(/live|in play/gi, "")
+          .trim() || "Canlı";
     return { phase: visual, label: "CANLI", kicker: liveMinute };
   }
 
