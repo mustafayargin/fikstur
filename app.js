@@ -17272,7 +17272,7 @@ async function syncSharedWeekScores({seasonId = getActiveSeasonId(), weekId = st
         await new Promise(resolve => setTimeout(resolve, 3000));
         result = await window.SkorxAuth.request("scoreSyncStatus", {seasonId, weekId});
       }
-      if (Number(result.finishedAt || 0) < startedAt) throw new Error("Önceki skor kontrolü tamamlanamadı. Son alınan skorlar korundu; yeniden deneyin.");
+      if (result.failed || Number(result.finishedAt || 0) < startedAt) throw new Error(result.failureMessage || "Önceki skor kontrolü tamamlanamadı. Son alınan skorlar korundu; yeniden deneyin.");
       result.completedByOther = true;
     }
     // An acknowledged shared write comes first. No client-provided score is trusted by the server.
@@ -17311,7 +17311,7 @@ async function maybeAutoSyncResults(options = {}) {
       // Failure is retryable on the next existing trigger, never a successful sync.
       lastServerScoreRequestTimes.delete(scope);
       console.warn("Skor kontrolü tamamlanamadı:", error.message);
-      renderDashboardAutoSyncStatus("⚠️ Skor kaynağı doğrulanamadı; son alınan veriler gösteriliyor");
+      renderDashboardAutoSyncStatus(`⚠️ ${error.message || "Skor kontrolü tamamlanamadı."}`);
       return false;
     } finally { if (autoResultsSyncScope === scope) autoResultsSyncPromise = null; }
   })();
