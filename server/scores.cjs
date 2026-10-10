@@ -2,6 +2,8 @@
 const {randomUUID}=require('node:crypto');
 const {contextualMatch,parseDate,normalizeName,key,Fault}=require('./policy.cjs');
 const valid=(a,b)=>[a,b].every(v=>v!==null&&v!==undefined&&v!==''&&Number.isInteger(Number(v))&&Number(v)>=0);
+// Temporary test mode; published-week and authentication checks still apply.
+const USER_MANUAL_SCORE_TEST_MODE=true;
 const yes=v=>v===true||v===1||v==='1'||v==='true';
 const finalStatus=s=>/^(ft|aet|pen|finished|match finished|full time|full-time|after extra time|after penalties|bitti)$/i.test(s);
 const lockActive=(record,now)=>!!record?.owner&&now-Number(record.startedAt)<90000;
@@ -40,7 +42,7 @@ function scorePatch(match,event,now=Date.now()) {
 }
 async function syncScores(db,actor,payload={}, {fetchImpl=fetch,now=Date.now()}={}) {
   const {weekId,seasonId,settings,week}=await scoreScope(db,actor,payload);
-  const force=actor.admin&&payload.force===true;
+  const force=(actor.admin||USER_MANUAL_SCORE_TEST_MODE)&&payload.force===true;
   const lock=db.ref(`serverPrivate/scoreSync/${weekId}`),owner=randomUUID();
   const claim=await lock.transaction(old=>{
     if(lockActive(old,now))return;
@@ -54,16 +56,20 @@ async function syncScores(db,actor,payload={}, {fetchImpl=fetch,now=Date.now()}=
   }
   try{
     const matches=(await db.ref('matches').get()).val()||{};
-    const candidates=Object.entries(matches).filter(([,row])=>{
+    const scopedMatches=Object.entries(matches).filter(([,row])=>{
       const match=contextualMatch(row,settings);
-      return match.seasonId===seasonId&&match.weekId===weekId&&!yes(row.manualScoreLocked ?? row.manualScoreLock ?? row.manuelSkorKilitli);
+      return match.seasonId===seasonId&&match.weekId===weekId;
     });
+    if(!scopedMatches.length)throw new Fault(409,'Seçili haftanın maçları ortak Firebase kaydında bulunamadı. Hafta kaydını kontrol edin.');
+    const candidates=scopedMatches.filter(([,row])=>!yes(row.manualScoreLocked ?? row.manualScoreLock ?? row.manuelSkorKilitli));
     if(candidates.length>24)throw new Fault(400,'Hafta maç sayısı beklenen sınırı aşıyor.');
     let updated=0,failures=0,checked=0;
+    const requestDeadline=Date.now()+45000;
+    const needsFinalCheck=(event,row)=>!finalStatus(String(event?.strStatus||'').trim())&&parseDate(row.date||row.tarih)+105*60000<=now&&!/postponed|delayed|deferred|suspended|abandoned|cancelled/i.test(String(event?.strStatus||''));
     const apiKey=process.env.SPORTSDB_API_KEY||'123';
     const fetchEvents=async suffix=>{
       try {
-        const response=await fetchImpl(`https://www.thesportsdb.com/api/v1/json/${encodeURIComponent(apiKey)}/${suffix}`,{signal:AbortSignal.timeout(7000),cache:'no-store'});
+        const response=await fetchImpl(`https://www.thesportsdb.com/api/v1/json/${encodeURIComponent(apiKey)}/${suffix}`,{signal:AbortSignal.timeout(Math.max(1,Math.min(12000,requestDeadline-Date.now()))),cache:'no-store'});
         if(!response.ok)throw Error('Provider HTTP failure');
         const data=await response.json();return Array.isArray(data.events)?data.events:[];
       } catch { throw new Fault(502,'Skor kaynağına ulaşılamadı veya yanıtı okunamadı. Yeniden deneyin.'); }
@@ -75,7 +81,7 @@ async function syncScores(db,actor,payload={}, {fetchImpl=fetch,now=Date.now()}=
       if(!season?.name)throw new Fault(409,'API sezon bilgisi bulunamadı.');
       try{roundEvents=await fetchEvents(`eventsround.php?id=4339&r=${encodeURIComponent(week.number)}&s=${encodeURIComponent(season.name)}`);}catch{}
       const findEvent=(events,row)=>events.filter(e=>row.apiId?String(e.idEvent)===String(row.apiId):normalizeName(e.strHomeTeam)===normalizeName(row.homeTeam||row.evSahibi)&&normalizeName(e.strAwayTeam)===normalizeName(row.awayTeam||row.deplasman));
-      if(candidates.some(([,row])=>{const found=findEvent(roundEvents,row);return found.length!==1||!valid(found[0].intHomeScore,found[0].intAwayScore);})){
+      if(candidates.some(([,row])=>{const found=findEvent(roundEvents,row);return found.length!==1||!valid(found[0].intHomeScore,found[0].intAwayScore)||needsFinalCheck(found[0],row);})){
         try{seasonEvents=await fetchEvents(`eventsseason.php?id=4339&s=${encodeURIComponent(season.name)}`);}catch{}
       }
     }
@@ -85,10 +91,10 @@ async function syncScores(db,actor,payload={}, {fetchImpl=fetch,now=Date.now()}=
           const findEvent=events=>events.filter(e=>original.apiId?String(e.idEvent)===String(original.apiId):normalizeName(e.strHomeTeam)===normalizeName(original.homeTeam||original.evSahibi)&&normalizeName(e.strAwayTeam)===normalizeName(original.awayTeam||original.deplasman));
           const round=findEvent(roundEvents),season=findEvent(seasonEvents);
           let event=round.length===1?round[0]:null;
-          if((!event||!valid(event.intHomeScore,event.intAwayScore))&&season.length===1)event=season[0];
-          if(!event&&/^\d+$/.test(String(original.apiId||''))){
+          if(season.length===1&&(!event||!valid(event.intHomeScore,event.intAwayScore)||(!finalStatus(String(event.strStatus||'').trim())&&finalStatus(String(season[0].strStatus||'').trim()))))event=season[0];
+          if((!event||needsFinalCheck(event,original))&&/^\d+$/.test(String(original.apiId||''))){
             const found=findEvent(await fetchEvents(`lookupevent.php?id=${encodeURIComponent(original.apiId)}`));
-            event=found.length===1?found[0]:null;
+            if(found.length===1&&(!event||finalStatus(String(found[0].strStatus||'').trim())||!valid(event.intHomeScore,event.intAwayScore)))event=found[0];
           }
           if(!event)throw Error('Provider event missing');
           // Transaction retries use current data, preserving concurrent admin edits and deletes.
