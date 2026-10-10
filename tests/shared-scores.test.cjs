@@ -186,12 +186,12 @@ test('live score snapshot does not overwrite an unsaved prediction draft',async(
 function requestDevice(adminRole=false){
   const timers=[],messages=[],calls=[];let reads=0;
   const c={console,Date,state:{matches:[],settings:{activeWeekId:'w'}},window:{SkorxAuth:{ready:true,admin:adminRole,request:async(action,payload)=>{calls.push({action,payload});return {success:true,checked:true,finishedAt:Date.now(),checkedCount:1,updatedCount:1}}}},
-    document:{visibilityState:'visible'},getActiveSeasonId:()=> 's',getSeasonById:()=>({id:'s',name:'2026-2027'}),getWeekById:()=>({id:'w',number:7}),
+    document:{visibilityState:'visible',getElementById:()=>null},getApiSeasonLabel:()=> '2026-2027',getActiveSeasonId:()=> 's',getSeasonById:()=>({id:'s',name:'2026-2027'}),getWeekById:()=>({id:'w',number:7}),
     isAuthenticated:()=>true,isFirebaseReady:()=>true,shouldPublishMatchChanges:()=>true,autoResultsSyncPromise:null,
     firebaseRead:async()=>{reads++;return {}},syncOnlineMatchesFromSheet:async()=>true,saveState:()=>{},debounceFirebaseRealtimeRender:()=>{},renderDashboardAutoSyncStatus:()=>{},renderManualScoreCooldown:()=>{},
     setInterval:(fn,ms)=>{timers.push({fn,ms})},setTimeout:()=>{},getActionButtonFromArg:()=>null,dashboardScoreUpdatePromise:null,
     setAsyncButtonState:()=>{},startDashboardApiProgress:()=>{},finishDashboardApiProgress:(ok,message)=>messages.push({ok,message}),showAlert:async()=>{},formatManualScoreCooldown:()=> '10:00'};
-  vm.createContext(c);vm.runInContext(section('const sharedScoreSyncTimes =','async function syncSelectedWeekFromApi(')+section('async function runDashboardWeekScoreUpdate(','async function syncDashboardWeek('),c);
+  vm.createContext(c);vm.runInContext(section('const sharedScoreSyncTimes =','async function syncSelectedWeekFromApi(')+section('async function runDashboardWeekScoreUpdate(','async function syncDashboardWeek(')+section('async function syncSelectedWeekFromApi(','async function importFixturesFromApi('),c);
   return {c,timers,messages,calls,stats:()=>({reads})};
 }
 test('dashboard admin manual checks repeatedly force server refresh; user preserves ten-minute automatic timer',async()=>{
@@ -246,4 +246,36 @@ test('login starts user score refresh after the published week is known, without
     validateFreshActiveSelection:()=>{ready=true},flushPendingPredictionQueue:async()=>({flushed:0}),updateLastSyncLabel:()=>{},recordAdminSyncActivity:()=>{},renderAll:()=>{}});
   f.c.window.setTimeout=()=>{};vm.runInContext(section('async function hydrateOnlineStateForSession(','let welcomeOverlayTimer'),f.c);
   assert.equal(await f.c.hydrateOnlineStateForSession({suppressLoadingOverlay:true}),true);assert.equal(requests,1);assert.equal(f.c.window.SkorxAuth.admin,false);
+});
+
+// Regression: the Weeks endpoint has results even when individual event lookup does not.
+test('published-week scores use the Weeks round source for user and admin; no individual lookup needed',async()=>{
+  for(const actor of [user,admin]){
+    const db=database(),urls=[];
+    const result=await syncScores(db,actor,{...payload,force:true},{now,fetchImpl:async url=>{
+      urls.push(url);return {ok:true,json:async()=>({events:url.includes('eventsround.php')?[event('FT',3,1)]:[]})};
+    }});
+    assert.equal(result.updatedCount,1);assert.equal(db.data.matches.m.homeScore,3);assert.equal(db.data.matches.m.played,true);
+    assert.equal(urls.length,1);assert.ok(urls[0].includes('r=7&s=2026-2027'));
+  }
+});
+test('missing round score falls back to registered season score and preserves the event identity',async()=>{
+  const db=database(),urls=[];
+  await syncScores(db,user,payload,{now,fetchImpl:async url=>{
+    urls.push(url);return {ok:true,json:async()=>({events:[url.includes('eventsseason.php')?event('FT',2,0):event('NS',null,null)]})};
+  }});
+  assert.equal(db.data.matches.m.homeScore,2);assert.equal(db.data.matches.m.played,true);
+  assert.equal(urls.length,2);assert.ok(urls[1].includes('eventsseason.php'));
+});
+test('Weeks button and dashboard invoke the same authenticated score operation for published weeks',async()=>{
+  for(const role of [false,true]){
+    const f=requestDevice(role);
+    await f.c.syncSelectedWeekFromApi();await f.c.runDashboardWeekScoreUpdate();
+    assert.equal(f.calls.length,2);assert.ok(f.calls.every(v=>v.action==='syncScores'&&v.payload.force===role));
+    assert.equal(f.stats().reads,2);
+  }
+});
+test('admin automatic startup follows the timer while the manual buttons can force refresh',async()=>{
+  const f=requestDevice(true);await f.c.maybeAutoSyncResults();assert.equal(f.calls[0].payload.force,false);
+  await f.c.runDashboardWeekScoreUpdate();assert.equal(f.calls[1].payload.force,true);
 });
