@@ -68,18 +68,28 @@ async function syncScores(db,actor,payload={}, {fetchImpl=fetch,now=Date.now()}=
         const data=await response.json();return Array.isArray(data.events)?data.events:[];
       } catch { throw new Fault(502,'Skor kaynağına ulaşılamadı veya yanıtı okunamadı. Yeniden deneyin.'); }
     };
-    let fallbackEvents=[];
-    if(candidates.some(([,row])=>!/^\d+$/.test(String(row.apiId||'')))){
-      const season=Object.values(settings.seasonsMeta||{}).find(s=>String(s.id)===seasonId);
+    // Use the same week/season sources as the Weeks screen, for every role.
+    const season=Object.values(settings.seasonsMeta||{}).find(s=>String(s.id)===seasonId);
+    let roundEvents=[],seasonEvents=[];
+    if(candidates.length){
       if(!season?.name)throw new Fault(409,'API sezon bilgisi bulunamadı.');
-      fallbackEvents=await fetchEvents(`eventsround.php?id=4339&r=${encodeURIComponent(week.number)}&s=${encodeURIComponent(season.name)}`);
+      try{roundEvents=await fetchEvents(`eventsround.php?id=4339&r=${encodeURIComponent(week.number)}&s=${encodeURIComponent(season.name)}`);}catch{}
+      const findEvent=(events,row)=>events.filter(e=>row.apiId?String(e.idEvent)===String(row.apiId):normalizeName(e.strHomeTeam)===normalizeName(row.homeTeam||row.evSahibi)&&normalizeName(e.strAwayTeam)===normalizeName(row.awayTeam||row.deplasman));
+      if(candidates.some(([,row])=>{const found=findEvent(roundEvents,row);return found.length!==1||!valid(found[0].intHomeScore,found[0].intAwayScore);})){
+        try{seasonEvents=await fetchEvents(`eventsseason.php?id=4339&s=${encodeURIComponent(season.name)}`);}catch{}
+      }
     }
     for(let offset=0;offset<candidates.length;offset+=4){
       await Promise.all(candidates.slice(offset,offset+4).map(async([id,original])=>{
         try{
-          const events=/^\d+$/.test(String(original.apiId||''))?await fetchEvents(`lookupevent.php?id=${encodeURIComponent(original.apiId)}`):fallbackEvents;
-          const matching=events.filter(e=>original.apiId?String(e.idEvent)===String(original.apiId):normalizeName(e.strHomeTeam)===normalizeName(original.homeTeam||original.evSahibi)&&normalizeName(e.strAwayTeam)===normalizeName(original.awayTeam||original.deplasman));
-          const event=matching.length===1?matching[0]:null;
+          const findEvent=events=>events.filter(e=>original.apiId?String(e.idEvent)===String(original.apiId):normalizeName(e.strHomeTeam)===normalizeName(original.homeTeam||original.evSahibi)&&normalizeName(e.strAwayTeam)===normalizeName(original.awayTeam||original.deplasman));
+          const round=findEvent(roundEvents),season=findEvent(seasonEvents);
+          let event=round.length===1?round[0]:null;
+          if((!event||!valid(event.intHomeScore,event.intAwayScore))&&season.length===1)event=season[0];
+          if(!event&&/^\d+$/.test(String(original.apiId||''))){
+            const found=findEvent(await fetchEvents(`lookupevent.php?id=${encodeURIComponent(original.apiId)}`));
+            event=found.length===1?found[0]:null;
+          }
           if(!event)throw Error('Provider event missing');
           // Transaction retries use current data, preserving concurrent admin edits and deletes.
           const result=await db.ref(`matches/${id}`).transaction(current=>{
