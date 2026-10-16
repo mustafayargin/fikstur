@@ -16,6 +16,7 @@ async function identify(auth,db,token) {
 async function execute({auth,db},actor,action,payload={}) {
   if (action === 'session') return {success:true,user:{...p.clean(actor.profile),id:actor.playerId,playerId:actor.playerId,rol:actor.admin?'admin':'user',panelAdmin:actor.admin,authUid:actor.uid},mustChangePassword:actor.access.mustChangePassword === true};
   if (actor.access.mustChangePassword === true && action !== 'changePassword') throw new p.Fault(403,'Önce geçici şifrenizi değiştirin.');
+  if (action === 'sportsDbData') return require('./sportsdb.cjs').sportsDbData(actor,payload);
   if (action === 'syncScores') return require('./scores.cjs').syncScores(db,actor,payload);
   if (action === 'scoreSyncStatus') return require('./scores.cjs').scoreSyncStatus(db,actor,payload);
   if (action === 'getSettings') {

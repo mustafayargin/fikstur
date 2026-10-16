@@ -3,7 +3,7 @@ const {randomUUID}=require('node:crypto');
 const {contextualMatch,parseDate,normalizeName,key,Fault}=require('./policy.cjs');
 const valid=(a,b)=>[a,b].every(v=>v!==null&&v!==undefined&&v!==''&&Number.isInteger(Number(v))&&Number(v)>=0);
 // Temporary test mode; published-week and authentication checks still apply.
-const USER_MANUAL_SCORE_TEST_MODE=true;
+const USER_MANUAL_SCORE_TEST_MODE=false;
 const yes=v=>v===true||v===1||v==='1'||v==='true';
 const finalStatus=s=>/^(ft|aet|pen|finished|match finished|full time|full-time|after extra time|after penalties|bitti)$/i.test(s);
 const lockActive=(record,now)=>!!record?.owner&&now-Number(record.startedAt)<90000;
@@ -76,17 +76,7 @@ async function syncScores(db,actor,payload={}, {fetchImpl=fetch,now=Date.now()}=
     const verifiedMatchIds=[],verifiedScores=[];
     const requestDeadline=Date.now()+45000;
     const needsFinalCheck=(event,row)=>!finalStatus(String(event?.strStatus||'').trim())&&parseDate(row.date||row.tarih)+105*60000<=now&&!/postponed|delayed|deferred|suspended|abandoned|cancelled/i.test(String(event?.strStatus||''));
-    const apiKey=process.env.SPORTSDB_API_KEY||'123';
-    const fetchEvents=async suffix=>{
-      const source=suffix.split('?')[0];
-      let response;
-      try{response=await fetchImpl(`https://www.thesportsdb.com/api/v1/json/${encodeURIComponent(apiKey)}/${suffix}`,{signal:AbortSignal.timeout(Math.max(1,Math.min(12000,requestDeadline-Date.now()))),cache:'no-store'});}
-      catch(error){throw scoreFault(error.name==='TimeoutError'||error.name==='AbortError'?'API_TIMEOUT':'API_NETWORK',`${source}: skor kaynağı bağlantısı ${error.name==='TimeoutError'||error.name==='AbortError'?'zaman aşımına uğradı':'kurulamadı'}.`);}
-      if(!response.ok)throw scoreFault('API_HTTP',`${source}: skor kaynağı HTTP ${Number(response.status)||'hata'} döndürdü.`);
-      let data;try{data=await response.json();}catch{throw scoreFault('API_JSON',`${source}: skor kaynağı yanıtı JSON olarak okunamadı.`);}
-      if(data?.events!==null&&!Array.isArray(data?.events))throw scoreFault('API_SCHEMA',`${source}: beklenen maç listesi yanıt içinde bulunamadı.`);
-      return data.events||[];
-    };
+    const fetchEvents=require('./sportsdb.cjs').createSportsDbClient({fetchImpl,deadline:requestDeadline});
     // Use the same week/season sources as the Weeks screen, for every role.
     const season=Object.values(settings.seasonsMeta||{}).find(s=>String(s.id)===seasonId);
     let roundEvents=[],seasonEvents=[];

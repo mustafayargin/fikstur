@@ -7669,7 +7669,7 @@ const dashboardApiProgressState = {
 };
 
 // Temporary test mode: only manual score buttons bypass the user cooldown.
-const USER_MANUAL_SCORE_TEST_MODE = true;
+const USER_MANUAL_SCORE_TEST_MODE = false;
 const MANUAL_SCORE_UPDATE_COOLDOWN_MS = 10 * 60 * 1000;
 let dashboardScoreCooldownTimer = null;
 let dashboardScoreUpdatePromise = null;
@@ -16864,18 +16864,12 @@ function parseApiEvent(item) {
 }
 
 async function fetchSeasonEvents(seasonLabel) {
-  const url = `https://www.thesportsdb.com/api/v1/json/123/eventsseason.php?id=${LEAGUE_ID}&s=${encodeURIComponent(seasonLabel)}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("API cevabı alınamadı.");
-  const data = await res.json();
+  const data = await window.SkorxAuth.request("sportsDbData", {endpoint: "eventsseason.php", season: seasonLabel});
   return (data.events || []).map(parseApiEvent).filter(Boolean);
 }
 
 async function fetchSeasonTeamReferences(seasonLabel) {
-  const url = `https://www.thesportsdb.com/api/v1/json/123/eventsseason.php?id=${LEAGUE_ID}&s=${encodeURIComponent(seasonLabel)}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("Sezon takım listesi API'den alınamadı.");
-  const data = await res.json();
+  const data = await window.SkorxAuth.request("sportsDbData", {endpoint: "eventsseason.php", season: seasonLabel});
   const events = Array.isArray(data.events) ? data.events : [];
   const teamMap = new Map();
 
@@ -16897,10 +16891,7 @@ async function fetchSeasonTeamReferences(seasonLabel) {
 
 async function fetchTeamDetailsById(apiTeamId) {
   if (!apiTeamId) return null;
-  const url = `https://www.thesportsdb.com/api/v1/json/123/lookupteam.php?id=${encodeURIComponent(apiTeamId)}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Takım detayı alınamadı (${apiTeamId}).`);
-  const data = await res.json();
+  const data = await window.SkorxAuth.request("sportsDbData", {endpoint: "lookupteam.php", teamId: apiTeamId});
   return Array.isArray(data.teams) ? data.teams[0] || null : null;
 }
 
@@ -17076,10 +17067,7 @@ async function importSeasonTeamsFromApi(buttonOrEvent) {
 }
 
 async function fetchRoundEvents(seasonLabel, weekNumber) {
-  const url = `https://www.thesportsdb.com/api/v1/json/123/eventsround.php?id=${LEAGUE_ID}&r=${encodeURIComponent(weekNumber)}&s=${encodeURIComponent(seasonLabel)}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("Hafta API cevabı alınamadı.");
-  const data = await res.json();
+  const data = await window.SkorxAuth.request("sportsDbData", {endpoint: "eventsround.php", season: seasonLabel, round: weekNumber});
   return (data.events || []).map(parseApiEvent).filter(Boolean);
 }
 
@@ -17309,7 +17297,7 @@ async function maybeAutoSyncResults(options = {}) {
     try { return !!(await syncSelectedWeekFromApi({scoreOnly: true, force: !!options.force && window.SkorxAuth.admin})).checked; }
     catch (error) {
       // Failure is retryable on the next existing trigger, never a successful sync.
-      lastServerScoreRequestTimes.delete(scope);
+      lastServerScoreRequestTimes.set(scope, Date.now() - 9 * 60000);
       console.warn("Skor kontrolü tamamlanamadı:", error.message);
       renderDashboardAutoSyncStatus(`⚠️ ${error.message || "Skor kontrolü tamamlanamadı."}`);
       return false;
@@ -17347,9 +17335,9 @@ async function syncSelectedWeekFromApi(options = {}) {
     });
   }
 
-  if ((!window.SkorxAuth.admin || options.scoreOnly === true) && isFirebaseReady() && shouldPublishMatchChanges(week.id)) {
+  if (isFirebaseReady() && shouldPublishMatchChanges(week.id)) {
     try {
-      const result = await syncSharedWeekScores({seasonId, weekId, force: options.force === undefined ? (window.SkorxAuth.admin || USER_MANUAL_SCORE_TEST_MODE) : options.force === true});
+      const result = await syncSharedWeekScores({seasonId, weekId, force: options.force === undefined ? window.SkorxAuth.admin : options.force === true});
       setWeekApiStatus(result.checked ? `${result.checkedCount} maç kontrol edildi; ${result.updatedCount} maç ortak kayıtta güncellendi.` : "Ortak skorlar alındı; 10 dakikalık kontrol süresi henüz dolmadı.");
       return {...result, createdCount: 0, movedCount: 0, sheetSyncSuccess: true};
     } catch (error) {
