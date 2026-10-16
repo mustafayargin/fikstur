@@ -1169,8 +1169,9 @@ function ensureFirebaseRealtimeBridge() {
       let comparable = value;
       if (path === "settings") {
         state.settings.resultsLastAutoSyncAt = Number(value?.resultsLastAutoSyncAt || 0);
+        state.settings.resultsLastSource = String(value?.resultsLastSource || "");
         comparable = {...value};
-        for (const key of ["resultsLastAutoSyncAt", "manualScoreLastSuccessAt", "manualScoreLastSuccessBy", "resultsAutoSyncInProgressAt", "resultsAutoSyncRequestedBy", "updatedAt"]) delete comparable[key];
+        for (const key of ["resultsLastAutoSyncAt", "resultsLastSource", "manualScoreLastSuccessAt", "manualScoreLastSuccessBy", "resultsAutoSyncInProgressAt", "resultsAutoSyncRequestedBy", "updatedAt"]) delete comparable[key];
         renderDashboardAutoSyncStatus();
       }
       const fingerprint = JSON.stringify(comparable);
@@ -2834,6 +2835,7 @@ async function syncSeasonRegistryFromFirebase(options = {}) {
   state.settings.resultsLastAutoSyncAt = Number(
     settings.resultsLastAutoSyncAt || 0,
   );
+  state.settings.resultsLastSource = String(settings.resultsLastSource || "");
   state.settings.resultsAutoSyncInProgressAt = Number(
     settings.resultsAutoSyncInProgressAt || 0,
   );
@@ -7865,7 +7867,7 @@ function renderDashboardAutoSyncStatus(message = "", forcedTimestamp = null) {
   const now = Date.now();
   const isRunning = lockAt && now - lockAt < 90 * 1000;
 
-  let text = `🔄 Son API sonuç güncellemesi: ${formatDashboardAutoSyncTime(lastSyncAt)}`;
+  let text = `🔄 Son API sonuç güncellemesi: ${formatDashboardAutoSyncTime(lastSyncAt)}${state.settings.resultsLastSource ? ` • Kaynak: ${state.settings.resultsLastSource}` : ""}`;
   let className = "dashboard-inline-status is-idle";
 
   if (isRunning) {
@@ -7873,7 +7875,7 @@ function renderDashboardAutoSyncStatus(message = "", forcedTimestamp = null) {
     className = "dashboard-inline-status is-running";
   } else if (message) {
     text = `${message} • Son başarılı güncelleme: ${formatDashboardAutoSyncTime(lastSyncAt)}`;
-    className = "dashboard-inline-status is-success";
+    className = message.startsWith("⚠") ? "dashboard-inline-status is-idle" : "dashboard-inline-status is-success";
   }
 
   el.className = className;
@@ -8071,7 +8073,7 @@ async function runDashboardWeekScoreUpdate(buttonOrEvent) {
         return result;
       }
       const message = result.checkedCount
-        ? `✓ API kontrol edildi: ${result.checkedCount} maç incelendi, ${result.updatedCount} maç Firebase'de güncellendi.`
+        ? `✓ ${result.sources?.join(" + ") || "API"}: ${result.checkedCount} maç incelendi, ${result.updatedCount} maç Firebase'de güncellendi.`
         : "Bu haftada API kontrolüne açık maç yok. Manuel skorlar korundu.";
       finishDashboardApiProgress(true, message);
       setAsyncButtonState(actionButton, "success", {success: "Kontrol tamamlandı ✓"});
@@ -8080,6 +8082,7 @@ async function runDashboardWeekScoreUpdate(buttonOrEvent) {
     } catch (error) {
       finishDashboardApiProgress(false, `⚠ ${error.message || "Skor kontrolü tamamlanamadı."} Başarılı güncelleme olarak kaydedilmedi.`);
       setAsyncButtonState(actionButton, "error", {error: "Tekrar dene"});
+      await showAlert(error.message || "Her iki skor kaynağına da ulaşılamadı.", {title: "Skor güncellenemedi", type: "warning"});
       return null;
     } finally {
       dashboardScoreUpdatePromise = null;
@@ -16809,8 +16812,14 @@ async function handleDangerousReset() {
 }
 
 function parseApiEvent(item) {
-  const homeTeam = item.strHomeTeam?.trim();
-  const awayTeam = item.strAwayTeam?.trim();
+  const localTeamName = name => {
+    const raw = String(name || "").trim();
+    if (item.provider !== "BSD") return raw;
+    const teams = getTeamsBySeasonId(getActiveSeasonId()).filter(team => footballTeamKey(team.name) === footballTeamKey(raw));
+    return teams.length === 1 ? teams[0].name : raw;
+  };
+  const homeTeam = localTeamName(item.strHomeTeam);
+  const awayTeam = localTeamName(item.strAwayTeam);
   if (!homeTeam || !awayTeam) return null;
 
   const roundMatch = String(item.intRound || item.strRound || "").match(/\d+/);
@@ -16845,7 +16854,8 @@ function parseApiEvent(item) {
     : "";
 
   return {
-    apiId: item.idEvent,
+    apiId: String(item.idEvent),
+    provider: item.provider || "TheSportsDB",
     weekNumber,
     homeTeam,
     awayTeam,
@@ -16869,7 +16879,9 @@ function parseApiEvent(item) {
 
 async function fetchSeasonEvents(seasonLabel) {
   const data = await window.SkorxAuth.request("sportsDbData", {endpoint: "eventsseason.php", season: seasonLabel});
-  return (data.events || []).map(parseApiEvent).filter(Boolean);
+  const events = (data.events || []).map(parseApiEvent).filter(Boolean);
+  events.sources = data.sources || ["TheSportsDB"];
+  return events;
 }
 
 async function fetchSeasonTeamReferences(seasonLabel) {
@@ -17072,7 +17084,9 @@ async function importSeasonTeamsFromApi(buttonOrEvent) {
 
 async function fetchRoundEvents(seasonLabel, weekNumber) {
   const data = await window.SkorxAuth.request("sportsDbData", {endpoint: "eventsround.php", season: seasonLabel, round: weekNumber});
-  return (data.events || []).map(parseApiEvent).filter(Boolean);
+  const events = (data.events || []).map(parseApiEvent).filter(Boolean);
+  events.sources = data.sources || ["TheSportsDB"];
+  return events;
 }
 
 function inferWeekStatusFromMatches(weekId) {
@@ -17103,16 +17117,19 @@ function syncWeekStatus(weekId) {
   }
 }
 
+function footballTeamKey(name){
+ const n=String(name||'').toLocaleLowerCase('tr-TR').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ı/g,'i').replace(/[^a-z0-9]/g,'');
+ const aliases={corum:'corum',corumfk:'corum',corumspor:'corum',caykurrizespor:'rizespor',istanbulbasaksehir:'basaksehir',istanbulbasaksehirfk:'basaksehir',basaksehirfk:'basaksehir',besiktasjk:'besiktas',fenerbahcesk:'fenerbahce',galatasaraysk:'galatasaray',gaziantepfk:'gaziantep',genclerbirligisk:'genclerbirligi',erzurumsporfk:'erzurumspor',bberzurumspor:'erzurumspor',amed:'amedspor',amedsporfk:'amedspor',amedsk:'amedspor',alanya:'alanyaspor'};
+ return aliases[n]||n;
+}
 function findExistingMatchForApiEvent(seasonId, weekId, event) {
-  return state.matches.find(
-    (match) =>
-      match.seasonId === seasonId &&
-      match.weekId === weekId &&
-      (match.apiId
-        ? match.apiId === event.apiId
-        : match.homeTeam === event.homeTeam &&
-          match.awayTeam === event.awayTeam),
-  );
+  const cross=(a,b)=>String(a||'').startsWith('bsd_')!==String(b||'').startsWith('bsd_');
+  const found=state.matches.filter(match=>String(match.seasonId)===String(seasonId)&&(
+    (match.apiId&&String(match.apiId)===String(event.apiId))||
+    (String(match.weekId)===String(weekId)&&(!match.apiId||cross(match.apiId,event.apiId))&&footballTeamKey(match.homeTeam)===footballTeamKey(event.homeTeam)&&footballTeamKey(match.awayTeam)===footballTeamKey(event.awayTeam))
+  ));
+  if(found.length>1)throw new Error('Aynı maç için birden fazla kayıt var. Hafta değiştirilmedi.');
+  return found[0]||null;
 }
 
 function applyApiEventToMatch(match, event, allowCreateIfMissing = false) {
@@ -17129,9 +17146,9 @@ function applyApiEventToMatch(match, event, allowCreateIfMissing = false) {
     postponed: false,
     wasPostponed: false,
   };
-  target.apiId = event.apiId;
-  target.homeTeam = event.homeTeam;
-  target.awayTeam = event.awayTeam;
+  target.apiId = target.apiId || event.apiId;
+  target.homeTeam = target.homeTeam && target.homeTeam !== event.homeTeam && footballTeamKey(target.homeTeam) === footballTeamKey(event.homeTeam) ? target.homeTeam : event.homeTeam;
+  target.awayTeam = target.awayTeam && target.awayTeam !== event.awayTeam && footballTeamKey(target.awayTeam) === footballTeamKey(event.awayTeam) ? target.awayTeam : event.awayTeam;
   target.statusText = event.statusText || "";
   if (event.date) target.date = event.date;
   const hasScore = hasValidMatchScore(event.homeScore, event.awayScore);
@@ -17278,6 +17295,7 @@ async function syncSharedWeekScores({seasonId = getActiveSeasonId(), weekId = st
       throw new Error("Ortak skor kaydı kontrol edildi fakat bu cihazda alınamadı. Bağlantıyı kontrol edip yeniden deneyin.");
     }
     sharedScoreSyncTimes.set(scope, Number(result.finishedAt || 0));
+    if (result.sources?.length) state.settings.resultsLastSource = result.sources.join(" + ");
     state.settings.resultsLastAutoSyncAt = Number(result.finishedAt || state.settings.resultsLastAutoSyncAt || 0);
     saveState(true);
     if (before !== matchScoreViewFingerprint()) debounceFirebaseRealtimeRender();
@@ -17340,7 +17358,7 @@ async function syncSelectedWeekFromApi(options = {}) {
     });
   }
 
-  if (isFirebaseReady() && shouldPublishMatchChanges(week.id)) {
+  if (!options.fixtures && isFirebaseReady() && shouldPublishMatchChanges(week.id)) {
     try {
       const result = await syncSharedWeekScores({seasonId, weekId, force: options.force === undefined ? window.SkorxAuth.admin : options.force === true, manual: !options.scoreOnly});
       setWeekApiStatus(result.checked ? `${result.checkedCount} maç kontrol edildi; ${result.updatedCount} maç ortak kayıtta güncellendi.` : result.message || "Ortak skorlar alındı; yeni kontrol süresi henüz dolmadı.");
@@ -17366,7 +17384,7 @@ async function syncSelectedWeekFromApi(options = {}) {
       (event) => Number(event.weekNumber) === Number(week.number),
     );
     const weekEvents = (roundEvents.length ? roundEvents : fallbackWeekEvents).map(event => {
-      const seasonMatches = seasonEvents.filter(item => String(item.apiId) === String(event.apiId));
+      const seasonMatches = seasonEvents.filter(item => String(item.apiId) === String(event.apiId) || (Number(item.weekNumber) === Number(event.weekNumber) && footballTeamKey(item.homeTeam) === footballTeamKey(event.homeTeam) && footballTeamKey(item.awayTeam) === footballTeamKey(event.awayTeam)));
       const newer = seasonMatches.length === 1 ? seasonMatches[0] : null;
       const isFinal = item => /^(ft|aet|pen|finished|match finished|full time|full-time|after extra time|after penalties|bitti)$/i.test(String(item?.statusText || "").trim());
       return !isFinal(event) && isFinal(newer) && hasValidMatchScore(newer.homeScore, newer.awayScore) ? newer : event;
@@ -17400,15 +17418,17 @@ async function syncSelectedWeekFromApi(options = {}) {
     let scoreCount = 0;
     let createdCount = 0;
 
+    const fixtureTeams = new Set();
+    for (const event of weekEvents) {
+      for (const team of [event.homeTeam, event.awayTeam]) {
+        const key = footballTeamKey(team);
+        if (fixtureTeams.has(key)) throw new Error("API aynı haftada bir takımı birden çok maçta gösteriyor. Hafta değiştirilmedi.");
+        fixtureTeams.add(key);
+      }
+      findExistingMatchForApiEvent(seasonId, weekId, event);
+    }
     weekEvents.forEach((event) => {
-      let existing = state.matches.find(
-        (match) =>
-          match.seasonId === seasonId &&
-          (match.apiId
-            ? match.apiId === event.apiId
-            : match.homeTeam === event.homeTeam &&
-              match.awayTeam === event.awayTeam),
-      );
+      let existing = findExistingMatchForApiEvent(seasonId, typeof weekId !== "undefined" ? weekId : week.id, event);
 
       if (!existing) {
         existing = {
@@ -17484,7 +17504,7 @@ async function syncSelectedWeekFromApi(options = {}) {
     }
 
     setWeekApiStatus(
-      `${week.number}. hafta güncellendi. ${updatedCount} maç işlendi, ${scoreCount} maçta skor var${createdCount ? `, ${createdCount} eksik maç eklendi` : ""}${movedCount ? `, ${movedCount} maç başka haftaya taşındı` : ""}${sheetSyncResult?.success ? `, Sheets senkronu tamamlandı` : ", Sheets yanıtı gecikti ama yerel güncelleme tamamlandı"}.`,
+      `${week.number}. hafta güncellendi. Kaynak: ${(roundEvents.sources?.length ? roundEvents.sources : seasonEvents.sources || ["API"]).join(" + ")}. ${updatedCount} maç işlendi, ${scoreCount} maçta skor var${createdCount ? `, ${createdCount} eksik maç eklendi` : ""}${movedCount ? `, ${movedCount} maç başka haftaya taşındı` : ""}${sheetSyncResult?.success ? `, Sheets senkronu tamamlandı` : ", Sheets yanıtı gecikti ama yerel güncelleme tamamlandı"}.`,
     );
 
     state.settings.resultsLastAutoSyncAt = finishedAt;
@@ -17616,14 +17636,7 @@ async function importFixturesFromApi(updateResultsOnly = false) {
       }
       touchedWeekIds.add(week.id);
 
-      let existing = state.matches.find(
-        (match) =>
-          match.seasonId === seasonId &&
-          (match.apiId
-            ? match.apiId === event.apiId
-            : match.homeTeam === event.homeTeam &&
-              match.awayTeam === event.awayTeam),
-      );
+      let existing = findExistingMatchForApiEvent(seasonId, typeof weekId !== "undefined" ? weekId : week.id, event);
       if (existing) {
         const beforeWeek = existing.weekId;
         if (event.weekNumber)
@@ -17993,7 +18006,7 @@ function bindEvents() {
   on("apiImportTeamsBtn", "click", (event) =>
     importSeasonTeamsFromApi(event.currentTarget),
   );
-  on("apiSyncWeekBtn", "click", () => syncSelectedWeekFromApi().catch(() => {}));
+  on("apiSyncWeekBtn", "click", () => syncSelectedWeekFromApi({fixtures: true}).catch(() => {}));
   on("dashboardSyncWeekBtn", "click", syncDashboardWeek);
   on("dashboardSyncSeasonBtn", "click", syncDashboardSeason);
   on("dashboardWeekScoreUpdateBtn", "click", runDashboardWeekScoreUpdate);

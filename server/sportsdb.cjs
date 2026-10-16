@@ -22,7 +22,7 @@ function createSportsDbClient({fetchImpl=fetch,deadline=Date.now()+45000}={}) {
     return data[field]||[];
   };
 }
-async function sportsDbData(actor,payload={}) {
+async function sportsDbData(actor,payload={},options={}) {
   if(!actor.admin)throw new Fault(403,'Bu API işlemi yöneticiye açık.');
   const {endpoint,season,round,teamId}=payload;
   let suffix,field='events';
@@ -35,6 +35,8 @@ async function sportsDbData(actor,payload={}) {
     else if(endpoint==='eventsround.php'&&Number.isInteger(Number(round))&&Number(round)>=1&&Number(round)<=60)suffix=`eventsround.php?id=4339&r=${Number(round)}&s=${encodeURIComponent(season)}`;
     else throw new Fault(400,'Geçersiz API işlemi.');
   }
-  return {success:true,[field]:await createSportsDbClient()(suffix,field)};
+  if(field==='teams')return {success:true,teams:await createSportsDbClient(options)(suffix,field),sources:['TheSportsDB']};
+  const source=require('./event-source.cjs').createEventSource({...options,seasonLabel:season});
+  return {success:true,events:await source.events(suffix),sources:[...source.sources]};
 }
 module.exports={createSportsDbClient,sportsDbData};
