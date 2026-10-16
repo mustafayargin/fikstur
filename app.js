@@ -5084,8 +5084,6 @@ function applyRolePermissions() {
         insideDashboardModal ||
         insideStatsInteraction ||
         [
-          "dashboardWeekScoreUpdateBtn",
-          "dashboardMobileWeekScoreUpdateBtn",
           "dashboardSeasonSelect",
           "dashboardWeekSelect",
           "standingsSeasonSelect",
@@ -7704,6 +7702,11 @@ function renderManualScoreCooldown() {
   const mobileButton = document.getElementById(
     "dashboardMobileWeekScoreUpdateBtn",
   );
+  const admin = window.SkorxAuth?.admin === true;
+  for (const button of [desktopButton, mobileButton]) {
+    if (button) { button.hidden = !admin; button.style.display = admin ? "" : "none"; button.disabled = !admin; }
+  }
+  if (!admin) { clearInterval(dashboardScoreCooldownTimer); dashboardScoreCooldownTimer = null; return; }
   const running = !!dashboardScoreUpdatePromise;
 
   if (desktopButton && !running) {
@@ -8047,6 +8050,7 @@ async function testFirebaseAdminConnection(buttonOrEvent) {
 }
 
 async function runDashboardWeekScoreUpdate(buttonOrEvent) {
+  if (!window.SkorxAuth?.admin) return null;
   if (dashboardScoreUpdatePromise) return dashboardScoreUpdatePromise;
   const actionButton = getActionButtonFromArg(buttonOrEvent);
   const season = getSeasonById(getActiveSeasonId());
@@ -17245,11 +17249,11 @@ function scoreReadbackSignature(row) {
 function matchScoreViewFingerprint() {
   return JSON.stringify(state.matches.map(m => [m.id, m.seasonId, m.weekId, m.apiId, m.homeTeam, m.awayTeam, m.date, m.played, m.homeScore, m.awayScore, m.liveHomeScore, m.liveAwayScore, m.statusText, m.manualScoreLocked, m.postponed, m.wasPostponed]));
 }
-async function syncSharedWeekScores({seasonId = getActiveSeasonId(), weekId = state.settings.activeWeekId, force = false} = {}) {
+async function syncSharedWeekScores({seasonId = getActiveSeasonId(), weekId = state.settings.activeWeekId, force = false, manual = false} = {}) {
   const scope = `${seasonId}:${weekId}`;
   if (sharedScoreSyncRequests.has(scope)) return sharedScoreSyncRequests.get(scope);
   const operation = (async () => {
-    let result = await window.SkorxAuth.request("syncScores", {seasonId, weekId, force});
+    let result = await window.SkorxAuth.request("syncScores", {seasonId, weekId, force, manual});
     if (result.pending) {
       const startedAt = Number(result.startedAt || 0);
       const deadline = Date.now() + 90000;
@@ -17311,6 +17315,7 @@ setInterval(() => {
 }, 10 * 60000);
 
 async function syncSelectedWeekFromApi(options = {}) {
+  if (!options.scoreOnly && !window.SkorxAuth?.admin) throw new Error("Manuel API güncellemesi yalnızca yöneticiye açık.");
   const seasonId = getActiveSeasonId();
   const weekId = state.settings.activeWeekId;
   const week = getWeekById(weekId);
@@ -17337,8 +17342,8 @@ async function syncSelectedWeekFromApi(options = {}) {
 
   if (isFirebaseReady() && shouldPublishMatchChanges(week.id)) {
     try {
-      const result = await syncSharedWeekScores({seasonId, weekId, force: options.force === undefined ? window.SkorxAuth.admin : options.force === true});
-      setWeekApiStatus(result.checked ? `${result.checkedCount} maç kontrol edildi; ${result.updatedCount} maç ortak kayıtta güncellendi.` : "Ortak skorlar alındı; 10 dakikalık kontrol süresi henüz dolmadı.");
+      const result = await syncSharedWeekScores({seasonId, weekId, force: options.force === undefined ? window.SkorxAuth.admin : options.force === true, manual: !options.scoreOnly});
+      setWeekApiStatus(result.checked ? `${result.checkedCount} maç kontrol edildi; ${result.updatedCount} maç ortak kayıtta güncellendi.` : result.message || "Ortak skorlar alındı; yeni kontrol süresi henüz dolmadı.");
       return {...result, createdCount: 0, movedCount: 0, sheetSyncSuccess: true};
     } catch (error) {
       setWeekApiStatus(error.message);

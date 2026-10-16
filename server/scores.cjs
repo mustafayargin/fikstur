@@ -2,8 +2,6 @@
 const {randomUUID}=require('node:crypto');
 const {contextualMatch,parseDate,normalizeName,key,Fault}=require('./policy.cjs');
 const valid=(a,b)=>[a,b].every(v=>v!==null&&v!==undefined&&v!==''&&Number.isInteger(Number(v))&&Number(v)>=0);
-// Temporary test mode; published-week and authentication checks still apply.
-const USER_MANUAL_SCORE_TEST_MODE=false;
 const yes=v=>v===true||v===1||v==='1'||v==='true';
 const finalStatus=s=>/^(ft|aet|pen|finished|match finished|full time|full-time|after extra time|after penalties|bitti)$/i.test(s);
 const lockActive=(record,now)=>!!record?.owner&&now-Number(record.startedAt)<90000;
@@ -24,7 +22,7 @@ async function scoreScope(db,actor,payload){
 async function scoreSyncStatus(db,actor,payload={}, {now=Date.now()}={}){
   const {weekId}=await scoreScope(db,actor,payload);
   const record=(await db.ref(`serverPrivate/scoreSync/${weekId}`).get()).val()||{};
-  return {success:true,checked:false,failed:!lockActive(record,now)&&Number(record.lastFailureAt||0)>=Number(record.startedAt||0)&&Number(record.lastSuccessAt||0)<Number(record.startedAt||0),failureMessage:record.failureMessage||"",pending:lockActive(record,now),verifiedScores:record.verifiedScores||[],verifiedMatchIds:record.verifiedMatchIds||[],finishedAt:Number(record.lastSuccessAt||0),startedAt:Number(record.startedAt||0),retryAfterMs:Math.max(0,10*60000-(now-Number(record.lastSuccessAt||0)))};
+  return {success:true,checked:false,failed:!lockActive(record,now)&&Number(record.lastFailureAt||0)>=Number(record.startedAt||0)&&Number(record.lastSuccessAt||0)<Number(record.startedAt||0),failureMessage:record.failureMessage||"",pending:lockActive(record,now),verifiedScores:record.verifiedScores||[],verifiedMatchIds:record.verifiedMatchIds||[],finishedAt:Number(record.lastSuccessAt||0),startedAt:Number(record.startedAt||0),retryAfterMs:Math.max(0,Number(record.nextCheckAt||Number(record.lastSuccessAt||0)+10*60000)-now)};
 }
 // Only provider fields change. No user, prediction, identity, week or manual result writes.
 function scorePatch(match,event,now=Date.now()) {
@@ -46,31 +44,45 @@ function scorePatch(match,event,now=Date.now()) {
   const changed=Object.entries(patch).some(([key,value])=>(match[key]??null)!==value);
   return changed?patch:null;
 }
+// Automatic checks only cover unfinished matches that have reached kickoff.
+function automaticScorePlan(rows,now=Date.now()) {
+  const eligible=rows.filter(([,m])=>!yes(m.manualScoreLocked??m.manualScoreLock??m.manuelSkorKilitli)&&!yes(m.played??m.oynandiMi)&&!yes(m.postponed)&&!/postponed|cancelled|abandoned|suspended/i.test(String(m.statusText||'')));
+  const candidates=eligible.filter(([,m])=>{const at=parseDate(m.date||m.tarih);return !Number.isFinite(at)||at<=now;});
+  const future=eligible.map(([,m])=>parseDate(m.date||m.tarih)).filter(at=>at>now);
+  const recent=candidates.some(([,m])=>{const at=parseDate(m.date||m.tarih);return Number.isFinite(at)&&now-at<6*3600000;});
+  const interval=recent?10*60000:60*60000;
+  return {candidates,interval,nextKickoff:future.length?Math.min(...future):0};
+}
 async function syncScores(db,actor,payload={}, {fetchImpl=fetch,now=Date.now()}={}) {
   const {weekId,seasonId,settings,week}=await scoreScope(db,actor,payload);
-  const force=(actor.admin||USER_MANUAL_SCORE_TEST_MODE)&&payload.force===true;
-  const lock=db.ref(`serverPrivate/scoreSync/${weekId}`),owner=randomUUID();
-  const claim=await lock.transaction(old=>{
-    if(lockActive(old,now))return;
-    if(!force&&now-Number(old?.lastSuccessAt||0)<10*60000)return;
-    return {...old,owner,startedAt:now,lastAttemptAt:now,lastFailureAt:0,failureMessage:""};
-  });
-  if(!claim.committed){
-    const previous=claim.snapshot.val()||{};
-    if(lockActive(previous,now))return {success:true,checked:false,pending:true,startedAt:Number(previous.startedAt),finishedAt:Number(previous.lastSuccessAt||0)};
-    return {success:true,checked:false,finishedAt:Number(previous.lastSuccessAt||0),checkedCount:0,updatedCount:0,verifiedScores:previous.verifiedScores||[],verifiedMatchIds:previous.verifiedMatchIds||[],retryAfterMs:Math.max(0,10*60000-(now-Number(previous.lastSuccessAt||0)))};
-  }
-  let stage='MATCHES_READ';
-  const failuresDetail=[];
-  try{
+  if(payload.manual===true&&!actor.admin)throw new Fault(403,'Manuel API güncellemesi yalnızca yöneticiye açık.');
+  const force=actor.admin&&payload.force===true;
     const matches=(await db.ref('matches').get()).val()||{};
     const scopedMatches=Object.entries(matches).filter(([,row])=>{
       const match=contextualMatch(row,settings);
       return match.seasonId===seasonId&&match.weekId===weekId;
     });
     if(!scopedMatches.length)throw new Fault(409,'Seçili haftanın maçları ortak Firebase kaydında bulunamadı. Hafta kaydını kontrol edin.');
-    const candidates=scopedMatches.filter(([,row])=>!yes(row.manualScoreLocked ?? row.manualScoreLock ?? row.manuelSkorKilitli));
+    const plan=automaticScorePlan(scopedMatches,now);
+    const candidates=force?scopedMatches.filter(([,row])=>!yes(row.manualScoreLocked ?? row.manualScoreLock ?? row.manuelSkorKilitli)):plan.candidates;
     if(candidates.length>24)throw new Fault(400,'Hafta maç sayısı beklenen sınırı aşıyor.');
+    if(!force&&!candidates.length)return {success:true,checked:false,skipped:true,checkedCount:0,updatedCount:0,retryAfterMs:plan.nextKickoff?Math.max(0,plan.nextKickoff-now):0,message:plan.nextKickoff?'Maçlar henüz başlamadı; ortak skorlar gösteriliyor.':'Otomatik kontrol gerektiren başlamış maç yok; ortak skorlar gösteriliyor.'};
+  const lock=db.ref(`serverPrivate/scoreSync/${weekId}`),owner=randomUUID();
+  const claim=await lock.transaction(old=>{
+    if(lockActive(old,now))return;
+    if(now<Number(old?.failureRetryAt||0))return;
+    if(!force&&now<Number(old?.nextCheckAt||Number(old?.lastSuccessAt||0)+plan.interval))return;
+    return {...old,owner,startedAt:now,lastAttemptAt:now,lastFailureAt:0,failureMessage:""};
+  });
+  if(!claim.committed){
+    const previous=claim.snapshot.val()||{};
+    if(now<Number(previous.failureRetryAt||0))throw scoreFault('SYNC_RETRY_WAIT',previous.failureMessage||'Son kontrol başarısız. Yeniden deneme süresi bekleniyor.',503);
+    if(lockActive(previous,now))return {success:true,checked:false,pending:true,startedAt:Number(previous.startedAt),finishedAt:Number(previous.lastSuccessAt||0)};
+    return {success:true,checked:false,finishedAt:Number(previous.lastSuccessAt||0),checkedCount:0,updatedCount:0,verifiedScores:previous.verifiedScores||[],verifiedMatchIds:previous.verifiedMatchIds||[],retryAfterMs:Math.max(0,Number(previous.nextCheckAt||Number(previous.lastSuccessAt||0)+plan.interval)-now)};
+  }
+  let stage='MATCHES_READ';
+  const failuresDetail=[];
+  try{
     let updated=0,failures=0,checked=0;
     const providerErrors=[];
     const verifiedMatchIds=[],verifiedScores=[];
@@ -138,13 +150,13 @@ async function syncScores(db,actor,payload={}, {fetchImpl=fetch,now=Date.now()}=
     const finishedAt=Date.now();
     await db.ref('settings').update({resultsLastAutoSyncAt:finishedAt,manualScoreLastSuccessAt:finishedAt});
     stage='SYNC_COMPLETE';
-    await lock.transaction(old=>old?.owner===owner?{...old,owner:null,lastSuccessAt:finishedAt,verifiedMatchIds,verifiedScores,lastFailureAt:0,failureMessage:''}:undefined);
-    return {success:true,checked:true,updatedCount:updated,checkedCount:checked,verifiedMatchIds,verifiedScores,finishedAt,retryAfterMs:10*60000};
+    await lock.transaction(old=>old?.owner===owner?{...old,owner:null,lastSuccessAt:finishedAt,nextCheckAt:Math.min(finishedAt+plan.interval,plan.nextKickoff||Infinity),verifiedMatchIds,verifiedScores,lastFailureAt:0,failureRetryAt:0,failureMessage:''}:undefined);
+    return {success:true,checked:true,updatedCount:updated,checkedCount:checked,verifiedMatchIds,verifiedScores,finishedAt,retryAfterMs:Math.min(plan.interval,plan.nextKickoff?Math.max(0,plan.nextKickoff-finishedAt):plan.interval)};
   }catch(error){
     const failure=error instanceof Fault?error:scoreFault(stage,stage==='MATCHES_READ'?'Ortak maç listesi Firebase’den okunamadı.':stage==='SETTINGS_WRITE'?'Skorlar kontrol edildi fakat ortak güncelleme bilgisi kaydedilemedi.':'Skor kontrolünün ortak durum kaydı tamamlanamadı.');
     console.warn('SKORX_SCORE_SYNC_FAILURE',JSON.stringify({seasonId,weekId,stage:failure.publicCode||stage,message:failure.message,matchFailures:failuresDetail}));
-    try{await lock.transaction(old=>old?.owner===owner?{...old,owner:null,lastFailureAt:Date.now(),failureMessage:failure.message}:undefined);}catch{console.warn('SKORX_SCORE_SYNC_STATUS_WRITE_FAILED');}
+    try{await lock.transaction(old=>old?.owner===owner?{...old,owner:null,lastFailureAt:Date.now(),failureRetryAt:Date.now()+(failure.message.includes('API erişimi reddedildi')?10*60000:60000),failureMessage:failure.message}:undefined);}catch{console.warn('SKORX_SCORE_SYNC_STATUS_WRITE_FAILED');}
     throw failure;
   }
 }
-module.exports={scorePatch,syncScores,scoreSyncStatus};
+module.exports={scorePatch,syncScores,scoreSyncStatus,automaticScorePlan};
