@@ -162,7 +162,9 @@
     const tick=async()=>{
       if(!session || generation!==pollGeneration)return;
       try{
-        if(document.visibilityState!=='hidden'){
+        if(document.visibilityState!=='hidden' &&
+          !(typeof currentHydrationPromise!=='undefined' && currentHydrationPromise) &&
+          !(typeof firebaseRealtimeHydrationPromise!=='undefined' && firebaseRealtimeHydrationPromise)) {
           const revision=predictionSyncRevision;
           const data=await request('getPredictions'),serialized=predictionResponseFingerprint([...(data.predictions || []),...(data.submissions || [])]);
           if(generation!==pollGeneration)return;
@@ -171,7 +173,10 @@
             if(applied){previousPredictions=serialized;debounceFirebaseRealtimeRender();}
           }
         }
-      }catch(error){console.warn('Tahmin eşitlemesi bekliyor.');}
+      }catch(error){
+        // A stopped poll belongs to an old login and must stay silent.
+        if(session && generation===pollGeneration)console.warn('Tahmin eşitlemesi bekliyor.',error.message);
+      }
       if(session && generation===pollGeneration)pollTimer=setTimeout(tick,3000);
     };
     pollTimer=setTimeout(tick,3000);

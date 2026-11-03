@@ -766,6 +766,8 @@
               </div>
             </div>
 
+            <details class="prediction-log-filter-panel">
+              <summary>Filtreler <span>Hafta, maç, işlem ve tarih seç</span></summary>
             <div class="prediction-log-filters">
               <label>
                 Kullanıcı
@@ -805,6 +807,7 @@
                 Filtreleri Temizle
               </button>
             </div>
+            </details>
 
             <div class="prediction-log-table-wrap">
               <table class="prediction-log-table">
@@ -977,6 +980,19 @@
               >
             </div>
           </div>
+
+          <fieldset class="notification-workspace-nav">
+            <legend>Bildirim merkezi bölümleri</legend>
+            <label><input type="radio" name="notificationWorkspace" id="notificationViewCompose" checked /><span>✎ Bildirim Hazırla</span></label>
+            <label><input type="radio" name="notificationWorkspace" id="notificationViewHistory" /><span>◷ Gönderim Geçmişi</span></label>
+            <label><input type="radio" name="notificationWorkspace" id="notificationViewAudience" /><span>♙ Kullanıcı Durumları</span></label>
+            <label><input type="radio" name="notificationWorkspace" id="notificationViewSystem" /><span>⚙ Otomatik Bildirimler</span></label>
+          </fieldset>
+
+          <label class="notification-mobile-summary-toggle">
+            <input type="checkbox" id="notificationMobileSummaryOpen" />
+            <span>Gönderim özetleri <small>8 gösterge · aç / kapat</small></span>
+          </label>
 
           <section class="notification-status-grid">
             <article class="card notification-stat-card">
@@ -1550,7 +1566,7 @@
               <div class="form-grid">
                 <label class="toggle-row" for="welcomeEnabled">
                   <input type="checkbox" id="welcomeEnabled" />
-                  <span>Karşılama kartı Aç / Kapat</span>
+                  <span>Duyuru görselini kullan</span>
                 </label>
 
                 <div class="field">
@@ -1615,16 +1631,7 @@
                 <div class="status-note" id="welcomeSettingsStatus">Hazır.</div>
               </div>
 
-              <div class="welcome-admin-preview" id="welcomeAdminPreview">
-                <div class="small-meta">Kart önizlemesi</div>
-                <div class="welcome-admin-preview-box">
-                  <img id="welcomeAdminPreviewImage" alt="Karşılama görseli" />
-                  <h3 id="welcomeAdminPreviewTitle">Hoş geldin!</h3>
-                  <p id="welcomeAdminPreviewMessage">
-                    İyi haftalar, bol şans! ✨
-                  </p>
-                </div>
-              </div>
+              <div class="welcome-admin-preview" id="welcomeAdminPreview" aria-live="polite"></div>
             </div>
           </section>
         </section>
@@ -1800,7 +1807,7 @@
         <div class="welcome-card__shine" aria-hidden="true"></div>
 
         <div class="welcome-card__topline">
-          <span class="welcome-card__mini">2026 • 2027 SEZONU</span>
+          <span class="welcome-card__mini">SEZON ARENASI</span>
         </div>
 
         <div class="welcome-card__media hidden" id="welcomeMediaWrap">
@@ -1827,7 +1834,7 @@
           class="secondary welcome-card__close"
           id="welcomeCloseBtn"
         >
-          Arenaya Gir
+          Arenaya Gir →
         </button>
       </div>
     </div>

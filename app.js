@@ -1202,12 +1202,8 @@ function ensureFirebaseRealtimeBridge() {
     });
   });
 
-  if (!window.SkorxAuth.admin) {
-    db.ref("settings/resultsLastAutoSyncAt").on("value", (snapshot) => {
-      state.settings.resultsLastAutoSyncAt = Number(snapshot.val() || 0);
-      renderDashboardAutoSyncStatus();
-    }, (error) => console.warn("Son skor kontrol zamanı alınamadı:", error.message));
-  }
+  // User score-sync timestamps are already returned by the authenticated
+  // getSettings request in syncSeasonRegistryFromFirebase; no denied listener.
 
   db.ref("presence").on("value", (snapshot) => {
     firebasePresenceCache = snapshot.exists() ? snapshot.val() || {} : {};
@@ -4029,37 +4025,16 @@ function hideWelcomeOverlay(immediate = false) {
   }
 }
 
-function showWelcomeOverlay(user = getAuthUser(), options = {}) {
-  
-  let config = normalizeWelcomeCardSettings(
-    options.config || getWelcomeCardSettings(),
-  );
-  const customWelcomeEnabled = config.enabled || options.force;
-  if (!customWelcomeEnabled) {
-    config = {
-      ...config,
-      title: "",
-      message: "",
-      imageFile: "",
-      showOnce: false,
-      imageFit: "cover",
-    };
-  }
-  if (config.showOnce && !options.force) {
-    const seenKey = getWelcomeSeenKey(config);
-    if (localStorage.getItem(seenKey) === "1") return;
-    localStorage.setItem(seenKey, "1");
-  }
-
-  const overlay = document.getElementById("welcomeOverlay");
-  const avatar = document.getElementById("welcomeAvatar");
-  const title = document.getElementById("welcomeTitle");
-  const message = document.getElementById("welcomeMessage");
-  const mediaWrap = document.getElementById("welcomeMediaWrap");
-  const image = document.getElementById("welcomeImage");
-  const eyebrow = document.querySelector(".welcome-card__eyebrow");
-  const stats = document.querySelector(".welcome-card__stats");
-  if (!overlay || !avatar || !title || !message) return;
+function renderWelcomeCardContent(card, user, config, options = {}) {
+  if (!card) return;
+  const avatar = card.querySelector("#" + "welcomeAvatar");
+  const title = card.querySelector("#" + "welcomeTitle");
+  const message = card.querySelector("#" + "welcomeMessage");
+  const mediaWrap = card.querySelector("#" + "welcomeMediaWrap");
+  const image = card.querySelector("#" + "welcomeImage");
+  const eyebrow = card.querySelector(".welcome-card__eyebrow");
+  const stats = card.querySelector(".welcome-card__stats");
+  if (!avatar || !title || !message) return;
 
   const displayName = getWelcomeDisplayName(user) || "Hoş geldin";
   const shortName = displayName.split(/\s+/).filter(Boolean)[0] || displayName;
@@ -4073,7 +4048,7 @@ function showWelcomeOverlay(user = getAuthUser(), options = {}) {
   const selectedMessage =
     options.message ||
     config.message ||
-    welcomeLines[Math.floor(Math.random() * welcomeLines.length)];
+    "Arena seni bekliyor. Şimdi tahmin zamanı.";
 
   const welcomePlayer = getCurrentPlayer?.() || user || { name: shortName };
 
@@ -4144,6 +4119,34 @@ function showWelcomeOverlay(user = getAuthUser(), options = {}) {
   } else if (mediaWrap) {
     mediaWrap.classList.add("hidden");
   }
+
+}
+
+function showWelcomeOverlay(user = getAuthUser(), options = {}) {
+  
+  let config = normalizeWelcomeCardSettings(
+    options.config || getWelcomeCardSettings(),
+  );
+  const customWelcomeEnabled = config.enabled;
+  if (!customWelcomeEnabled) {
+    config = {
+      ...config,
+      title: "",
+      message: "",
+      imageFile: "",
+      showOnce: false,
+      imageFit: "cover",
+    };
+  }
+  if (config.showOnce && !options.force) {
+    const seenKey = getWelcomeSeenKey(config);
+    if (localStorage.getItem(seenKey) === "1") return;
+    localStorage.setItem(seenKey, "1");
+  }
+
+  const overlay = document.getElementById("welcomeOverlay");
+  if (!overlay) return;
+  renderWelcomeCardContent(document.getElementById("welcomeCard"), user, config, options);
 
   overlay.classList.remove("hidden");
   overlay.setAttribute("aria-hidden", "false");
@@ -5426,6 +5429,30 @@ function renderDashboardOverview() {
   }
 }
 
+// Yalnızca kartta gösterilen saat metni; maç durumunu veya skorları değiştirmez.
+function formatDashboardCardRemaining(diffMs) {
+  if (!Number.isFinite(diffMs)) return "Saat bekleniyor";
+  if (diffMs <= 0) return "Başlama saati geldi";
+  const minutes = Math.max(1, Math.ceil(diffMs / 60000));
+  if (minutes >= 1440) return `${Math.floor(minutes / 1440)} gün kaldı`;
+  if (minutes >= 60) return `${Math.floor(minutes / 60)} sa ${minutes % 60} dk kaldı`;
+  return `${minutes} dk kaldı`;
+}
+function getDashboardCardClockText(match, meta = getPremiumMatchState(match)) {
+  if (match.played || meta.phase === "played" || meta.phase === "played-postponed") return "Maç sonu";
+  if (meta.phase === "finished-time") return "Sonuç bekleniyor";
+  if (meta.phase === "live") return `Canlı · ${meta.kicker || ""}`;
+  if (meta.phase === "postponed") return "Ertelendi";
+  const runtime = getMatchRuntimeInfo(match, Date.now());
+  return formatDashboardCardRemaining(runtime.diffMs);
+}
+function getDashboardCardDateText(date) {
+  const time = new Date(date);
+  return Number.isNaN(time.getTime()) ? "Tarih bekleniyor" : time.toLocaleString("tr-TR", {
+    day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+  });
+}
+
 function renderDashboardMatchCards(container, matches) {
   if (!container) return;
   if (!matches.length) {
@@ -5565,8 +5592,9 @@ function renderDashboardMatchCards(container, matches) {
           return `
             <button
               type="button"
-              class="dashboard-avatar-chip ${tone}"
-              title="${escapeHtml(player.name)}"
+              class="dashboard-avatar-chip ${tone} ${hasSubmittedPrediction(match.id, player.id) ? "has-submitted" : "not-submitted"}"
+              title="${escapeHtml(player.name)} · ${hasSubmittedPrediction(match.id, player.id) ? "Tahmin girildi" : "Tahmin bekleniyor"}"
+              aria-label="${escapeHtml(player.name)} · ${hasSubmittedPrediction(match.id, player.id) ? "Tahmin girildi" : "Tahmin bekleniyor"}"
               onclick="event.stopPropagation(); handleDashboardAvatarTap(event, '${match.id}', '${player.id}');">
               ${createGenericAvatarMarkup(player, "dashboard-inline-avatar")}
             </button>
@@ -5576,7 +5604,7 @@ function renderDashboardMatchCards(container, matches) {
 
       return `
       <article
-      class="dashboard-match-card premium-match-card master-match-card is-${visual} ${coverageClass} ${match.played ? "is-played" : ""} ${visual === "postponed" ? "postponed-row" : ""} ${visual === "played-postponed" ? "rescheduled-played-row" : ""}"
+      class="dashboard-match-card premium-match-card master-match-card clean-overview-card is-${visual} ${coverageClass} ${match.played ? "is-played" : ""} ${visual === "postponed" ? "postponed-row" : ""} ${visual === "played-postponed" ? "rescheduled-played-row" : ""}"
       data-match-id="${match.id}"
       style="--match-stadium-bg:url('${getMatchSceneUrl(match.homeTeam, match.seasonId)}'), url('${MATCH_SCENE_DEFAULT}')">
           <div class="premium-stadium-bg" aria-hidden="true"></div>
@@ -5584,14 +5612,9 @@ function renderDashboardMatchCards(container, matches) {
           <div class="dashboard-match-card__glow"></div>
 
           <div class="premium-card-head dashboard-match-open-zone" onclick="openDashboardMatchModal('${match.id}')">
-            <span class="premium-status-chip">
-              <span class="premium-status-icon">${premium.icon}</span>
-              <strong>${escapeHtml(premium.label)}</strong>
-              <span>•</span>
-              <b>${premium.timeText}</b>
-            </span>
+            <span class="dashboard-card-date">${escapeHtml(getDashboardCardDateText(match.date))}</span>
             <span class="premium-countdown" data-countdown-role="match-clock">
-              <strong data-countdown-text>${escapeHtml(premium.kicker)}</strong>
+              <strong data-countdown-text>${escapeHtml(getDashboardCardClockText(match))}</strong>
             </span>
           </div>
 
@@ -5613,22 +5636,11 @@ function renderDashboardMatchCards(container, matches) {
             </div>
           </div>
 
-          <div class="premium-progress-line" aria-hidden="true">
-            <span style="width:${premium.progress}%"></span>
-          </div>
-
           <div class="dashboard-avatar-row premium-avatar-row">
             <div class="dashboard-avatar-row__chips">${avatars}</div>
           </div>
 
-          <div class="dashboard-match-card__footer premium-card-footer">
-            <div class="dashboard-match-meta-pills premium-meta-pills">
-              <span class="dashboard-meta-pill"><i>🎯</i><b>${filled.length}/${players.length}</b><em>tahmin</em></span>
-              <span class="dashboard-meta-pill"><i>👥</i><b>${missing}</b><em>eksik</em></span>
-              <span class="dashboard-meta-pill"><i>✅</i><b>${exact}</b><em>tam</em></span>
-              <span class="dashboard-meta-pill"><i>📍</i><b>${resultOnly}</b><em>yakın</em></span>
-            </div>
-          </div>
+          <div class="dashboard-participation-note">${filled.length}/${players.length} kişi tahmin yaptı</div>
         </article>
       `;
     })
@@ -7878,6 +7890,9 @@ function renderDashboardAutoSyncStatus(message = "", forcedTimestamp = null) {
     className = message.startsWith("⚠") ? "dashboard-inline-status is-idle" : "dashboard-inline-status is-success";
   }
 
+  if (getCurrentRole() !== "admin" && !isRunning && !message) {
+    text = `Son güncelleme: ${formatDashboardAutoSyncTime(lastSyncAt)}`;
+  }
   el.className = className;
   el.textContent = text;
 }
@@ -9337,7 +9352,10 @@ function getWeekStatusMeta(week) {
 function renderWeeks() {
   const seasonId = getActiveSeasonId();
   const container = document.getElementById("weeksList");
-  const weeks = getAllWeeksBySeasonId(seasonId);
+  // Yalnızca admin Haftalar ekranının görsel sıralaması.
+  const weeks = [...getAllWeeksBySeasonId(seasonId)].sort(
+    (a, b) => Number(b.number) - Number(a.number),
+  );
   if (!weeks.length)
     return (container.innerHTML = createEmptyState("Henüz hafta eklenmedi."));
 
@@ -12047,6 +12065,34 @@ function renderFocusedUserPredictions(container, matches) {
   bindPredictionActionElements(container);
 }
 
+// Yalnızca admin görünümüne ait geçici maç seçimi; veritabanına yazılmaz.
+let adminPredictionSelectedMatchId = null;
+
+// Açılan tahmin panelini, seçili kartın görsel satırının sonuna yerleştir.
+function placeAdminPredictionPanel() {
+  const grid = document.querySelector("#predictionsTable .admin-match-explorer");
+  if (!grid) return;
+  const panel = grid.querySelector(".admin-match-expanded");
+  if (!panel) return;
+  const cards = Array.from(grid.querySelectorAll(".admin-match-choice"));
+  const selectedIndex = cards.findIndex((card) => card.getAttribute("aria-expanded") === "true");
+  if (selectedIndex < 0) return;
+  // Grid'in gerçek sütun sayısını oku; ekran genişliğini ayrıca varsayma.
+  const tracks = getComputedStyle(grid).gridTemplateColumns.trim().split(/\s+/);
+  const columns = Math.max(1, tracks.length);
+  const rowEnd = Math.min(cards.length - 1, Math.floor(selectedIndex / columns) * columns + columns - 1);
+  const anchor = cards[rowEnd];
+  if (anchor.nextElementSibling !== panel) anchor.after(panel);
+}
+let adminPredictionPanelResizeFrame = null;
+window.addEventListener("resize", () => {
+  if (adminPredictionPanelResizeFrame !== null) cancelAnimationFrame(adminPredictionPanelResizeFrame);
+  adminPredictionPanelResizeFrame = requestAnimationFrame(() => {
+    adminPredictionPanelResizeFrame = null;
+    placeAdminPredictionPanel();
+  });
+});
+
 function renderPredictions() {
   const viewportSnapshot = capturePredictionViewport();
   const container = document.getElementById("predictionsTable");
@@ -12101,7 +12147,8 @@ function renderPredictions() {
     return;
   }
 
-  if (isMobileView()) {
+  const compactAdminView = !state.settings.predictionShareMode;
+  if (isMobileView() && !compactAdminView) {
     renderMobilePredictions(container, matches);
     hydrateTeamLogosIn(container);
     updatePredictionShareModeButton();
@@ -12124,7 +12171,10 @@ function renderPredictions() {
     })
     .join("");
 
-  const rows = matches
+  const selectedMatch = matches.find((match) => String(match.id) === String(adminPredictionSelectedMatchId)) || null;
+  const visibleMatches = compactAdminView ? (selectedMatch ? [selectedMatch] : []) : matches;
+
+  const rows = visibleMatches
     .map((match) => {
       const locked = isMatchLocked(match);
       const badge = getMatchBadge(match);
@@ -12176,6 +12226,7 @@ function renderPredictions() {
 
           return `
         <div class="prediction-cell prediction-pro-cell ${hasPrediction ? "filled-prediction" : "empty-prediction"} ${pointLabel(pred.points)} ${outcomeClass} ${locked || !canEdit ? "locked-cell" : ""}${ownClass}${showPointBadge ? " has-point-badge" : ""} ${!revealPrediction ? "prediction-secret-cell" : ""}">
+          ${compactAdminView ? `<div class="admin-prediction-player-name">${escapeHtml(player.name)}${player.id === currentPlayerId ? '<span class="own-pill">Sen</span>' : ""}</div>` : ""}
           ${showPointBadge && revealPrediction ? `<div class="points-badge-inline" style="background:${badgeBg};">${badgeText}</div>` : ""}
 
           ${
@@ -12260,11 +12311,40 @@ function renderPredictions() {
     })
     .join("");
 
-  container.innerHTML = `<div class="predictions-scroll-shell"><div class="excel-predictions" style="--player-count:${players.length};"><div class="prediction-grid-head"><div>Maç</div>${headerPlayers}</div><div class="prediction-grid-body">${rows}</div></div></div>`;
+  if (compactAdminView) {
+    const details = `<div class="predictions-scroll-shell admin-prediction-card-view"><div class="excel-predictions" style="--player-count:${players.length};"><div class="prediction-grid-body">${rows}</div></div></div>`;
+    container.innerHTML = `<div class="admin-match-explorer">${matches.map((match) => {
+      const expanded = selectedMatch && String(selectedMatch.id) === String(match.id);
+      const score = getMatchDisplayScore(match);
+      const badge = getMatchBadge(match);
+      const panelId = `adminPredPanel_${match.id}`;
+      return `<button type="button" class="admin-match-choice ${expanded ? 'is-open' : ''}" data-admin-pred-match="${escapeHtml(String(match.id))}" aria-expanded="${expanded ? 'true' : 'false'}" ${expanded ? `aria-controls="${escapeHtml(panelId)}"` : ''}>
+        <span class="admin-choice-meta"><span class="badge ${badge.cls}">${badge.text}</span><span>${formatDate(match.date)}</span></span>
+        <span class="admin-choice-fixture">
+          <span class="admin-choice-team">${teamLogoHtml(match.homeTeam, match.seasonId)}<strong>${escapeHtml(match.homeTeam)}</strong></span>
+          <span class="admin-choice-score">${score ? `${score.home} – ${score.away}` : 'VS'}</span>
+          <span class="admin-choice-team">${teamLogoHtml(match.awayTeam, match.seasonId)}<strong>${escapeHtml(match.awayTeam)}</strong></span>
+        </span>
+        <span class="admin-choice-footer">${players.length} kişi<span>${expanded ? 'Tahminleri kapat ▴' : 'Tahminleri gör ▾'}</span></span>
+      </button>${expanded ? `<section class="admin-match-expanded" id="${escapeHtml(panelId)}"><div class="admin-expanded-heading"><strong>${escapeHtml(match.homeTeam)} — ${escapeHtml(match.awayTeam)}</strong><span>Kişi · Tahmin · Kazanılan puan</span></div>${details}</section>` : ''}`;
+    }).join('')}</div>`;
+    container.querySelectorAll('[data-admin-pred-match]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const matchId = button.dataset.adminPredMatch;
+        adminPredictionSelectedMatchId = String(adminPredictionSelectedMatchId) === String(matchId) ? null : matchId;
+        renderPredictions();
+        Array.from(container.querySelectorAll('[data-admin-pred-match]')).find((item) => item.dataset.adminPredMatch === matchId)?.focus({preventScroll: true});
+      });
+    });
+  } else {
+    container.innerHTML = `<div class="predictions-scroll-shell"><div class="excel-predictions" style="--player-count:${players.length};"><div class="prediction-grid-head"><div>Maç</div>${headerPlayers}</div><div class="prediction-grid-body">${rows}</div></div></div>`;
+  }
 
+  if (compactAdminView) placeAdminPredictionPanel();
+  hydrateTeamLogosIn(container);
   updatePredictionShareModeButton();
   bindPredictionActionElements(container);
-  bindPredictionTableDesktopScroll();
+  if (!compactAdminView) bindPredictionTableDesktopScroll();
   schedulePredictionViewportRestore(viewportSnapshot);
 }
 
@@ -15395,7 +15475,22 @@ function renderCurrentTabOnly(
   }
 }
 
+// Background refreshes must not replace a score field under the user's keyboard.
+let predictionRenderRetryTimer = null;
+function isPredictionInputEditing() {
+  return !!document.activeElement?.matches?.('input[data-pred-role="input"]');
+}
 function renderAll() {
+  if (isAuthenticated() && isPredictionInputEditing()) {
+    clearTimeout(predictionRenderRetryTimer);
+    predictionRenderRetryTimer = setTimeout(() => {
+      predictionRenderRetryTimer = null;
+      renderAll();
+    }, 400);
+    return;
+  }
+  clearTimeout(predictionRenderRetryTimer);
+  predictionRenderRetryTimer = null;
   if (typeof persistCurrentViewportForActiveTab === "function") {
     persistCurrentViewportForActiveTab();
   }
@@ -15992,21 +16087,24 @@ function readWelcomeSettingsForm() {
 }
 
 function updateWelcomeSettingsPreview(config = readWelcomeSettingsForm()) {
-  const title = document.getElementById("welcomeAdminPreviewTitle");
-  const message = document.getElementById("welcomeAdminPreviewMessage");
-  const image = document.getElementById("welcomeAdminPreviewImage");
-  if (image) {
-    image.classList.toggle("is-contain", config.imageFit === "contain");
-    image.classList.toggle("is-cover", config.imageFit !== "contain");
-  }
-  if (title) title.textContent = config.title || "Hoş geldin!";
-  if (message)
-    message.textContent = config.message || "İyi haftalar, bol şans! ✨";
-  if (image) {
-    const src = getWelcomeImageSrc(config.imageFile);
-    image.src = src || "";
-    image.classList.toggle("hidden", !src);
-  }
+  const host = document.getElementById("welcomeAdminPreview");
+  const source = document.getElementById("welcomeCard");
+  if (!host || !source) return;
+  let presentation = normalizeWelcomeCardSettings(config);
+  if (!presentation.enabled) presentation = {
+    ...presentation, title: "", message: "", imageFile: "", showOnce: false, imageFit: "cover",
+  };
+  const card = source.cloneNode(true);
+  renderWelcomeCardContent(card, getAuthUser(), presentation);
+  card.querySelectorAll("[id]").forEach((node) => node.removeAttribute("id"));
+  card.removeAttribute("id");
+  const close = card.querySelector(".welcome-card__close");
+  if (close) { close.disabled = true; close.tabIndex = -1; }
+  const label = document.createElement("div");
+  label.className = "welcome-preview-caption";
+  label.textContent = presentation.enabled && presentation.imageFile
+    ? "Duyuru kartı · canlı önizleme" : "Kişisel karşılama · mevcut hesabınla önizleme";
+  host.replaceChildren(label, card);
 }
 
 function renderWelcomeSettingsPanel() {
@@ -18364,10 +18462,16 @@ let appLastResumeRefreshAt = 0;
 function logAppResumeRefresh(step, details = {}) {}
 
 async function runAppResumeRefresh(reason = "visible") {
-  if (!isAuthenticated()) {
+  if (!isAuthenticated() || !window.SkorxAuth?.ready) {
     logAppResumeRefresh("skip:not-authenticated", { reason });
     return false;
   }
+
+  // Login owns the initial complete load. Focus from the login popup must
+  // not launch another load before that session is ready.
+  if (appBootstrapInProgress || appBootLoading || currentHydrationPromise ||
+      firebaseRealtimeHydrationPromise || isPredictionInputEditing()) return false;
+  if (reason === "focus" && !appWasHiddenAt) return false;
 
   if (appResumeRefreshPromise) {
     logAppResumeRefresh("skip:already-running", { reason });
@@ -18380,7 +18484,7 @@ async function runAppResumeRefresh(reason = "visible") {
     ? now - appLastResumeRefreshAt
     : 0;
 
-  if (sinceLastResumeMs && sinceLastResumeMs < 1500) {
+  if (appLastResumeRefreshAt && sinceLastResumeMs < 15000) {
     logAppResumeRefresh("skip:cooldown", {
       reason,
       sinceLastResumeMs,
@@ -18388,6 +18492,7 @@ async function runAppResumeRefresh(reason = "visible") {
     return false;
   }
 
+  const resumeOwner = window.SkorxAuth.session;
   appResumeRefreshPromise = (async () => {
     logAppResumeRefresh("start", { reason, hiddenForMs });
 
@@ -18423,6 +18528,7 @@ async function runAppResumeRefresh(reason = "visible") {
         });
       }
 
+      if (resumeOwner !== window.SkorxAuth.session || !isAuthenticated()) return false;
       clearTimeout(firebaseRealtimeRenderTimer);
       logAppResumeRefresh("renderAll:done", {
         currentTab: state.settings?.currentTab || "dashboard",
@@ -18442,6 +18548,7 @@ async function runAppResumeRefresh(reason = "visible") {
         });
       }
 
+      if (resumeOwner !== window.SkorxAuth.session || !isAuthenticated()) return false;
       renderAll();
       logAppResumeRefresh("renderAll:after-sync");
       if (typeof scheduleTabViewportRestore === "function") {
@@ -18768,7 +18875,9 @@ function startDashboardClockRefresh() {
           );
 
           if (countdownEl) {
-            countdownEl.textContent = premium.kicker || "";
+            countdownEl.textContent = card.classList.contains("clean-overview-card")
+              ? getDashboardCardClockText(match, premium)
+              : premium.kicker || "";
           }
 
           const oldPhase = dashboardClockLastPhaseMap.get(matchId);
@@ -20752,48 +20861,48 @@ function getPredictionLogCurrentPlayerId() {
 function canSeePredictionLogItem(item) {
   if (getCurrentRole() === "admin") return true;
   const currentPlayerId = getPredictionLogCurrentPlayerId();
-  if (!currentPlayerId) return false;
-  return (
-    String(item.targetPlayerId || "") === currentPlayerId ||
-    String(item.actorId || "") === currentPlayerId
-  );
+  return !!currentPlayerId && String(item.targetPlayerId || item.playerId || "") === currentPlayerId;
+}
+
+function getPredictionLogSessionKey() {
+  return `${window.SkorxAuth?.session?.user?.authUid || ""}|${getPredictionLogCurrentPlayerId()}|${getCurrentRole()}`;
 }
 
 async function fetchPredictionLogs(force = false) {
-  if (predictionLogState.loading) return predictionLogState.logs;
-  if (predictionLogState.loadedOnce && !force) return predictionLogState.logs;
-
-  predictionLogState.loading = true;
-  try {
-    let raw = {};
-    try {
-      raw = (await firebaseRead("predictionLogs")) || {};
-    } catch (primaryError) {
-      console.warn(
-        "predictionLogs yolu okunamadı, settings/auditLogs deneniyor:",
-        primaryError,
-      );
-    }
-
-    let fallbackRaw = {};
-    try {
-      fallbackRaw = (await firebaseRead("settings/auditLogs")) || {};
-    } catch (fallbackError) {
-      console.warn("settings/auditLogs yolu okunamadı:", fallbackError);
-    }
-
-    predictionLogState.logs = Object.entries({ ...fallbackRaw, ...raw })
-      .map(([id, item]) => ({ id, ...(item || {}) }))
-      .filter(canSeePredictionLogItem)
-      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-    predictionLogState.loadedOnce = true;
-  } catch (error) {
-    console.warn("Tahmin logları yüklenemedi:", error);
-    predictionLogState.logs = [];
-  } finally {
-    predictionLogState.loading = false;
+  const owner = getPredictionLogSessionKey();
+  const session = window.SkorxAuth?.session;
+  if (predictionLogState.owner !== owner || predictionLogState.session !== session) {
+    Object.assign(predictionLogState, {owner, session, logs: [], filtered: [], loadedOnce: false, loading: false, error: "", page: 1, pending: null});
   }
-  return predictionLogState.logs;
+  if (predictionLogState.loading) return predictionLogState.pending;
+  if (predictionLogState.loadedOnce && !force) return predictionLogState.logs;
+  const token = {};
+  predictionLogState.requestToken = token;
+  predictionLogState.loading = true;
+  predictionLogState.error = "";
+  const stillCurrent = () => predictionLogState.requestToken === token && getPredictionLogSessionKey() === owner && window.SkorxAuth?.session === session;
+  predictionLogState.pending = (async () => {
+    try {
+      if (!window.SkorxAuth?.request) throw new Error("Oturum bağlantısı hazır değil.");
+      const result = await window.SkorxAuth.request("getPredictionLogs");
+      if (!result.success || !Array.isArray(result.logs)) throw new Error("Log yanıtı geçersiz.");
+      if (!stillCurrent()) return [];
+      predictionLogState.logs = result.logs.filter(canSeePredictionLogItem)
+        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      predictionLogState.loadedOnce = true;
+      return predictionLogState.logs;
+    } catch (error) {
+      if (!stillCurrent()) return [];
+      console.warn("Tahmin logları yüklenemedi:", error);
+      predictionLogState.error = "Loglar yüklenemedi. Yenile düğmesiyle tekrar deneyin.";
+      predictionLogState.loadedOnce = false;
+      predictionLogState.logs = [];
+      return [];
+    } finally {
+      if (stillCurrent()) { predictionLogState.loading = false; predictionLogState.pending = null; }
+    }
+  })();
+  return predictionLogState.pending;
 }
 
 function fillPredictionLogFilters() {
@@ -21085,7 +21194,21 @@ async function renderPredictionLogs(options = {}) {
   if (body && !predictionLogState.loadedOnce) {
     body.innerHTML = `<tr><td colspan="7">Log kayıtları yükleniyor...</td></tr>`;
   }
+  const owner = getPredictionLogSessionKey();
+  const session = window.SkorxAuth?.session;
   await fetchPredictionLogs(options.force === true);
+  if (owner !== getPredictionLogSessionKey() || session !== window.SkorxAuth?.session) return;
+  if (predictionLogState.error) {
+    if (body) body.innerHTML = '<tr><td colspan="7">Loglar yüklenemedi. Yenile düğmesiyle tekrar deneyin.</td></tr>';
+    const mobile = document.getElementById("predictionLogMobileList");
+    if (mobile) mobile.textContent = predictionLogState.error;
+    for (const id of ["predictionLogTotalCount", "predictionLogAdminCount", "predictionLogLastAction", "predictionLogLastDate", "predictionLogPageInfo"]) {
+      const el = document.getElementById(id); if (el) el.textContent = "—";
+    }
+    const pagination = document.getElementById("predictionLogPagination");
+    if (pagination) pagination.replaceChildren();
+    return;
+  }
   fillPredictionLogFilters();
   applyPredictionLogFilters();
   renderPredictionLogStats();

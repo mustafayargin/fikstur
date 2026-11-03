@@ -19,6 +19,7 @@ async function execute({auth,db},actor,action,payload={}) {
   if (action === 'sportsDbData') return require('./sportsdb.cjs').sportsDbData(actor,payload,{db});
   if (action === 'syncScores') return require('./scores.cjs').syncScores(db,actor,payload);
   if (action === 'scoreSyncStatus') return require('./scores.cjs').scoreSyncStatus(db,actor,payload);
+  if (action === 'getPredictionLogs') return require('./prediction-logs.cjs').getPredictionLogs(db,actor);
   if (action === 'getSettings') {
     const settings = p.clean(await read(db,'settings') || {});
     for (const key of ['dataManagementTrash','auditLogs','connectionTest']) delete settings[key];
