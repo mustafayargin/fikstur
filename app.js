@@ -10269,7 +10269,7 @@ function updatePredictionShareModeButton() {
     saveState();
   }
   const active = allowed && isPredictionShareMode();
-  btn.innerHTML = '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m-4 4 4-4 4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>';
+  if (!btn.querySelector('svg')) btn.innerHTML = '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m-4 4 4-4 4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>';
   btn.setAttribute("aria-label", active ? "Paylaşım araçlarını kapat" : "Paylaşım araçlarını aç");
   btn.title = active ? "Paylaşımı kapat" : "Paylaşım";
   btn.setAttribute("aria-expanded", String(active));
@@ -17918,7 +17918,11 @@ function bindEvents() {
   state.settings.predictionShareMode = false;
   updatePredictionShareModeButton();
   document.addEventListener("click", (event) => {
-    if (!event.target.closest?.("#toggleShareModeBtn, #predictionShareToolbar")) closePredictionShareTools();
+    // Use the original event path: updating controls can detach the clicked SVG.
+    const insideShareTools = event.composedPath().some(node =>
+      node?.id === "toggleShareModeBtn" || node?.id === "predictionShareToolbar"
+    );
+    if (!insideShareTools) closePredictionShareTools();
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closePredictionShareTools({ restoreFocus: true });
