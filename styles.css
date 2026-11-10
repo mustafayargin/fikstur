@@ -24187,3 +24187,62 @@ body:has(#tab-dashboard.active) .desktop-topbar__spacer::after { display: none !
   }
   #tab-logs .prediction-log-mobile-actor strong { margin-left: auto; }
 }
+
+/* Compact prediction share controls: one fixed, readable layout. */
+#tab-predictions .share-toolbar-simple:not(.hidden) {
+  display: flex; flex-flow: row wrap; align-items: center; gap: 10px;
+  padding: 10px 12px; margin: 0 0 12px; border-radius: 12px;
+  background: #101d2e; box-shadow: none;
+}
+#tab-predictions .share-toolbar-simple .share-toolbar-group { gap: 10px; }
+#tab-predictions .share-toolbar-simple .share-segmented { display: flex; gap: 3px; padding: 3px; border-radius: 9px; }
+#tab-predictions .share-toolbar-simple .share-segment-btn { min-height: 36px; padding: 7px 12px; font-size: 12px; border-radius: 7px; }
+#tab-predictions .share-toolbar-simple .share-download-btn { min-height: 38px; font-size: 12px; margin-left: auto; }
+@media (max-width: 760px) {
+  body[data-role="admin"] #tab-predictions .page-header { display: flex; flex-direction: column; align-items: stretch; gap: 10px; margin-bottom: 12px; }
+  body[data-role="admin"] #tab-predictions .prediction-header-actions { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 8px; width: 100%; }
+  body[data-role="admin"] #tab-predictions .prediction-header-actions .double-selects { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 6px; min-width: 0; }
+  body[data-role="admin"] #tab-predictions .prediction-header-actions select { width: 100%; min-width: 0; max-width: 100%; min-height: 40px; padding: 7px 5px; font-size: 12px; }
+  body[data-role="admin"] #tab-predictions #toggleShareModeBtn { width: auto; min-width: 0; min-height: 40px; padding: 8px 10px; font-size: 11px; white-space: nowrap; }
+  body[data-role="admin"] #tab-predictions .share-toolbar-simple:not(.hidden) { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; padding: 8px; }
+  body[data-role="admin"] #tab-predictions .share-toolbar-simple .share-toolbar-group { display: block; width: auto; min-width: 0; }
+  body[data-role="admin"] #tab-predictions .share-toolbar-simple .share-toolbar-label { display: none; }
+  body[data-role="admin"] #tab-predictions .share-toolbar-simple .share-segmented { width: 100%; min-width: 0; }
+  body[data-role="admin"] #tab-predictions .share-toolbar-simple .share-segment-btn { width: auto; flex: 1; min-width: 0; min-height: 38px; font-size: 11px; padding: 6px; }
+  body[data-role="admin"] #tab-predictions .share-toolbar-simple .share-download-btn { width: auto; margin: 0; min-height: 44px; padding: 8px 10px; font-size: 11px; }
+}
+
+/* Prediction header: compact actions and a dismissible floating share panel. */
+#tab-predictions .prediction-topbar { position: relative; z-index: 12; margin-bottom: 12px; }
+#tab-predictions .prediction-topbar > .page-header { margin-bottom: 0; }
+#tab-predictions .prediction-header-actions { display: flex; align-items: center; gap: 7px; }
+#tab-predictions #toggleShareModeBtn,
+#tab-predictions .prediction-header-actions [data-role="global-sync-btn"] {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px !important; height: 40px !important; min-width: 40px !important; min-height: 40px !important;
+  max-width: 40px !important; padding: 0 !important; flex: 0 0 40px;
+  border: 1px solid rgba(148,163,184,.2); border-radius: 11px;
+  background: #15273a; color: #c8deee; font-size: 19px;
+}
+#tab-predictions #toggleShareModeBtn.hidden { display: none !important; }
+#tab-predictions #toggleShareModeBtn.is-active { background: #16465a; border-color: #3b9fbd; color: #a5efff; }
+#tab-predictions .prediction-topbar #predictionShareToolbar:not(.hidden) {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 30;
+  width: min(360px,100%); box-sizing: border-box; margin: 0;
+  box-shadow: 0 16px 40px rgba(0,0,0,.45); border: 1px solid #355069;
+  background: #102033; padding: 10px; border-radius: 14px;
+}
+#tab-predictions #toggleShareModeBtn:focus-visible,
+#tab-predictions .prediction-header-actions [data-role="global-sync-btn"]:focus-visible { outline: 2px solid #67d9fa; outline-offset: 3px; }
+@media (max-width: 760px) {
+  body[data-role="admin"] #tab-predictions .prediction-header-actions {
+    display: grid !important; grid-template-columns: minmax(0,1fr) 40px 40px !important;
+    gap: 6px !important; width: 100%;
+  }
+  body[data-role="admin"] #tab-predictions .prediction-header-actions .double-selects {
+    display: grid !important; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 6px; min-width: 0;
+  }
+  body[data-role="admin"] #tab-predictions .prediction-header-actions select { font-size: 11px; border-radius: 10px; padding-left: 6px; }
+  body[data-role="admin"] #tab-predictions .prediction-header-actions [data-role="global-sync-btn"] { grid-column: 3; grid-row: 1; }
+  body[data-role="admin"] #tab-predictions #toggleShareModeBtn { grid-column: 2; grid-row: 1; }
+}

@@ -622,6 +622,7 @@
       >
       </button>
         <section class="tab-panel" id="tab-predictions">
+          <div class="prediction-topbar">
           <div class="page-header">
             <div>
               <h2>Tahminler</h2>
@@ -636,19 +637,23 @@
                 id="toggleShareModeBtn"
                 type="button"
                 class="secondary share-mode-btn"
+                aria-label="Paylaşım araçlarını aç"
+                aria-expanded="false"
+                aria-controls="predictionShareToolbar"
+                title="Paylaşım"
               >
-                Paylaşım Modu: Kapalı
+                ↗
               </button>
             </div>
           </div>
 
           <div
             id="predictionShareToolbar"
-            class="share-toolbar hidden"
+            class="share-toolbar share-toolbar-simple hidden"
             aria-hidden="true"
           >
             <div class="share-toolbar-group">
-              <span class="share-toolbar-label">Görünüm</span>
+              <span class="share-toolbar-label">Görsel içeriği</span>
               <div
                 class="share-segmented"
                 role="group"
@@ -659,25 +664,17 @@
                   type="button"
                   class="share-segment-btn is-active"
                 >
-                  Maç Öncesi
+                  Tahminler
                 </button>
                 <button
                   id="shareViewPostBtn"
                   type="button"
                   class="share-segment-btn"
                 >
-                  Maç Sonrası
+                  Sonuçlar
                 </button>
               </div>
             </div>
-            <label class="share-toggle-inline" for="shareCompactToggle">
-              <input id="shareCompactToggle" type="checkbox" checked />
-              <span>Sıkı görünüm</span>
-            </label>
-            <label class="share-toggle-inline" for="shareHideEmptyToggle">
-              <input id="shareHideEmptyToggle" type="checkbox" />
-              <span>Boşları soluk göster</span>
-            </label>
             <button
               id="downloadShareImageBtn"
               type="button"
@@ -685,6 +682,8 @@
             >
               Görsel İndir
             </button>
+          </div>
+
           </div>
 
           <div class="card">

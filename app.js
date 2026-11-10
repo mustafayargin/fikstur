@@ -10236,11 +10236,12 @@ function getPredictionShareView() {
 }
 
 function isPredictionShareCompact() {
-  return state.settings.predictionShareCompact !== false;
+  // One consistent share layout; the retired controls no longer affect it.
+  return true;
 }
 
 function isPredictionShareFadeEmpty() {
-  return !!state.settings.predictionShareFadeEmpty;
+  return false;
 }
 
 function togglePredictionShareMode() {
@@ -10251,18 +10252,6 @@ function togglePredictionShareMode() {
 
 function setPredictionShareView(view) {
   state.settings.predictionShareView = view === "post" ? "post" : "pre";
-  saveState();
-  updatePredictionShareModeButton();
-}
-
-function setPredictionShareCompact(enabled) {
-  state.settings.predictionShareCompact = !!enabled;
-  saveState();
-  updatePredictionShareModeButton();
-}
-
-function setPredictionShareFadeEmpty(enabled) {
-  state.settings.predictionShareFadeEmpty = !!enabled;
   saveState();
   updatePredictionShareModeButton();
 }
@@ -10280,10 +10269,11 @@ function updatePredictionShareModeButton() {
     saveState();
   }
   const active = allowed && isPredictionShareMode();
-  const mobileAdminTools = isMobileView() && getCurrentRole() === "admin";
-  btn.textContent = mobileAdminTools
-    ? `Paylaşım Araçları: ${active ? "Açık" : "Kapalı"}`
-    : `Paylaşım Modu: ${active ? "Açık" : "Kapalı"}`;
+  btn.innerHTML = '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m-4 4 4-4 4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>';
+  btn.setAttribute("aria-label", active ? "Paylaşım araçlarını kapat" : "Paylaşım araçlarını aç");
+  btn.title = active ? "Paylaşımı kapat" : "Paylaşım";
+  btn.setAttribute("aria-expanded", String(active));
+  btn.setAttribute("aria-controls", "predictionShareToolbar");
   btn.classList.toggle("is-active", active);
   btn.classList.toggle("hidden", !allowed);
   btn.setAttribute("aria-hidden", allowed ? "false" : "true");
@@ -10296,13 +10286,11 @@ function updatePredictionShareModeButton() {
 
   const preBtn = document.getElementById("shareViewPreBtn");
   const postBtn = document.getElementById("shareViewPostBtn");
-  const compactToggle = document.getElementById("shareCompactToggle");
-  const fadeEmptyToggle = document.getElementById("shareHideEmptyToggle");
   const view = getPredictionShareView();
   if (preBtn) preBtn.classList.toggle("is-active", view === "pre");
   if (postBtn) postBtn.classList.toggle("is-active", view === "post");
-  if (compactToggle) compactToggle.checked = isPredictionShareCompact();
-  if (fadeEmptyToggle) fadeEmptyToggle.checked = isPredictionShareFadeEmpty();
+  preBtn?.setAttribute("aria-pressed", String(view === "pre"));
+  postBtn?.setAttribute("aria-pressed", String(view === "post"));
 }
 
 function getPredictionDisplayValue(pred) {
@@ -17917,7 +17905,24 @@ function updateAdminSyncToggleButton() {
   applyDashboardCollapseStates();
 }
 
+function closePredictionShareTools({ restoreFocus = false } = {}) {
+  if (!isPredictionShareMode()) return;
+  state.settings.predictionShareMode = false;
+  saveState();
+  updatePredictionShareModeButton();
+  if (restoreFocus) document.getElementById("toggleShareModeBtn")?.focus();
+}
+
 function bindEvents() {
+  // Opening share tools is transient; do not restore an open panel after reload.
+  state.settings.predictionShareMode = false;
+  updatePredictionShareModeButton();
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest?.("#toggleShareModeBtn, #predictionShareToolbar")) closePredictionShareTools();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closePredictionShareTools({ restoreFocus: true });
+  });
   on("appModal", "click", (e) => {
     if (e.target.id === "appModal") resolveAppModal(false);
   });
@@ -18145,12 +18150,6 @@ function bindEvents() {
   });
   on("shareViewPreBtn", "click", () => setPredictionShareView("pre"));
   on("shareViewPostBtn", "click", () => setPredictionShareView("post"));
-  on("shareCompactToggle", "change", (event) =>
-    setPredictionShareCompact(event.target.checked),
-  );
-  on("shareHideEmptyToggle", "change", (event) =>
-    setPredictionShareFadeEmpty(event.target.checked),
-  );
   on("downloadShareImageBtn", "click", exportPredictionShareImage);
   on("closeChampionModalBtn", "click", () =>
     document.getElementById("championModal")?.classList.add("hidden"),
